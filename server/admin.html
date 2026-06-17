@@ -11,27 +11,28 @@
     <div id="app" class="max-w-5xl mx-auto">
         <header class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
             <h1 class="text-2xl font-bold flex items-center gap-2">⚙️ 探针中枢管理台</h1>
-            <button @click="saveConfig" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition">
-                💾 保存并动态下发配置
-            </button>
+            <button @click="saveConfig" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition">💾 保存并动态下发配置</button>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-indigo-400">🖥️ 被控节点 (小鸡) 管理</h2>
-                    <button @click="addNode" class="bg-green-600/20 text-green-400 px-3 py-1 rounded hover:bg-green-600/40 text-sm transition">+ 新增节点</button>
+                    <button @click="addNode" class="bg-indigo-600/20 text-indigo-400 px-3 py-1 rounded hover:bg-indigo-600/40 text-sm transition">+ 新增节点</button>
                 </div>
                 <div class="space-y-4">
                     <div v-for="(node, index) in config.nodes" :key="index" class="bg-gray-900 p-4 rounded-lg border border-gray-700 relative group">
-                        <button @click="removeNode(index)" class="absolute top-2 right-2 text-red-500 opacity-50 hover:opacity-100 text-sm">✖ 删除</button>
-                        <div class="grid grid-cols-2 gap-3 mb-2 mt-2">
-                            <div><label class="text-xs text-gray-500">节点 ID (英文)</label><input v-model="node.id" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"></div>
-                            <div><label class="text-xs text-gray-500">显示名称</label><input v-model="node.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"></div>
+                        <div class="absolute top-2 right-2 flex gap-2">
+                            <button @click="showDeployModal(node)" class="bg-green-600/20 text-green-400 px-2 py-1 rounded text-xs hover:bg-green-600/40 transition">🚀 一键部署</button>
+                            <button @click="removeNode(index)" class="text-red-500 opacity-50 hover:opacity-100 text-xs px-1">✖</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 mb-2 mt-4">
+                            <div><label class="text-xs text-gray-500">节点 ID</label><input v-model="node.id" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
+                            <div><label class="text-xs text-gray-500">显示名称</label><input v-model="node.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
-                            <div><label class="text-xs text-gray-500">通信 Token (密钥)</label><input v-model="node.token" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"></div>
-                            <div><label class="text-xs text-gray-500">到期时间 (如 2027/01/01)</label><input v-model="node.expire_date" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"></div>
+                            <div><label class="text-xs text-gray-500">通信 Token</label><input v-model="node.token" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
+                            <div><label class="text-xs text-gray-500">到期时间</label><input v-model="node.expire_date" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
                         </div>
                     </div>
                 </div>
@@ -44,36 +45,68 @@
                 </div>
                 <div class="space-y-4">
                     <div v-for="(task, index) in config.ping_tasks" :key="index" class="bg-gray-900 p-4 rounded-lg border border-gray-700 flex items-center gap-3">
-                        <div class="flex-1"><label class="text-xs text-gray-500">目标名称</label><input v-model="task.name" placeholder="如: 广东移动" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-green-500"></div>
-                        <div class="flex-1"><label class="text-xs text-gray-500">IP 或 域名</label><input v-model="task.host" placeholder="如: 120.196.x.x" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-green-500"></div>
+                        <div class="flex-1"><label class="text-xs text-gray-500">目标名称</label><input v-model="task.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-green-500 outline-none"></div>
+                        <div class="flex-1"><label class="text-xs text-gray-500">IP或域名</label><input v-model="task.host" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-green-500 outline-none"></div>
                         <button @click="removeTask(index)" class="mt-4 text-red-500 hover:text-red-400">✖</button>
                     </div>
                 </div>
-                <div class="mt-4 text-xs text-gray-500">提示：修改目标后保存，所有在线小鸡会自动接管新任务，无需重启。</div>
+            </div>
+        </div>
+
+        <!-- 部署命令弹窗 -->
+        <div v-if="deployModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="deployModal = false">
+            <div class="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-2xl mx-4 shadow-2xl overflow-hidden">
+                <div class="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-200">一键部署指令 - <span class="text-indigo-400">{{ activeNode.name }}</span></h3>
+                    <button @click="deployModal = false" class="text-gray-400 hover:text-white">✖</button>
+                </div>
+                <div class="p-6">
+                    <p class="text-sm text-gray-400 mb-4">请登录到您的被控端终端，复制并运行以下命令：</p>
+                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 font-mono text-sm text-green-400 break-all mb-4 relative">
+                        {{ deployCommand }}
+                    </div>
+                    <button @click="copyCommand" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg shadow transition">
+                        {{ copyText }}
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        const { createApp, ref, onMounted } = Vue;
+        const { createApp, ref, onMounted, computed } = Vue;
         createApp({
             setup() {
                 const config = ref({ nodes: [], ping_tasks: [] });
+                const deployModal = ref(false);
+                const activeNode = ref({});
+                const copyText = ref("🔗 复制一键部署命令");
 
-                const loadConfig = async () => {
-                    const res = await fetch('/api/admin/config');
-                    if (res.ok) config.value = await res.json();
-                    else alert("配置拉取失败，请检查登录状态！");
+                const loadConfig = async () => { const res = await fetch('/api/admin/config'); if (res.ok) config.value = await res.json(); };
+                const saveConfig = async () => {
+                    const res = await fetch('/api/admin/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
+                    if (res.ok) alert("✅ 保存成功！");
                 };
 
-                const saveConfig = async () => {
-                    const res = await fetch('/api/admin/config', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(config.value)
-                    });
-                    if (res.ok) alert("✅ 保存成功！配置已自动下发至所有在线节点。");
-                    else alert("❌ 保存失败！");
+                const showDeployModal = (node) => { activeNode.value = node; copyText.value = "🔗 复制一键部署命令"; deployModal.value = true; };
+                const deployCommand = computed(() => { const host = window.location.host; return `curl -sL http://${host}/install.sh | bash -s -- -s ${host} -t ${activeNode.value.token}`; });
+
+                const copyCommand = () => {
+                    const text = deployCommand.value;
+                    // 彻底兼容 HTTP 网址的复制策略
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(text);
+                    } else {
+                        const textArea = document.createElement("textarea");
+                        textArea.value = text;
+                        textArea.style.position = "fixed"; textArea.style.opacity = "0";
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand("copy");
+                        textArea.remove();
+                    }
+                    copyText.value = "✅ 复制成功！快去终端粘贴吧";
+                    setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000);
                 };
 
                 const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date: "2027/01/01" });
@@ -82,7 +115,7 @@
                 const removeTask = (idx) => config.value.ping_tasks.splice(idx, 1);
 
                 onMounted(loadConfig);
-                return { config, addNode, removeNode, addTask, removeTask, saveConfig };
+                return { config, deployModal, activeNode, copyText, deployCommand, showDeployModal, copyCommand, addNode, removeNode, addTask, removeTask, saveConfig };
             }
         }).mount('#app');
     </script>
