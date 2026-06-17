@@ -4,7 +4,6 @@ type PingTask struct { Name string `json:"name"`; Host string `json:"host"` }
 type NodeConfig struct { ID string `json:"id"`; Name string `json:"name"`; Token string `json:"token"`; ExpireDate string `json:"expire_date"`; Region string `json:"region"` }
 type AppConfig struct { SiteName string `json:"site_name"`; AdminUser string `json:"admin_user"`; AdminPass string `json:"admin_pass"`; Nodes []NodeConfig `json:"nodes"`; PingTasks []PingTask `json:"ping_tasks"` }
 type AgentInstruction struct { ServerName string `json:"server_name"`; PingTasks []PingTask `json:"ping_tasks"` }
-type PingResult struct { TargetName string `json:"target_name"`; CurrentDelay float64 `json:"current_delay"`; LossRate float64 `json:"loss_rate"`; History []int `json:"history"` }
 type ServerStatus struct {
 ServerID string `json:"server_id"`
 IsOnline bool `json:"is_online"`
