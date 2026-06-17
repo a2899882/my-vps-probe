@@ -26,7 +26,7 @@ if [ -d "/root/my-vps-probe" ]; then
 fi
 
 # 提示输入 GitHub 仓库地址进行拉取
-read -p "请输入您的 GitHub 仓库 HTTPS 克隆地址 (例如 https://github.com/a2899882/my-vps-probe.git): " repo_url
+repo_url="https://github.com/a2899882/my-vps-probe.git"
 git clone "$repo_url" /root/my-vps-probe
 cd /root/my-vps-probe
 go mod tidy > /dev/null 2>&1
