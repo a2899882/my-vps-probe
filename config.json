@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    {
+      "id": "node-1",
+      "name": "主控测试机",
+      "token": "my_secret_token_123",
+      "expire_date": "2027/05/13"
+    }
+  ],
+  "ping_tasks": [
+    {
+      "name": "Cloudflare",
+      "host": "1.1.1.1"
+    },
+    {
+      "name": "Google",
+      "host": "8.8.8.8"
+    }
+  ]
+}

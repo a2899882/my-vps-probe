@@ -1,79 +1,127 @@
 package main
 
 import (
+"database/sql"
 "encoding/json"
 "fmt"
 "log"
 "net/http"
+"os"
 "sync"
+"time"
 
 "my-vps-probe/common"
 
 "github.com/gorilla/websocket"
+_ "modernc.org/sqlite"
 )
 
-// serverStatusMap 在内存中存储所有小鸡的最新状态
-// mapMutex 用于防止并发读写冲突
 var (
 serverStatusMap = make(map[string]common.ServerStatus)
+appConfig       common.AppConfig
+configMutex     sync.RWMutex
 mapMutex        sync.RWMutex
+db              *sql.DB
 )
 
-// 定义 WebSocket 升级器
-var upgrader = websocket.Upgrader{
-CheckOrigin: func(r *http.Request) bool {
-return true // 允许跨域，方便前端联调
-},
+func initDB() {
+var err error
+db, err = sql.Open("sqlite", "data.db")
+if err != nil { log.Fatal(err) }
+
+db.Exec(`CREATE TABLE IF NOT EXISTS ping_history (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+server_id TEXT,
+target_name TEXT,
+delay REAL,
+loss_rate REAL
+);`)
+
+go func() {
+for {
+time.Sleep(1 * time.Minute)
+saveHistoryToDB()
+db.Exec("DELETE FROM ping_history WHERE timestamp <= datetime('now', '-3 days')")
 }
+}()
+}
+
+func saveHistoryToDB() {
+mapMutex.RLock(); defer mapMutex.RUnlock()
+tx, _ := db.Begin(); defer tx.Commit()
+stmt, _ := tx.Prepare("INSERT INTO ping_history (server_id, target_name, delay, loss_rate) VALUES (?, ?, ?, ?)")
+defer stmt.Close()
+
+for serverID, status := range serverStatusMap {
+if !status.IsOnline { continue }
+for _, ping := range status.PingStatuses {
+stmt.Exec(serverID, ping.TargetName, ping.CurrentDelay, ping.LossRate)
+}
+}
+}
+
+func loadConfig() {
+data, err := os.ReadFile("config.json")
+if err == nil { json.Unmarshal(data, &appConfig) } else {
+appConfig = common.AppConfig{
+Nodes: []common.NodeConfig{ {ID: "node-1", Name: "主控测试机", Token: "my_secret_token_123", ExpireDate: "2027/05/13"} },
+PingTasks: []common.PingTask{ {Name: "广东移动", Host: "120.196.165.24"}, {Name: "广东电信", Host: "14.215.177.39"} },
+}
+data, _ := json.MarshalIndent(appConfig, "", "  ")
+os.WriteFile("config.json", data, 0644)
+}
+}
+
+var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+type FrontendNode struct { common.NodeConfig; Status common.ServerStatus `json:"status"` }
 
 func main() {
-// 1. 接收 Agent 数据的 WebSocket 路由
+loadConfig(); initDB(); defer db.Close()
+http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/index.html") })
 http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-// 极简安全校验：核对 Token (防止别人恶意上报数据)
 token := r.URL.Query().Get("token")
-if token != "my_secret_token_123" {
-http.Error(w, "Unauthorized", http.StatusUnauthorized)
-return
-}
+configMutex.RLock(); var cNode *common.NodeConfig
+for _, n := range appConfig.Nodes { if n.Token == token { cNode = &n; break } }
+pTasks := appConfig.PingTasks; configMutex.RUnlock()
+if cNode == nil { return }
+conn, _ := upgrader.Upgrade(w, r, nil); defer conn.Close()
+conn.WriteJSON(common.AgentInstruction{ ServerName: cNode.Name, PingTasks: pTasks })
 
-// 升级 HTTP 为 WebSocket 长连接
-conn, err := upgrader.Upgrade(w, r, nil)
-if err != nil {
-log.Println("WebSocket 升级失败:", err)
-return
-}
-defer conn.Close()
-
-fmt.Println("🎉 一个 Agent 已成功连接:", r.RemoteAddr)
-
-// 不断循环，接收 Agent 传来的 JSON 数据
+mapMutex.Lock(); st := serverStatusMap[cNode.ID]; st.IsOnline = true; serverStatusMap[cNode.ID] = st; mapMutex.Unlock()
 for {
-var status common.ServerStatus
-err := conn.ReadJSON(&status)
-if err != nil {
-fmt.Println("Agent 断开连接:", err)
-// 这里可以选择在 map 中将该服务器标记为离线，目前先直接跳出
+if err := conn.ReadJSON(&st); err != nil {
+mapMutex.Lock(); st = serverStatusMap[cNode.ID]; st.IsOnline = false; serverStatusMap[cNode.ID] = st; mapMutex.Unlock()
 break
 }
-
-// 将接收到的最新状态更新到内存中
-mapMutex.Lock()
-serverStatusMap[status.ServerID] = status
-mapMutex.Unlock()
+st.ServerID = cNode.ID; st.IsOnline = true
+mapMutex.Lock(); serverStatusMap[cNode.ID] = st; mapMutex.Unlock()
 }
 })
 
-// 2. 提供给前端网页获取所有机器状态的 API 路由
 http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
-w.Header().Set("Content-Type", "application/json")
-w.Header().Set("Access-Control-Allow-Origin", "*")
-
-mapMutex.RLock()
-json.NewEncoder(w).Encode(serverStatusMap)
-mapMutex.RUnlock()
+w.Header().Set("Content-Type", "application/json"); configMutex.RLock(); mapMutex.RLock()
+var result []FrontendNode
+for _, n := range appConfig.Nodes { result = append(result, FrontendNode{ NodeConfig: n, Status: serverStatusMap[n.ID] }) }
+mapMutex.RUnlock(); configMutex.RUnlock(); json.NewEncoder(w).Encode(result)
 })
 
-fmt.Println("🚀 主控服务端已启动，正在监听端口 :8080")
-// 启动服务器
+// 【修改】获取该节点下的 所有 目标历史数据，实现聚合折线图
+http.HandleFunc("/api/ping_history", func(w http.ResponseWriter, r *http.Request) {
+w.Header().Set("Content-Type", "application/json")
+serverID := r.URL.Query().Get("server_id")
+hours := r.URL.Query().Get("hours"); if hours == "" { hours = "24" }
+
+query := fmt.Sprintf(`SELECT datetime(timestamp, 'localtime'), target_name, delay, loss_rate 
+FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', '-%s hours') ORDER BY timestamp ASC`, hours)
+rows, _ := db.Query(query, serverID); defer rows.Close()
+
+type DataPoint struct { Time string `json:"time"`; Target string `json:"target"`; Delay float64 `json:"delay"`; Loss float64 `json:"loss"` }
+var points []DataPoint
+for rows.Next() { var p DataPoint; rows.Scan(&p.Time, &p.Target, &p.Delay, &p.Loss); points = append(points, p) }
+json.NewEncoder(w).Encode(points)
+})
+
+fmt.Println("🚀 服务端聚合 API 升级完毕！")
 log.Fatal(http.ListenAndServe(":8080", nil))
 }

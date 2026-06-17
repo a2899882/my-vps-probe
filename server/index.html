@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极简探针看板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        .glass-card { background: rgba(31, 41, 55, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(75, 85, 99, 0.4); }
+        .bar-transition { transition: width 0.5s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 font-sans min-h-screen p-4 md:p-8" style="background-image: radial-gradient(circle at top right, #1f2937, #111827);">
+    <div id="app" class="max-w-7xl mx-auto">
+        <header class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
+            <h1 class="text-2xl font-bold tracking-wider flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span>节点状态监测
+            </h1>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div v-for="(node, id) in servers" :key="id" class="glass-card rounded-xl p-5 hover:border-gray-500 transition-colors">
+                
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="text-lg font-bold flex items-center gap-2">🇺🇸 <span class="text-red-500">🌀</span> {{ node.name }}</div>
+                        <span v-if="!node.status.is_online" class="px-2 py-0.5 bg-red-900/50 text-red-400 text-xs rounded border border-red-800">离线</span>
+                    </div>
+                    <span class="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded-full border border-green-800/50">到期: {{ node.expire_date }}</span>
+                </div>
+
+                <div class="flex items-center justify-between text-xs font-mono text-gray-300 mb-5 px-1">
+                    <div class="flex items-center gap-1.5"><span class="text-blue-500 text-sm">🔲</span> {{ node.status.cpu_cores || 0 }} Cores</div>
+                    <div class="flex items-center gap-1.5"><span class="text-green-500 text-sm">🧠</span> {{ formatBytes(node.status.mem_total || 0) }}</div>
+                    <div class="flex items-center gap-1.5"><span class="text-red-500 text-sm">💽</span> {{ formatBytes(node.status.disk_total || 0) }}</div>
+                </div>
+
+                <div class="space-y-3 mb-5 font-mono text-xs">
+                    <div class="flex items-center justify-between"><span class="w-10 text-gray-400 font-sans">CPU</span><div class="flex-1 mx-3 h-2 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-blue-500 bar-transition" :style="`width: ${node.status.cpu_usage || 0}%`"></div></div><span class="w-8 text-right">{{ (node.status.cpu_usage || 0).toFixed(0) }}%</span></div>
+                    <div class="flex items-center justify-between"><span class="w-10 text-gray-400 font-sans">内存</span><div class="flex-1 mx-3 h-2 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-green-500 bar-transition" :style="`width: ${calcPercent(node.status.mem_used, node.status.mem_total)}%`"></div></div><span class="w-8 text-right">{{ calcPercent(node.status.mem_used, node.status.mem_total) }}%</span></div>
+                    <div class="flex items-center justify-between"><span class="w-10 text-gray-400 font-sans">SWAP</span><div class="flex-1 mx-3 h-2 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-purple-500 bar-transition" :style="`width: ${calcPercent(node.status.swap_used, node.status.swap_total)}%`"></div></div><span class="w-8 text-right" v-if="!node.status.swap_total">OFF</span><span class="w-8 text-right" v-else>{{ calcPercent(node.status.swap_used, node.status.swap_total) }}%</span></div>
+                    <div class="flex items-center justify-between"><span class="w-10 text-gray-400 font-sans">硬盘</span><div class="flex-1 mx-3 h-2 bg-gray-800 rounded-full overflow-hidden"><div class="h-full bg-red-400 bar-transition" :style="`width: ${calcPercent(node.status.disk_used, node.status.disk_total)}%`"></div></div><span class="w-8 text-right">{{ calcPercent(node.status.disk_used, node.status.disk_total) }}%</span></div>
+                </div>
+
+                <div class="space-y-2 text-xs font-mono text-gray-300 mb-5">
+                    <div class="flex justify-between"><span class="font-sans text-gray-400">网络</span><span>↑ {{ formatBytes(node.status.net_out_speed) }}/s <span class="mx-1">|</span> ↓ {{ formatBytes(node.status.net_in_speed) }}/s</span></div>
+                    <div class="flex justify-between"><span class="font-sans text-gray-400">流量</span><span>↑ {{ formatBytes(node.status.net_out_transfer) }} <span class="mx-1">|</span> ↓ {{ formatBytes(node.status.net_in_transfer) }}</span></div>
+                    <div class="flex justify-between pt-2 border-t border-gray-700/50 mt-2"><span class="font-sans text-gray-400">负载: {{ (node.status.load_1 || 0).toFixed(2) }}</span><span class="font-sans text-gray-400">在线: {{ formatUptime(node.status.uptime) }}</span></div>
+                </div>
+
+                <div class="border-t border-gray-700/50 pt-3 bg-gray-900/30 -mx-5 -mb-5 p-5 rounded-b-xl cursor-pointer hover:bg-gray-800/80 transition" @click="openChart(node.id, node.name)" title="查看聚合走势图">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs text-gray-500 font-bold">1小时连通率监测 (60格)</span>
+                        <span class="text-xs text-indigo-400 font-bold flex items-center gap-1">📈 展开趋势图</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div v-for="(ping, idx) in node.status.ping_statuses" :key="idx" class="flex items-center text-xs">
+                            <span class="w-16 truncate text-gray-400 font-bold">{{ ping.target_name }}</span>
+                            <div class="flex-1 flex gap-[1px] mx-2 h-2.5">
+                                <div v-for="(status, hIdx) in ping.history" :key="hIdx" :class="['flex-1 rounded-[1px]', status === 1 ? 'bg-green-500/80' : 'bg-red-500']"></div>
+                                <div v-for="i in (60 - (ping.history ? ping.history.length : 0))" :key="'p'+i" class="flex-1 rounded-[1px] bg-gray-700/30"></div>
+                            </div>
+                            <span class="w-10 text-right font-mono" :class="ping.loss_rate > 0 ? 'text-red-400' : 'text-gray-300'">{{ ping.current_delay }}ms</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showChart" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity" @click.self="closeChart">
+            <div class="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-5xl mx-4 shadow-2xl overflow-hidden flex flex-col">
+                <div class="flex justify-between items-center p-4 border-b border-gray-700 bg-gray-900">
+                    <h3 class="text-lg font-bold text-gray-200"><span class="text-indigo-400">{{ currentChartNodeName }}</span> 多链路延迟波动</h3>
+                    <div class="flex items-center gap-3">
+                        <div class="bg-gray-700 rounded-lg p-1 flex gap-1">
+                            <button @click="loadHistory(1)" :class="chartHours === 1 ? 'bg-indigo-500 text-white shadow' : 'text-gray-400 hover:text-gray-200'" class="px-3 py-1 rounded text-xs transition">1小时</button>
+                            <button @click="loadHistory(4)" :class="chartHours === 4 ? 'bg-indigo-500 text-white shadow' : 'text-gray-400 hover:text-gray-200'" class="px-3 py-1 rounded text-xs transition">4小时</button>
+                            <button @click="loadHistory(24)" :class="chartHours === 24 ? 'bg-indigo-500 text-white shadow' : 'text-gray-400 hover:text-gray-200'" class="px-3 py-1 rounded text-xs transition">24小时</button>
+                        </div>
+                        <button @click="closeChart" class="text-gray-400 hover:text-white p-1">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-800">
+                    <div id="echarts-container" class="w-full h-[400px]"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue;
+        createApp({
+            setup() {
+                const servers = ref([]);
+                const showChart = ref(false);
+                const currentChartNodeId = ref('');
+                const currentChartNodeName = ref('');
+                const chartHours = ref(4);
+                let myChart = null;
+
+                const fetchData = async () => { try { const res = await fetch('/api/status'); servers.value = await res.json(); } catch (e) {} };
+                const formatBytes = (bytes) => { if (!bytes || bytes === 0) return '0 B'; const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; };
+                const calcPercent = (used, total) => { return !total ? 0 : ((used / total) * 100).toFixed(0); };
+                const formatUptime = (seconds) => { if (!seconds) return '离线'; const d = Math.floor(seconds / 86400); const h = Math.floor(seconds % 86400 / 3600); return d > 0 ? `${d}天${h}小时` : `${h}小时`; };
+
+                const openChart = async (nodeId, nodeName) => {
+                    currentChartNodeId.value = nodeId; currentChartNodeName.value = nodeName; showChart.value = true;
+                    await nextTick();
+                    if (!myChart) { myChart = echarts.init(document.getElementById('echarts-container'), 'dark', { renderer: 'canvas' }); }
+                    loadHistory(4);
+                };
+
+                const closeChart = () => { showChart.value = false; if (myChart) { myChart.dispose(); myChart = null; } };
+
+                const loadHistory = async (hours) => {
+                    chartHours.value = hours;
+                    myChart.showLoading({ text: '拼命加载聚合数据...', color: '#6366f1', textColor: '#fff', maskColor: 'rgba(31, 41, 55, 0.8)' });
+                    
+                    try {
+                        const res = await fetch(`/api/ping_history?server_id=${currentChartNodeId.value}&hours=${hours}`);
+                        const data = await res.json() || [];
+                        
+                        // 数据按照目标分组
+                        const timeSet = new Set();
+                        const targetMap = {};
+                        data.forEach(item => {
+                            const t = item.time.substring(11, 16);
+                            timeSet.add(t);
+                            if (!targetMap[item.target]) targetMap[item.target] = [];
+                            targetMap[item.target].push(item.delay);
+                        });
+
+                        const timeData = Array.from(timeSet);
+                        const colors = ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#3b82f6']; // 预设几种漂亮的线路颜色
+                        const seriesData = Object.keys(targetMap).map((target, idx) => ({
+                            name: target,
+                            type: 'line',
+                            smooth: true,
+                            symbol: 'none',
+                            itemStyle: { color: colors[idx % colors.length] },
+                            data: targetMap[target]
+                        }));
+
+                        const option = {
+                            backgroundColor: 'transparent',
+                            tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                            legend: { data: Object.keys(targetMap), textStyle: { color: '#e5e7eb' }, top: 0, icon: 'circle' },
+                            grid: { left: '3%', right: '4%', bottom: '3%', top: '12%', containLabel: true },
+                            xAxis: { type: 'category', data: timeData, boundaryGap: false, axisLine: { lineStyle: { color: '#4b5563' } } },
+                            yAxis: { type: 'value', name: 'ms', splitLine: { lineStyle: { color: '#374151', type: 'dashed' } } },
+                            series: seriesData
+                        };
+                        myChart.setOption(option, true);
+                    } catch (e) { console.error("图表加载失败", e); }
+                    myChart.hideLoading();
+                };
+
+                onMounted(() => { fetchData(); setInterval(fetchData, 2000); });
+                return { servers, showChart, currentChartNodeName, chartHours, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
