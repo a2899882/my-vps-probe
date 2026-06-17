@@ -1,74 +1,89 @@
 package main
 
 import (
-"encoding/json"
 "fmt"
+"log"
 "os/exec"
 "strings"
 "time"
 
 "my-vps-probe/common"
 
+"github.com/gorilla/websocket"
 "github.com/shirou/gopsutil/v3/cpu"
 "github.com/shirou/gopsutil/v3/disk"
 "github.com/shirou/gopsutil/v3/mem"
 "github.com/shirou/gopsutil/v3/net"
 )
 
-// 维护上一秒的网络数据，用于计算实时网速
 var lastNetBytesRecv uint64
 var lastNetBytesSent uint64
-
-// 维护多点 Ping 的历史状态 (0代表丢包, 1代表通畅)
 var pingHistories = make(map[string][]int)
 
-func main() {
-fmt.Println("🚀 Agent 启动成功，正在采集系统状态与网络延迟...")
+// 填写主控服务端的 WebSocket 地址和安全 Token (如果在一台机测试，写 localhost 即可)
+const serverWSURL = "ws://localhost:8080/ws?token=my_secret_token_123"
 
-// 预设两个测试目标：Cloudflare 和 Google DNS（后期可由主控端下发）
+func main() {
+fmt.Println("🚀 Agent 启动成功，准备连接服务端...")
 targets := []string{"1.1.1.1", "8.8.8.8"}
+
+// 外层死循环：保证断线后能无限次重连
+for {
+connectAndReport(targets)
+fmt.Println("⚠️ 与服务端的连接断开，5秒后尝试重连...")
+time.Sleep(5 * time.Second)
+}
+}
+
+// 核心长连接发送逻辑
+func connectAndReport(targets []string) {
+dialer := websocket.Dialer{HandshakeTimeout: 5 * time.Second}
+conn, _, err := dialer.Dial(serverWSURL, nil)
+if err != nil {
+log.Println("连接服务端失败:", err)
+return
+}
+defer conn.Close()
+fmt.Println("✅ 成功连接到主控服务端！开始每2秒上报一次实时数据...")
 
 for {
 status := collectData(targets)
-
-// 将采集到的结构体转换为漂亮的 JSON 格式打印出来
-jsonData, _ := json.MarshalIndent(status, "", "  ")
-fmt.Println(string(jsonData))
-
-time.Sleep(2 * time.Second) // 每 2 秒采集一次
+err := conn.WriteJSON(status)
+if err != nil {
+log.Println("发送数据失败，网络异常:", err)
+return // 退出当前循环，触发外层的5秒重连
+}
+time.Sleep(2 * time.Second)
 }
 }
+
+// ================= 以下为原版数据采集逻辑，保持不变 =================
 
 func collectData(targets []string) common.ServerStatus {
 var status common.ServerStatus
 status.ServerID = "my-debian-node"
 
-// 1. CPU 负载
 cpuPercent, _ := cpu.Percent(0, false)
 if len(cpuPercent) > 0 {
 status.CPUUsage = cpuPercent[0]
 }
 
-// 2. 内存使用
 vMem, _ := mem.VirtualMemory()
 if vMem != nil {
 status.MemTotal = vMem.Total
 status.MemUsed = vMem.Used
 }
 
-// 3. 硬盘使用 (主目录)
 dInfo, _ := disk.Usage("/")
 if dInfo != nil {
 status.DiskTotal = dInfo.Total
 status.DiskUsed = dInfo.Used
 }
 
-// 4. 网络流量与实时网速
 nInfo, _ := net.IOCounters(false)
 if len(nInfo) > 0 {
 status.NetInTransfer = nInfo[0].BytesRecv
 status.NetOutTransfer = nInfo[0].BytesSent
-
 if lastNetBytesRecv > 0 {
 status.NetInSpeed = (nInfo[0].BytesRecv - lastNetBytesRecv) / 2
 status.NetOutSpeed = (nInfo[0].BytesSent - lastNetBytesSent) / 2
@@ -77,19 +92,15 @@ lastNetBytesRecv = nInfo[0].BytesRecv
 lastNetBytesSent = nInfo[0].BytesSent
 }
 
-// 5. 执行 Ping 并维护前端需要的“红绿条”历史数组
 var pingResults []common.PingResult
 for _, ip := range targets {
 delay, success := doPing(ip)
-
-// 获取该 IP 的历史记录
 hist := pingHistories[ip]
 if success {
-hist = append(hist, 1) // 成功记录 1
+hist = append(hist, 1)
 } else {
-hist = append(hist, 0) // 丢包记录 0
+hist = append(hist, 0)
 }
-// 保持数组长度为 30（对应前端的 30 个像素块）
 if len(hist) > 30 {
 hist = hist[1:]
 }
@@ -103,20 +114,15 @@ History:      hist,
 })
 }
 status.PingStatuses = pingResults
-
 return status
 }
 
-// 调用 Debian 系统的 ping 命令，解析延迟数据
 func doPing(ip string) (float64, bool) {
-// 发送 1 个包，超时时间 1 秒
 cmd := exec.Command("ping", "-c", "1", "-W", "1", ip)
 out, err := cmd.Output()
 if err != nil {
-return 0, false // 命令报错即视为丢包
+return 0, false
 }
-
-// 从输出中提取 "time=XX.X ms" 的数值
 outStr := string(out)
 idx := strings.Index(outStr, "time=")
 if idx != -1 {
@@ -131,7 +137,6 @@ return delay, true
 return 0, true
 }
 
-// 计算丢包率
 func calculateLossRate(hist []int) float64 {
 if len(hist) == 0 {
 return 0
