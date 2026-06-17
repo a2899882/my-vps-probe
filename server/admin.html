@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>探针管理中心</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-200 font-sans min-h-screen p-4 md:p-8">
+    <div id="app" class="max-w-5xl mx-auto">
+        <header class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
+            <h1 class="text-2xl font-bold flex items-center gap-2">⚙️ 探针中枢管理台</h1>
+            <button @click="saveConfig" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition">
+                💾 保存并动态下发配置
+            </button>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-indigo-400">🖥️ 被控节点 (小鸡) 管理</h2>
+                    <button @click="addNode" class="bg-green-600/20 text-green-400 px-3 py-1 rounded hover:bg-green-600/40 text-sm transition">+ 新增节点</button>
+                </div>
+                <div class="space-y-4">
+                    <div v-for="(node, index) in config.nodes" :key="index" class="bg-gray-900 p-4 rounded-lg border border-gray-700 relative group">
+                        <button @click="removeNode(index)" class="absolute top-2 right-2 text-red-500 opacity-50 hover:opacity-100 text-sm">✖ 删除</button>
+                        <div class="grid grid-cols-2 gap-3 mb-2 mt-2">
+                            <div><label class="text-xs text-gray-500">节点 ID (英文)</label><input v-model="node.id" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"></div>
+                            <div><label class="text-xs text-gray-500">显示名称</label><input v-model="node.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="text-xs text-gray-500">通信 Token (密钥)</label><input v-model="node.token" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"></div>
+                            <div><label class="text-xs text-gray-500">到期时间 (如 2027/01/01)</label><input v-model="node.expire_date" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-green-400">🎯 全局 Ping 监测目标</h2>
+                    <button @click="addTask" class="bg-green-600/20 text-green-400 px-3 py-1 rounded hover:bg-green-600/40 text-sm transition">+ 新增目标</button>
+                </div>
+                <div class="space-y-4">
+                    <div v-for="(task, index) in config.ping_tasks" :key="index" class="bg-gray-900 p-4 rounded-lg border border-gray-700 flex items-center gap-3">
+                        <div class="flex-1"><label class="text-xs text-gray-500">目标名称</label><input v-model="task.name" placeholder="如: 广东移动" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-green-500"></div>
+                        <div class="flex-1"><label class="text-xs text-gray-500">IP 或 域名</label><input v-model="task.host" placeholder="如: 120.196.x.x" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-green-500"></div>
+                        <button @click="removeTask(index)" class="mt-4 text-red-500 hover:text-red-400">✖</button>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-gray-500">提示：修改目标后保存，所有在线小鸡会自动接管新任务，无需重启。</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        createApp({
+            setup() {
+                const config = ref({ nodes: [], ping_tasks: [] });
+
+                const loadConfig = async () => {
+                    const res = await fetch('/api/admin/config');
+                    if (res.ok) config.value = await res.json();
+                    else alert("配置拉取失败，请检查登录状态！");
+                };
+
+                const saveConfig = async () => {
+                    const res = await fetch('/api/admin/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(config.value)
+                    });
+                    if (res.ok) alert("✅ 保存成功！配置已自动下发至所有在线节点。");
+                    else alert("❌ 保存失败！");
+                };
+
+                const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date: "2027/01/01" });
+                const removeNode = (idx) => config.value.nodes.splice(idx, 1);
+                const addTask = () => config.value.ping_tasks.push({ name: "新目标", host: "1.1.1.1" });
+                const removeTask = (idx) => config.value.ping_tasks.splice(idx, 1);
+
+                onMounted(loadConfig);
+                return { config, addNode, removeNode, addTask, removeTask, saveConfig };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
