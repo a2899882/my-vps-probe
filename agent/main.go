@@ -1,6 +1,7 @@
 package main
 
 import (
+"flag"
 "fmt"
 "log"
 "os/exec"
@@ -20,26 +21,46 @@ import (
 
 var lastNetBytesRecv, lastNetBytesSent uint64
 
-// 用于 1 小时 60 格子的状态追踪
 type PingTracker struct {
-History      []int // 保存 60 个格子的状态 (0 或 1)
-FailsThisMin int   // 这一分钟内丢包的次数
+History      []int
+FailsThisMin int
 LastDelay    float64
 }
 var trackers = make(map[string]*PingTracker)
 var tickCount = 0
 
-const serverWSURL = "ws://localhost:8080/ws?token=my_secret_token_123"
+// 动态接收命令行参数
+var serverAddr string
+var token string
 
-func main() { for { connectAndReport(); time.Sleep(5 * time.Second) } }
+func main() {
+// 解析命令行参数
+flag.StringVar(&serverAddr, "server", "localhost:8080", "主控服务端地址 (如 103.96.140.121:8080 或 domain.com)")
+flag.StringVar(&token, "token", "my_secret_token_123", "节点通信密钥 (Token)")
+flag.Parse()
+
+for {
+connectAndReport()
+time.Sleep(5 * time.Second)
+}
+}
 
 func connectAndReport() {
-conn, _, err := websocket.DefaultDialer.Dial(serverWSURL, nil)
+// 动态拼接 WebSocket 连接地址
+wsScheme := "ws://"
+if strings.HasPrefix(serverAddr, "https://") || strings.HasSuffix(serverAddr, "443") {
+wsScheme = "wss://" // 自动兼容以后的 https/SSL 域名反代
+}
+cleanAddr := strings.TrimPrefix(strings.TrimPrefix(serverAddr, "http://"), "https://")
+wsURL := fmt.Sprintf("%s%s/ws?token=%s", wsScheme, cleanAddr, token)
+
+conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 if err != nil { log.Println("连接失败:", err); return }
 defer conn.Close()
 
 var instruction common.AgentInstruction
 if err := conn.ReadJSON(&instruction); err != nil { return }
+log.Printf("✅ 成功连接主控！我是 [%s]，接管 %d 个任务\n", instruction.ServerName, len(instruction.PingTasks))
 
 for {
 status := collectData(instruction.PingTasks)
@@ -65,7 +86,7 @@ lastNetBytesRecv = nInfo[0].BytesRecv; lastNetBytesSent = nInfo[0].BytesSent
 }
 
 tickCount++
-isMinuteTick := (tickCount % 30 == 0) // 每执行 30 次 (60秒) 结算一次分钟状态
+isMinuteTick := (tickCount % 30 == 0)
 
 var pingResults []common.PingResult
 for _, task := range tasks {
@@ -76,11 +97,10 @@ if !ok { t = &PingTracker{History: make([]int, 0)}; trackers[task.Name] = t }
 t.LastDelay = delay
 if !success { t.FailsThisMin++ }
 
-// 每满一分钟，生成一个代表这一分钟的红绿块 (60块=1小时)
 if isMinuteTick {
 if t.FailsThisMin > 0 { t.History = append(t.History, 0) } else { t.History = append(t.History, 1) }
-if len(t.History) > 60 { t.History = t.History[1:] } // 保持最多 60 个块
-t.FailsThisMin = 0 // 重置计数器
+if len(t.History) > 60 { t.History = t.History[1:] }
+t.FailsThisMin = 0
 }
 
 failCount := 0; for _, v := range t.History { if v == 0 { failCount++ } }
