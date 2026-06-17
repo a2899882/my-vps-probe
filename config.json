@@ -20,12 +20,16 @@
   ],
   "ping_tasks": [
     {
-      "name": "Cloudflare",
-      "host": "1.1.1.1"
+      "name": "广东电信",
+      "host": "202.96.128.166"
     },
     {
-      "name": "Google",
-      "host": "8.8.8.8"
+      "name": "广东联通",
+      "host": "gd-cu-v4.ip.zstaticcdn.com:80"
+    },
+    {
+      "name": "广东移动",
+      "host": "211.136.192.6"
     }
   ]
 }
