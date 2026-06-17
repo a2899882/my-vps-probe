@@ -1,16 +1,21 @@
 {
+  "site_name": "T小K的VPS",
+  "admin_user": "morckylee@gmail.com",
+  "admin_pass": "Lee12718848.@",
   "nodes": [
     {
       "id": "node-1",
       "name": "主控测试机",
       "token": "my_secret_token_123",
-      "expire_date": "2027/05/13"
+      "expire_date": "2027/05/13",
+      "region": "HK"
     },
     {
       "id": "node-1781681444008",
       "name": "新节点",
       "token": "secret_2726",
-      "expire_date": "2027/01/01"
+      "expire_date": "2027/01/01",
+      "region": ""
     }
   ],
   "ping_tasks": [

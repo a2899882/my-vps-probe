@@ -4,15 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>探针管理中心</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
 <body class="bg-gray-900 text-gray-200 font-sans min-h-screen p-4 md:p-8">
     <div id="app" class="max-w-5xl mx-auto">
-        <header class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
+        <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 pb-4 border-b border-gray-800 gap-4">
             <h1 class="text-2xl font-bold flex items-center gap-2">⚙️ 探针中枢管理台</h1>
-            <button @click="saveConfig" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition">💾 保存并动态下发配置</button>
+            <div class="flex items-center gap-3">
+                <a href="/" target="_blank" class="text-indigo-400 hover:text-indigo-300 text-sm font-bold flex items-center gap-1">👉 返回前端首页</a>
+                <button @click="saveConfig" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition">💾 保存并动态下发配置</button>
+            </div>
         </header>
+
+        <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-6 flex flex-wrap gap-4 items-end">
+            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">网站标题名称</label><input v-model="config.site_name" placeholder="极简探针看板" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-indigo-500 outline-none w-full"></div>
+            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">后台登录账号</label><input v-model="config.admin_user" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-indigo-500 outline-none w-full"></div>
+            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">后台登录新密码</label><input type="password" v-model="config.admin_pass" placeholder="留空则不修改密码" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-indigo-500 outline-none placeholder-gray-600 w-full"></div>
+            <div class="text-xs text-yellow-500 pb-2 w-full mt-1">⚠️ 提示：修改了账号或密码后，再次点击任何操作都会要求重新登录。</div>
+        </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
@@ -26,8 +37,8 @@
                             <button @click="showDeployModal(node)" class="bg-green-600/20 text-green-400 px-2 py-1 rounded text-xs hover:bg-green-600/40 transition">🚀 一键部署</button>
                             <button @click="removeNode(index)" class="text-red-500 opacity-50 hover:opacity-100 text-xs px-1">✖</button>
                         </div>
-                        <div class="grid grid-cols-2 gap-3 mb-2 mt-4">
-                            <div><label class="text-xs text-gray-500">节点 ID</label><input v-model="node.id" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
+                        <div class="grid grid-cols-2 gap-3 mb-2 mt-6">
+                            <div><label class="text-xs text-gray-500">节点 ID (需唯一)</label><input v-model="node.id" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
                             <div><label class="text-xs text-gray-500">显示名称</label><input v-model="node.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
@@ -53,7 +64,6 @@
             </div>
         </div>
 
-        <!-- 部署命令弹窗 -->
         <div v-if="deployModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="deployModal = false">
             <div class="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-2xl mx-4 shadow-2xl overflow-hidden">
                 <div class="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
@@ -74,39 +84,35 @@
     </div>
 
     <script>
-        const { createApp, ref, onMounted, computed } = Vue;
+        const { createApp, ref, onMounted, computed, watch } = Vue;
         createApp({
             setup() {
-                const config = ref({ nodes: [], ping_tasks: [] });
+                const config = ref({ site_name: '', admin_user: '', admin_pass: '', nodes: [], ping_tasks: [] });
                 const deployModal = ref(false);
                 const activeNode = ref({});
                 const copyText = ref("🔗 复制一键部署命令");
 
+                // 【新增】：后台页面的标题也能实时同步
+                watch(() => config.value.site_name, (newVal) => {
+                    document.title = newVal ? newVal + ' - 管理后台' : '探针中枢管理台';
+                });
+
                 const loadConfig = async () => { const res = await fetch('/api/admin/config'); if (res.ok) config.value = await res.json(); };
                 const saveConfig = async () => {
                     const res = await fetch('/api/admin/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
-                    if (res.ok) alert("✅ 保存成功！");
+                    if (res.ok) { alert("✅ 保存成功！若是修改了密码，再次刷新或操作将会要求重新登录。"); config.value.admin_pass = ''; } else { alert("❌ 保存失败，可能是凭证验证过期，请刷新页面重新登录。"); }
                 };
 
                 const showDeployModal = (node) => { activeNode.value = node; copyText.value = "🔗 复制一键部署命令"; deployModal.value = true; };
-                const deployCommand = computed(() => { const host = window.location.host; return `curl -sL http://${host}/install.sh | bash -s -- -s ${host} -t ${activeNode.value.token}`; });
+                const deployCommand = computed(() => { const host = window.location.host; return `curl -sL https://${host}/install.sh | bash -s -- -s ${origin} -t ${activeNode.value.token}`; });
 
                 const copyCommand = () => {
                     const text = deployCommand.value;
-                    // 彻底兼容 HTTP 网址的复制策略
-                    if (navigator.clipboard && window.isSecureContext) {
-                        navigator.clipboard.writeText(text);
-                    } else {
-                        const textArea = document.createElement("textarea");
-                        textArea.value = text;
-                        textArea.style.position = "fixed"; textArea.style.opacity = "0";
-                        document.body.appendChild(textArea);
-                        textArea.select();
-                        document.execCommand("copy");
-                        textArea.remove();
+                    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text); } else {
+                        const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; textArea.style.opacity = "0";
+                        document.body.appendChild(textArea); textArea.select(); document.execCommand("copy"); textArea.remove();
                     }
-                    copyText.value = "✅ 复制成功！快去终端粘贴吧";
-                    setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000);
+                    copyText.value = "✅ 复制成功！快去终端粘贴吧"; setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000);
                 };
 
                 const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date: "2027/01/01" });
