@@ -10,8 +10,8 @@ TOKEN=""
 
 while getopts "s:t:" opt; do
   case $opt in
-    s) SERVER=$optarg ;;
-    t) TOKEN=$optarg ;;
+    s) SERVER=$OPTARG ;;
+    t) TOKEN=$OPTARG ;;
   esac
 done
 
