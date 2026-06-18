@@ -54,7 +54,7 @@ systemctl daemon-reload
 systemctl enable probe-agent >/dev/null 2>&1
 systemctl restart probe-agent
 
-cat << 'MenuEOF' > /usr/local/bin/tz
+cat << 'MenuEOF' > /usr/local/bin/tza
 #!/bin/bash
 echo "=========================================="
 echo "       极简私有探针 - 被控端本地管理      "
@@ -73,14 +73,14 @@ case $choice in
         systemctl disable probe-agent
         rm -f /etc/systemd/system/probe-agent.service
         rm -rf /etc/probe
-        rm -f /usr/local/bin/tz
+        rm -f /usr/local/bin/tza
         systemctl daemon-reload
         echo "✅ 卸载成功，探针已彻底离开此系统！"
         ;;
     *) exit 0 ;;
 esac
 MenuEOF
-chmod +x /usr/local/bin/tz
+chmod +x /usr/local/bin/tza
 
 echo "=========================================="
 echo "🎉 部署彻底完成！探针已秒级上线！"
