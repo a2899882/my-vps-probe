@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-                <style>
+                    <style>
         body { font-family: 'Noto Sans SC', sans-serif; transition: background 0.8s ease; background-size: cover; background-attachment: fixed; background-position: center; min-height: 100vh; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         
@@ -18,50 +18,51 @@
         .progress-track { border-radius: 99px; overflow: hidden; height: 6px; }
         
         .glass-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 12px; }
-        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2); }
+        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25); }
 
-        /* ==================== 1. 极致黑夜模式 (Dark Theme - 动漫星空 & 极度通透) ==================== */
+        /* ==================== 1. 极致黑夜模式 (深蓝星辰 & 霜面白边高级通透感) ==================== */
         body.theme-dark { 
-            /* 绝美暗夜星空壁纸，加了一层微透的深蓝渐变，保证背景不喧宾夺主 */
-            background-image: linear-gradient(rgba(10, 15, 30, 0.4), rgba(10, 15, 30, 0.7)), url('https://images.unsplash.com/photo-1506443432602-ac2fcd6f54e0?q=80&w=1920&auto=format&fit=crop'); 
+            /* 绝美深蓝星空群山壁纸，带有极具纵深感的光影 */
+            background-image: linear-gradient(rgba(10, 15, 30, 0.3), rgba(10, 15, 30, 0.6)), url('https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1920&auto=format&fit=crop'); 
             color: #f1f5f9; 
         }
         .theme-dark .glass-card { 
-            /* 【核心优化】极度通透的底色 (仅25%不透明度)，配上高强度毛玻璃和清脆的高光边框 */
-            background: rgba(15, 23, 42, 0.25); 
+            /* 【核心优化】放弃黑底，改用极微弱的纯白霜感 (0.03透明度) + 超强模糊 + 0.15的高光白边，打造顶级通透感 */
+            background: rgba(255, 255, 255, 0.03); 
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); 
             border: 1px solid rgba(255, 255, 255, 0.15); 
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
         }
-        .theme-dark .panel-bg { background: rgba(0, 0, 0, 0.25); border-top: 1px solid rgba(255, 255, 255, 0.08); }
+        .theme-dark .panel-bg { background: rgba(0, 0, 0, 0.3); border-top: 1px solid rgba(255, 255, 255, 0.08); }
         .theme-dark .progress-track { background: rgba(255, 255, 255, 0.1); }
         
-        /* 黑夜字体：加入黑色文字阴影，保证在透明卡片上依然清晰无比 */
+        /* 黑夜字体：保留黑色文字阴影，保证在任何星光下都清晰无比 */
         .theme-dark .text-gray-100 { color: #ffffff !important; font-weight: 700; letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
         .theme-dark .text-gray-200 { color: #f8fafc !important; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
         .theme-dark .text-gray-300 { color: #e2e8f0 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
         .theme-dark .text-gray-400 { color: #94a3b8 !important; }
 
-        /* ==================== 2. 原汁原味昼模式 (Komari Light Theme - 唯美动漫 & 护眼防刺眼) ==================== */
+        /* ==================== 2. 昼模式 (Komari 风格 - 唯美二次元樱花 & 护眼) ==================== */
         body.theme-komari { 
-            /* 唯美动漫风风景，【核心优化】增加了一层 15% 的黑色遮罩，直接压住刺眼的强光 */
-            background-image: linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15)), url('https://images.unsplash.com/photo-1498736297812-3a08021f206f?q=80&w=1920&auto=format&fit=crop'); 
+            /* 换成一张非常唯美的粉蓝调樱花动漫风风景，加了5%-10%的微遮罩防眩光 */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.1)), url('https://images.unsplash.com/photo-1522383225653-ed111181a951?q=80&w=1920&auto=format&fit=crop'); 
             color: #1e293b; 
         }
         .theme-komari .glass-card { 
-            /* 【核心优化】白底不透明度从 0.75 降到 0.65，让它更柔和，配合降低亮度的背景，绝不刺眼 */
+            /* 保持你满意的柔和白底和模糊度 */
             background: rgba(255, 255, 255, 0.65); 
             backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
-            border: 1px solid rgba(255, 255, 255, 0.5); 
+            border: 1px solid rgba(255, 255, 255, 0.6); 
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); 
         }
         .theme-komari .panel-bg { background: rgba(255, 255, 255, 0.4); border-top: 1px solid rgba(0, 0, 0, 0.05); }
         .theme-komari .progress-track { background: rgba(0, 0, 0, 0.08); }
         
-        /* 昼模式字体保持高对比度 */
+        /* 昼模式字体：高对比深色 */
         .theme-komari .text-gray-100 { color: #0f172a !important; font-weight: 800; letter-spacing: 0.5px; }
         .theme-komari .text-gray-200 { color: #1e293b !important; font-weight: 700; }
         .theme-komari .text-gray-300 { color: #334155 !important; font-weight: 600; }
+        .theme-komari .text-komari-accent { color: #475569 !important; font-weight: 700; } 
         .theme-komari .text-gray-400 { color: #475569 !important; font-weight: 700; } 
         
         /* 昼模式弹窗（折线图） */
@@ -71,6 +72,7 @@
         .theme-komari .hover\:text-white:hover { color: #000 !important; }
         .theme-komari .text-white.shadow { color: #fff !important; }
     </style>
+
 
 
 
