@@ -132,7 +132,7 @@
                 const toggleTheme = () => { theme.value = theme.value === 'komari' ? 'dark' : 'komari'; }; 
                 watch(theme, (newVal) => localStorage.setItem('probe_theme', newVal));
                 
-                const fetchData = async () => { try { const res = await fetch('/api/status'); const data = await res.json(); siteName.value = data.site_name || '探针看板'; servers.value = data.nodes || []; } catch (e) {} };
+                const fetchData = async () => { try { const res = await fetch('/api/status'); const data = await res.json(); siteName.value = data.site_name || '探针看板'; document.title = siteName.value; servers.value = data.nodes || []; } catch (e) {} };
                 const totalNodes = computed(() => servers.value.length); const onlineNodes = computed(() => servers.value.filter(n => n.status && n.status.is_online).length);
                 const totalNetIn = computed(() => servers.value.reduce((acc, curr) => acc + (curr.status?.net_in_transfer || 0), 0)); const totalNetOut = computed(() => servers.value.reduce((acc, curr) => acc + (curr.status?.net_out_transfer || 0), 0));
                 const totalSpeedIn = computed(() => servers.value.reduce((acc, curr) => acc + (curr.status?.net_in_speed || 0), 0)); const totalSpeedOut = computed(() => servers.value.reduce((acc, curr) => acc + (curr.status?.net_out_speed || 0), 0));
