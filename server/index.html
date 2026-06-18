@@ -10,15 +10,13 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-                                        <style>
-        /* 全局开启抗锯齿，文字边缘瞬间锐利如刀刻！ */
+                                            <style>
+        /* 全局抗锯齿，保证字体边缘清晰 */
         body { 
             font-family: 'Noto Sans SC', sans-serif; 
             -webkit-font-smoothing: antialiased; 
             -moz-osx-font-smoothing: grayscale;
-            text-rendering: optimizeLegibility;
-            transition: all 0.8s ease; 
-            background-image: url('https://i.yon.li/w/682f73d97eade.png'); 
+            transition: background 0.8s ease; 
             background-size: cover; 
             background-attachment: fixed; 
             background-position: center; 
@@ -26,67 +24,74 @@
         }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         
+        /* 进度条变得更细致、柔和 */
         .bar-transition { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 99px; }
         .progress-track { border-radius: 99px; overflow: hidden; height: 6px; }
         
-        .glass-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 12px; }
-        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0,0,0,0.15); }
+        .glass-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 14px; }
+        .glass-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); }
 
-        /* ==================== 1. 暗色模式 (极客黑紫，深邃护眼) ==================== */
-        body.theme-dark { color: #f8fafc; }
-        /* 增加 35% 纯黑遮罩，压住耀眼背景，保护视力 */
+        /* ==================== 1. 昼模式 (唯美粉蓝云彩 + 牛奶磨砂白板) ==================== */
+        body.theme-komari { 
+            /* 非常温柔低饱和的粉蓝云彩，绝无高光刺眼 */
+            background-image: url('https://images.unsplash.com/photo-1500964757637-c85e8a162699?q=80&w=1920&auto=format&fit=crop'); 
+            color: #0f172a; 
+        }
+        body.theme-komari::before {
+            /* 全局铺一层 15% 的白色柔光罩，进一步降低背景对比度，极度护眼 */
+            content: ""; position: fixed; inset: 0; background: rgba(255, 255, 255, 0.15); z-index: -1; pointer-events: none;
+        }
+        .theme-komari .glass-card { 
+            /* 【核心】：85% 厚度的纯白底色，这就叫“牛奶磨砂”。挡住一切背景干扰，让卡片上的字无比清晰！ */
+            background: rgba(255, 255, 255, 0.85); 
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.9); 
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); 
+        }
+        .theme-komari .panel-bg { background: rgba(248, 250, 252, 0.7); border-top: 1px solid rgba(0, 0, 0, 0.03); }
+        .theme-komari .progress-track { background: rgba(0, 0, 0, 0.06); }
+        
+        /* 白天文字：采用极深石板蓝，加粗，对比度拉满 */
+        .theme-komari .text-gray-100 { color: #0f172a !important; font-weight: 800; letter-spacing: 0.5px; }
+        .theme-komari .text-gray-200 { color: #1e293b !important; font-weight: 700; }
+        .theme-komari .text-gray-300 { color: #334155 !important; font-weight: 600; }
+        .theme-komari .text-gray-400 { color: #475569 !important; font-weight: 600; } 
+
+        /* ==================== 2. 暗色模式 (静谧夜空 + 深灰岩磨砂) ==================== */
+        body.theme-dark { 
+            /* 干净宁静的暗色夜空 */
+            background-image: url('https://images.unsplash.com/photo-1507408315620-58fe53655df4?q=80&w=1920&auto=format&fit=crop'); 
+            color: #f8fafc; 
+        }
         body.theme-dark::before {
-            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.35); z-index: -1; pointer-events: none;
+            /* 压一层深黑遮罩，确保背景完全沦为陪衬 */
+            content: ""; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); z-index: -1; pointer-events: none;
             transition: background 0.8s ease;
         }
         .theme-dark .glass-card { 
-            /* 提高底色不透明度到 0.55，防止背景过透吃掉文字 */
-            background: rgba(15, 23, 42, 0.55); 
-            backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%); 
-            border: 1px solid rgba(255, 255, 255, 0.12); 
-            border-top: 1px solid rgba(255, 255, 255, 0.25); 
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            /* 高厚度深灰岩底色，数据清晰可见 */
+            background: rgba(30, 41, 59, 0.80); 
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
         }
-        .theme-dark .panel-bg { background: rgba(0, 0, 0, 0.3); border-top: 1px solid rgba(255, 255, 255, 0.05); }
-        .theme-dark .progress-track { background: rgba(255, 255, 255, 0.1); }
+        .theme-dark .panel-bg { background: rgba(15, 23, 42, 0.6); border-top: 1px solid rgba(255, 255, 255, 0.05); }
+        .theme-dark .progress-track { background: rgba(255, 255, 255, 0.08); }
         
-        /* 暗色文字加入文字阴影，保证在任何背景下都极度清晰 */
-        .theme-dark .text-gray-100 { color: #ffffff !important; font-weight: 700; letter-spacing: 0.5px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-        .theme-dark .text-gray-200 { color: #f1f5f9 !important; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        /* 黑夜文字：明亮白色系 */
+        .theme-dark .text-gray-100 { color: #ffffff !important; font-weight: 800; letter-spacing: 0.5px; }
+        .theme-dark .text-gray-200 { color: #f8fafc !important; font-weight: 700; }
         .theme-dark .text-gray-300 { color: #cbd5e1 !important; font-weight: 600; }
         .theme-dark .text-gray-400 { color: #94a3b8 !important; font-weight: 600; }
 
-        /* ==================== 2. 亮色模式 (Purcarte 纯血亚克力白) ==================== */
-        body.theme-komari { color: #0f172a; }
-        body.theme-komari::before { background: rgba(0, 0, 0, 0); }
-        
-        .theme-komari .glass-card { 
-            /* 【核心修复】：白底不透明度提高到 0.65，配合 24px 顶级模糊，形成真正的“实体磨砂玻璃”，彻底解决花眼问题！ */
-            background: rgba(255, 255, 255, 0.65); 
-            backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%); 
-            /* Purcarte 经典高光白边 */
-            border: 1px solid rgba(255, 255, 255, 0.6); 
-            border-top: 1px solid rgba(255, 255, 255, 1);
-            border-left: 1px solid rgba(255, 255, 255, 1);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08); 
-        }
-        .theme-komari .panel-bg { background: rgba(255, 255, 255, 0.4); border-top: 1px solid rgba(255, 255, 255, 0.5); }
-        .theme-komari .progress-track { background: rgba(0, 0, 0, 0.05); }
-        
-        /* 【核心修复】：亮色模式文字彻底摒弃灰色！全部使用极深蓝/纯黑，并且加粗！ */
-        .theme-komari .text-gray-100 { color: #000000 !important; font-weight: 900; letter-spacing: 0.5px; }
-        .theme-komari .text-gray-200 { color: #0f172a !important; font-weight: 800; }
-        .theme-komari .text-gray-300 { color: #1e293b !important; font-weight: 800; }
-        .theme-komari .text-gray-400 { color: #334155 !important; font-weight: 800; } 
-        
         /* 弹窗完美适配 */
-        .theme-komari .bg-gray-800 { background: rgba(255, 255, 255, 0.9) !important; backdrop-filter: blur(24px) saturate(150%); border: 1px solid rgba(255,255,255,1); box-shadow: 0 16px 32px rgba(31,38,135,0.1); }
-        .theme-komari .bg-gray-900 { background: rgba(248, 250, 252, 0.8) !important; border-bottom: 1px solid rgba(255,255,255,0.8) !important; }
-        .theme-komari .bg-gray-700 { background: rgba(255, 255, 255, 0.5) !important; }
-        .theme-komari .hover\:text-white:hover { color: #000 !important; }
-        .theme-komari .text-white.shadow { color: #fff !important; }
+        .theme-komari .bg-gray-800 { background: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,1); box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        .theme-komari .bg-gray-900 { background: rgba(248, 250, 252, 0.9) !important; border-bottom: 1px solid rgba(0,0,0,0.05) !important; }
+        .theme-komari .bg-gray-700 { background: rgba(241, 245, 249, 0.8) !important; }
+        .theme-komari .hover\:text-white:hover { color: #0f172a !important; }
+        .theme-komari .text-white.shadow { color: #000 !important; }
     </style>
+
 
 
 
