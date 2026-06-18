@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# 解析参数
 SERVER=""
 TOKEN=""
 while getopts "s:t:" opt; do
@@ -15,22 +14,36 @@ if [ -z "$SERVER" ] || [ -z "$TOKEN" ]; then
   exit 1
 fi
 
-echo "🚀 开始极速部署被控端 (预编译免环境版)..."
+echo "🚀 开始极速部署被控端 (本地主控全闭环版)..."
 
-# 判断系统架构并下载对应的“成品饼干”
+# 【核心进化】：提取用户输入的主控连接地址，直接作为下载源！
+# 如果 SERVER 传入的是带 http 的域名，直接用；如果是纯 IP:端口，则拼上 http
+if [[ "$SERVER" =~ "http" ]]; then
+    BASE_URL="${SERVER}"
+else
+    BASE_URL="http://${SERVER}"
+fi
+
 ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then
-    DL_URL="https://raw.githubusercontent.com/a2899882/my-vps-probe/main/probe-agent-amd64"
+    DL_URL="${BASE_URL}/probe-agent-amd64"
 elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    DL_URL="https://raw.githubusercontent.com/a2899882/my-vps-probe/main/probe-agent-arm64"
+    DL_URL="${BASE_URL}/probe-agent-arm64"
 else
     echo "❌ 暂不支持的架构: $ARCH"
     exit 1
 fi
 
-echo "📥 正在极速拉取 15MB 核心程序..."
+echo "📥 正在直接从你的主控机极速拉取成品 ($DL_URL) ..."
 mkdir -p /etc/probe
 curl -sL $DL_URL -o /etc/probe/probe-agent || wget -qO /etc/probe/probe-agent $DL_URL
+
+if [ ! -s "/etc/probe/probe-agent" ] || grep -q "404" /etc/probe/probe-agent; then
+    echo "❌ 核心程序拉取失败！请检查主控端对应文件是否存在。"
+    rm -f /etc/probe/probe-agent
+    exit 1
+fi
+
 chmod +x /etc/probe/probe-agent
 
 echo "⚙️ 正在配置后台服务..."
@@ -84,5 +97,5 @@ chmod +x /usr/local/bin/tza
 
 echo "=========================================="
 echo "🎉 部署彻底完成！探针已秒级上线！"
-echo "💡 提示：全程无需编译，仅占用不足 15MB 硬盘空间。"
+echo "💡 提示：此版本为完全闭环版，不依赖任何第三方平台。"
 echo "=========================================="
