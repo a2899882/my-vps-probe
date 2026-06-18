@@ -10,26 +10,34 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-                            <style>
-        body { font-family: 'Noto Sans SC', sans-serif; transition: background 0.8s ease; background-size: cover; background-attachment: fixed; background-position: center; min-height: 100vh; }
+                                <style>
+        body { 
+            font-family: 'Noto Sans SC', sans-serif; 
+            transition: all 0.8s ease; 
+            /* 完美复刻：注入原版 Komari Purcarte 的默认神级壁纸！ */
+            background-image: url('https://i.yon.li/w/682f73d97eade.png'); 
+            background-size: cover; 
+            background-attachment: fixed; 
+            background-position: center; 
+            min-height: 100vh; 
+        }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         
-        /* Purcarte 标志性的纤细圆润进度条 */
         .bar-transition { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 99px; }
         .progress-track { border-radius: 99px; overflow: hidden; height: 6px; }
         
-        /* Purcarte 标志性的卡片悬浮与倒角 */
         .glass-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 12px; }
         .glass-card:hover { transform: translateY(-2px); }
 
-        /* ==================== 1. Purcarte 暗色模式 (极客深邃蓝) ==================== */
-        body.theme-dark { 
-            /* 推荐搭配深色风景或抽象几何壁纸 */
-            background-image: url('https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1920&auto=format&fit=crop'); 
-            color: #f8fafc; 
+        /* ==================== 1. 暗色模式 (Purcarte 极客黑紫) ==================== */
+        body.theme-dark { color: #f8fafc; }
+        /* 【神级细节】：不换壁纸，而是给壁纸覆盖一层 30% 的纯黑滤镜，保护眼睛 */
+        body.theme-dark::before {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.3); z-index: -1; pointer-events: none;
+            transition: background 0.8s ease;
         }
         .theme-dark .glass-card { 
-            /* Purcarte 经典暗色亚克力配方：深石板蓝底色 + 20px模糊 + 0.12高光细边 */
             background: rgba(17, 25, 40, 0.5); 
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); 
             border: 1px solid rgba(255, 255, 255, 0.12); 
@@ -43,14 +51,12 @@
         .theme-dark .text-gray-300 { color: #cbd5e1 !important; }
         .theme-dark .text-gray-400 { color: #94a3b8 !important; }
 
-        /* ==================== 2. Purcarte 亮色模式 (原汁原味亚克力白) ==================== */
-        body.theme-komari { 
-            /* 去除所有遮罩，完全还原壁纸色彩，这是 Purcarte 的精髓 */
-            background-image: url('https://images.unsplash.com/photo-1493246507139-91e8fad9978e?q=80&w=1920&auto=format&fit=crop'); 
-            color: #1e293b; 
-        }
+        /* ==================== 2. 亮色模式 (Purcarte 原生亚克力白) ==================== */
+        body.theme-komari { color: #1e293b; }
+        /* 亮色模式下去掉遮罩，展示原画 */
+        body.theme-komari::before { background: rgba(0, 0, 0, 0); }
+        
         .theme-komari .glass-card { 
-            /* Purcarte 经典亮色亚克力配方：0.45 纯白底色 + 微蓝阴影 (31,38,135) + 0.6 不透明度高光边框 */
             background: rgba(255, 255, 255, 0.45); 
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); 
             border: 1px solid rgba(255, 255, 255, 0.6); 
@@ -59,19 +65,18 @@
         .theme-komari .panel-bg { background: rgba(255, 255, 255, 0.3); border-top: 1px solid rgba(255, 255, 255, 0.4); }
         .theme-komari .progress-track { background: rgba(0, 0, 0, 0.06); }
         
-        /* Purcarte 经典文字配色：绝对不使用纯黑，采用高级的 Slate 灰蓝体系 */
         .theme-komari .text-gray-100 { color: #0f172a !important; font-weight: 800; letter-spacing: 0.5px; }
         .theme-komari .text-gray-200 { color: #1e293b !important; font-weight: 700; }
         .theme-komari .text-gray-300 { color: #334155 !important; font-weight: 600; }
         .theme-komari .text-gray-400 { color: #475569 !important; font-weight: 600; } 
         
-        /* 弹窗完美适配亚克力风格 */
         .theme-komari .bg-gray-800 { background: rgba(255, 255, 255, 0.75) !important; backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 16px 32px rgba(31,38,135,0.1); }
         .theme-komari .bg-gray-900 { background: rgba(248, 250, 252, 0.6) !important; border-bottom: 1px solid rgba(255,255,255,0.5) !important; }
         .theme-komari .bg-gray-700 { background: rgba(255, 255, 255, 0.4) !important; }
         .theme-komari .hover\:text-white:hover { color: #000 !important; }
         .theme-komari .text-white.shadow { color: #fff !important; }
     </style>
+
 
 
 
