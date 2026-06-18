@@ -10,63 +10,68 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-        <style>
+            <style>
         body { font-family: 'Noto Sans SC', sans-serif; transition: background 0.8s ease; background-size: cover; background-attachment: fixed; background-position: center; min-height: 100vh; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
-        /* 优化进度条：加粗且圆润 */
-        .bar-transition { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 99px; }
-        .progress-track { border-radius: 99px; overflow: hidden; height: 8px; }
         
-        /* 动态卡片：增加微距悬浮效果 */
-        .glass-card { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 16px; }
-        .glass-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15); }
+        /* 进度条：变细且对比更强烈（致敬 Komari 的精致感） */
+        .bar-transition { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 99px; }
+        .progress-track { border-radius: 99px; overflow: hidden; height: 6px; }
+        
+        /* 动态卡片：降低倒角圆润度，更显硬朗精致 */
+        .glass-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 12px; }
+        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12); }
 
         /* ==================== 1. 极致黑夜模式 (Dark Theme) ==================== */
         body.theme-dark { 
-            background-image: linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.95)), url('https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?q=80&w=1920&auto=format&fit=crop'); 
+            background-image: linear-gradient(rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.95)), url('https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?q=80&w=1920&auto=format&fit=crop'); 
             color: #f1f5f9; 
         }
         .theme-dark .glass-card { 
-            background: rgba(30, 41, 59, 0.45); 
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); 
+            background: rgba(21, 25, 36, 0.75); /* 加深底色，降低透明度，杜绝背景干扰 */
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
             border: 1px solid rgba(255, 255, 255, 0.08); 
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         }
-        .theme-dark .panel-bg { background: rgba(15, 23, 42, 0.6); border-top: 1px solid rgba(255, 255, 255, 0.05); }
-        .theme-dark .progress-track { background: rgba(255, 255, 255, 0.08); }
+        .theme-dark .panel-bg { background: rgba(0, 0, 0, 0.2); border-top: 1px solid rgba(255, 255, 255, 0.05); }
+        .theme-dark .progress-track { background: rgba(255, 255, 255, 0.1); }
         
-        /* 黑夜字体：增加对比度和微发光 */
-        .theme-dark .text-gray-100 { color: #ffffff !important; font-weight: 700; text-shadow: 0 0 10px rgba(255,255,255,0.1); }
-        .theme-dark .text-gray-200 { color: #f1f5f9 !important; }
+        /* 黑夜字体：极高对比度 */
+        .theme-dark .text-gray-100 { color: #ffffff !important; font-weight: 700; letter-spacing: 0.5px; }
+        .theme-dark .text-gray-200 { color: #f8fafc !important; }
         .theme-dark .text-gray-300 { color: #cbd5e1 !important; }
         .theme-dark .text-gray-400 { color: #94a3b8 !important; }
 
-        /* ==================== 2. 柔和昼模式 (Komari Light Theme) ==================== */
+        /* ==================== 2. 原汁原味昼模式 (Komari Light Theme) ==================== */
         body.theme-komari { 
-            background-image: linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.3)), url('https://images.unsplash.com/photo-1493246507139-91e8fad9978e?q=80&w=1920&auto=format&fit=crop'); 
+            /* 去掉变暗滤镜，展现壁纸原色 */
+            background-image: url('https://images.unsplash.com/photo-1493246507139-91e8fad9978e?q=80&w=1920&auto=format&fit=crop'); 
             color: #1e293b; 
         }
         .theme-komari .glass-card { 
-            background: rgba(255, 255, 255, 0.55); 
-            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); 
-            border: 1px solid rgba(255, 255, 255, 0.8); 
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); 
+            /* 关键修改：白底不透明度提高到 0.75，毛玻璃 16px，杜绝花哨背景吃掉文字 */
+            background: rgba(255, 255, 255, 0.75); 
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.7); 
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); 
         }
-        .theme-komari .panel-bg { background: rgba(255, 255, 255, 0.6); border-top: 1px solid rgba(0, 0, 0, 0.05); }
-        .theme-komari .progress-track { background: rgba(0, 0, 0, 0.06); }
+        .theme-komari .panel-bg { background: rgba(255, 255, 255, 0.5); border-top: 1px solid rgba(0, 0, 0, 0.04); }
+        .theme-komari .progress-track { background: rgba(0, 0, 0, 0.08); }
         
-        /* 昼模式字体：深邃护眼 */
-        .theme-komari .text-gray-100 { color: #0f172a !important; font-weight: 800; }
+        /* 昼模式字体：加深颜色，杜绝发灰看不清 */
+        .theme-komari .text-gray-100 { color: #0f172a !important; font-weight: 800; letter-spacing: 0.5px; }
         .theme-komari .text-gray-200 { color: #1e293b !important; font-weight: 700; }
-        .theme-komari .text-gray-300 { color: #475569 !important; font-weight: 600; }
-        .theme-komari .text-gray-400 { color: #64748b !important; font-weight: 500; }
+        .theme-komari .text-gray-300 { color: #334155 !important; font-weight: 600; }
+        .theme-komari .text-gray-400 { color: #475569 !important; font-weight: 700; } /* 极大幅度加深副标题颜色 */
         
-        /* 昼模式弹窗（折线图）适配 */
-        .theme-komari .bg-gray-800 { background: rgba(255, 255, 255, 0.85) !important; backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.9); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1); }
-        .theme-komari .bg-gray-900 { background: rgba(248, 250, 252, 0.8) !important; border-bottom: 1px solid rgba(0,0,0,0.05) !important; }
-        .theme-komari .bg-gray-700 { background: rgba(0, 0, 0, 0.05) !important; }
+        /* 昼模式弹窗（折线图） */
+        .theme-komari .bg-gray-800 { background: rgba(255, 255, 255, 0.95) !important; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,1); box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15); }
+        .theme-komari .bg-gray-900 { background: rgba(248, 250, 252, 0.95) !important; border-bottom: 1px solid rgba(0,0,0,0.06) !important; }
+        .theme-komari .bg-gray-700 { background: rgba(0, 0, 0, 0.04) !important; }
         .theme-komari .hover\:text-white:hover { color: #000 !important; }
         .theme-komari .text-white.shadow { color: #fff !important; }
     </style>
+
 
 </head>
 <body class="min-h-screen p-4 md:p-8 transition-colors duration-500">
