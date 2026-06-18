@@ -4,3 +4,6 @@ probe-agent
 data.db
 config.json
 server.log
+data.db
+config.json
+server.log

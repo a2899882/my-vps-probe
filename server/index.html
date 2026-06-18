@@ -195,7 +195,7 @@
                         
                         const isLight = theme.value === 'komari';
                         const option = { 
-                            backgroundColor: 'transparent', tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } }, legend: { show: false }, 
+                            backgroundColor: 'transparent', tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: (value) => value ? value.toFixed(1) + ' ms' : '-- ms' }, legend: { show: false }, 
                             grid: { left: '3%', right: '4%', bottom: '3%', top: '5%', containLabel: true }, 
                             xAxis: { type: 'category', data: timeData, boundaryGap: false, axisLine: { lineStyle: { color: isLight ? '#9ca3af' : '#4b5563' } } }, 
                             yAxis: { type: 'value', name: 'ms', splitLine: { lineStyle: { color: isLight ? '#e5e7eb' : '#374151', type: 'dashed' } } }, 
