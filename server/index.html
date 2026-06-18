@@ -10,8 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-                                    <style>
-        /* 【核心修复 1】：全局开启抗锯齿，文字边缘瞬间锐利，告别发虚模糊！ */
+                                        <style>
+        /* 全局开启抗锯齿，文字边缘瞬间锐利如刀刻！ */
         body { 
             font-family: 'Noto Sans SC', sans-serif; 
             -webkit-font-smoothing: antialiased; 
@@ -30,61 +30,64 @@
         .progress-track { border-radius: 99px; overflow: hidden; height: 6px; }
         
         .glass-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 12px; }
-        .glass-card:hover { transform: translateY(-2px); }
+        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0,0,0,0.15); }
 
-        /* ==================== 1. 暗色模式 (Purcarte 极客黑紫) ==================== */
+        /* ==================== 1. 暗色模式 (极客黑紫，深邃护眼) ==================== */
         body.theme-dark { color: #f8fafc; }
+        /* 增加 35% 纯黑遮罩，压住耀眼背景，保护视力 */
         body.theme-dark::before {
             content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.35); z-index: -1; pointer-events: none;
             transition: background 0.8s ease;
         }
         .theme-dark .glass-card { 
-            /* 【核心修复 2】：加入 saturate(150%)，让暗色毛玻璃不发灰、更通透 */
-            background: rgba(15, 23, 42, 0.4); 
-            backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%); 
-            border: 1px solid rgba(255, 255, 255, 0.08); 
-            border-top: 1px solid rgba(255, 255, 255, 0.15); /* 顶部高光 */
+            /* 提高底色不透明度到 0.55，防止背景过透吃掉文字 */
+            background: rgba(15, 23, 42, 0.55); 
+            backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%); 
+            border: 1px solid rgba(255, 255, 255, 0.12); 
+            border-top: 1px solid rgba(255, 255, 255, 0.25); 
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
-        .theme-dark .panel-bg { background: rgba(0, 0, 0, 0.25); border-top: 1px solid rgba(255, 255, 255, 0.05); }
-        .theme-dark .progress-track { background: rgba(255, 255, 255, 0.08); }
+        .theme-dark .panel-bg { background: rgba(0, 0, 0, 0.3); border-top: 1px solid rgba(255, 255, 255, 0.05); }
+        .theme-dark .progress-track { background: rgba(255, 255, 255, 0.1); }
         
-        .theme-dark .text-gray-100 { color: #ffffff !important; font-weight: 700; letter-spacing: 0.5px; }
-        .theme-dark .text-gray-200 { color: #f1f5f9 !important; }
-        .theme-dark .text-gray-300 { color: #cbd5e1 !important; }
-        .theme-dark .text-gray-400 { color: #94a3b8 !important; }
+        /* 暗色文字加入文字阴影，保证在任何背景下都极度清晰 */
+        .theme-dark .text-gray-100 { color: #ffffff !important; font-weight: 700; letter-spacing: 0.5px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .theme-dark .text-gray-200 { color: #f1f5f9 !important; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .theme-dark .text-gray-300 { color: #cbd5e1 !important; font-weight: 600; }
+        .theme-dark .text-gray-400 { color: #94a3b8 !important; font-weight: 600; }
 
-        /* ==================== 2. 亮色模式 (100% 纯血 Purcarte) ==================== */
+        /* ==================== 2. 亮色模式 (Purcarte 纯血亚克力白) ==================== */
         body.theme-komari { color: #0f172a; }
         body.theme-komari::before { background: rgba(0, 0, 0, 0); }
         
         .theme-komari .glass-card { 
-            /* 【核心修复 3】：降低白底不透明度到 0.25，加入 saturate(150%) 增强背景色彩穿透力，打造真正的“玻璃感”而非“塑料感” */
-            background: rgba(255, 255, 255, 0.25); 
-            backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%); 
-            /* 【核心修复 4】：引入 Purcarte 标志性的左上角强光切边 */
-            border: 1px solid rgba(255, 255, 255, 0.4); 
-            border-top: 1px solid rgba(255, 255, 255, 0.8);
-            border-left: 1px solid rgba(255, 255, 255, 0.8);
-            box-shadow: 0 8px 24px -4px rgba(31, 38, 135, 0.1); 
+            /* 【核心修复】：白底不透明度提高到 0.65，配合 24px 顶级模糊，形成真正的“实体磨砂玻璃”，彻底解决花眼问题！ */
+            background: rgba(255, 255, 255, 0.65); 
+            backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%); 
+            /* Purcarte 经典高光白边 */
+            border: 1px solid rgba(255, 255, 255, 0.6); 
+            border-top: 1px solid rgba(255, 255, 255, 1);
+            border-left: 1px solid rgba(255, 255, 255, 1);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08); 
         }
-        .theme-komari .panel-bg { background: rgba(255, 255, 255, 0.25); border-top: 1px solid rgba(255, 255, 255, 0.4); }
-        .theme-komari .progress-track { background: rgba(0, 0, 0, 0.06); }
+        .theme-komari .panel-bg { background: rgba(255, 255, 255, 0.4); border-top: 1px solid rgba(255, 255, 255, 0.5); }
+        .theme-komari .progress-track { background: rgba(0, 0, 0, 0.05); }
         
-        /* 【核心修复 5】：白天模式文字彻底去灰！全部加黑、加粗，绝对清晰！ */
-        .theme-komari .text-gray-100 { color: #000000 !important; font-weight: 800; letter-spacing: 0.5px; }
-        .theme-komari .text-gray-200 { color: #111827 !important; font-weight: 700; }
-        .theme-komari .text-gray-300 { color: #374151 !important; font-weight: 700; }
-        .theme-komari .text-gray-400 { color: #4b5563 !important; font-weight: 700; } 
+        /* 【核心修复】：亮色模式文字彻底摒弃灰色！全部使用极深蓝/纯黑，并且加粗！ */
+        .theme-komari .text-gray-100 { color: #000000 !important; font-weight: 900; letter-spacing: 0.5px; }
+        .theme-komari .text-gray-200 { color: #0f172a !important; font-weight: 800; }
+        .theme-komari .text-gray-300 { color: #1e293b !important; font-weight: 800; }
+        .theme-komari .text-gray-400 { color: #334155 !important; font-weight: 800; } 
         
-        /* 弹窗完美适配亚克力风格 */
-        .theme-komari .bg-gray-800 { background: rgba(255, 255, 255, 0.85) !important; backdrop-filter: blur(24px) saturate(150%); border: 1px solid rgba(255,255,255,0.9); box-shadow: 0 16px 32px rgba(31,38,135,0.1); }
-        .theme-komari .bg-gray-900 { background: rgba(248, 250, 252, 0.6) !important; border-bottom: 1px solid rgba(255,255,255,0.5) !important; }
-        .theme-komari .bg-gray-700 { background: rgba(255, 255, 255, 0.4) !important; }
+        /* 弹窗完美适配 */
+        .theme-komari .bg-gray-800 { background: rgba(255, 255, 255, 0.9) !important; backdrop-filter: blur(24px) saturate(150%); border: 1px solid rgba(255,255,255,1); box-shadow: 0 16px 32px rgba(31,38,135,0.1); }
+        .theme-komari .bg-gray-900 { background: rgba(248, 250, 252, 0.8) !important; border-bottom: 1px solid rgba(255,255,255,0.8) !important; }
+        .theme-komari .bg-gray-700 { background: rgba(255, 255, 255, 0.5) !important; }
         .theme-komari .hover\:text-white:hover { color: #000 !important; }
         .theme-komari .text-white.shadow { color: #fff !important; }
     </style>
+
 
 
 
