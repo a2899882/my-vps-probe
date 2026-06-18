@@ -1,3 +1,0 @@
-nohup: ignoring input
-# my-vps-probe/common
-common/model.go:24:16: undefined: PingResult
