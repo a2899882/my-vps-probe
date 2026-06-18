@@ -1,5 +1,5 @@
 package main
-import ("encoding/json"; "flag"; "fmt"; "net"; "net/http"; "os/exec"; "strings"; "time"; "github.com/gorilla/websocket"; "github.com/shirou/gopsutil/v3/cpu"; "github.com/shirou/gopsutil/v3/disk"; "github.com/shirou/gopsutil/v3/host"; "github.com/shirou/gopsutil/v3/load"; "github.com/shirou/gopsutil/v3/mem"; "github.com/shirou/gopsutil/v3/net")
+import ("encoding/json"; "flag"; "fmt"; "net"; "net/http"; "os/exec"; "strings"; "time"; "github.com/gorilla/websocket"; "github.com/shirou/gopsutil/v3/cpu"; "github.com/shirou/gopsutil/v3/disk"; "github.com/shirou/gopsutil/v3/host"; "github.com/shirou/gopsutil/v3/load"; "github.com/shirou/gopsutil/v3/mem"; psnet "github.com/shirou/gopsutil/v3/net")
 type PingTask struct { Name string `json:"name"`; Host string `json:"host"`; Type string `json:"type"` }
 type AgentInstruction struct { ServerName string `json:"server_name"`; PingTasks []PingTask `json:"ping_tasks"` }
 type PingResult struct { TargetName string `json:"target_name"`; CurrentDelay float64 `json:"current_delay"`; AvgDelay float64 `json:"avg_delay"`; LossRate float64 `json:"loss_rate"`; History []int `json:"history"` }
@@ -12,42 +12,27 @@ func main() { flag.StringVar(&serverAddr, "server", "localhost:8080", "主控地
 
 func connectAndReport() { cleanAddr := strings.TrimPrefix(strings.TrimPrefix(serverAddr, "http://"), "https://"); wsScheme := "ws://"; if strings.HasPrefix(serverAddr, "https://") || strings.HasSuffix(serverAddr, "443") { wsScheme = "wss://" }; conn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("%s%s/ws?token=%s", wsScheme, cleanAddr, token), nil); if err != nil { return }; defer conn.Close(); var instr AgentInstruction; if err := conn.ReadJSON(&instr); err != nil { return }
 for { 
-status := ServerStatus{IsOnline: true, CountryCode: globalCountryCode}; if h, err := host.Info(); err == nil && h != nil { status.Uptime = h.Uptime }; if l, err := load.Avg(); err == nil && l != nil { status.Load1 = l.Load1 }; if c, err := cpu.Percent(0, false); err == nil && len(c) > 0 { status.CPUUsage = c[0] }; if cores, err := cpu.Counts(true); err == nil { status.CPUCores = cores }; if v, err := mem.VirtualMemory(); err == nil && v != nil { status.MemTotal = v.Total; status.MemUsed = v.Used }; if s, err := mem.SwapMemory(); err == nil && s != nil { status.SwapTotal = s.Total; status.SwapUsed = s.Used }; if d, err := disk.Usage("/"); err == nil && d != nil { status.DiskTotal = d.Total; status.DiskUsed = d.Used }; if n, err := net.IOCounters(false); err == nil && len(n) > 0 { status.NetInTransfer = n[0].BytesRecv; status.NetOutTransfer = n[0].BytesSent; if lastNetBytesRecv > 0 { status.NetInSpeed = (n[0].BytesRecv - lastNetBytesRecv) / 2; status.NetOutSpeed = (n[0].BytesSent - lastNetBytesSent) / 2 }; lastNetBytesRecv = n[0].BytesRecv; lastNetBytesSent = n[0].BytesSent }
+status := ServerStatus{IsOnline: true, CountryCode: globalCountryCode}; if h, err := host.Info(); err == nil && h != nil { status.Uptime = h.Uptime }; if l, err := load.Avg(); err == nil && l != nil { status.Load1 = l.Load1 }; if c, err := cpu.Percent(0, false); err == nil && len(c) > 0 { status.CPUUsage = c[0] }; if cores, err := cpu.Counts(true); err == nil { status.CPUCores = cores }; if v, err := mem.VirtualMemory(); err == nil && v != nil { status.MemTotal = v.Total; status.MemUsed = v.Used }; if s, err := mem.SwapMemory(); err == nil && s != nil { status.SwapTotal = s.Total; status.SwapUsed = s.Used }; if d, err := disk.Usage("/"); err == nil && d != nil { status.DiskTotal = d.Total; status.DiskUsed = d.Used }; if n, err := psnet.IOCounters(false); err == nil && len(n) > 0 { status.NetInTransfer = n[0].BytesRecv; status.NetOutTransfer = n[0].BytesSent; if lastNetBytesRecv > 0 { status.NetInSpeed = (n[0].BytesRecv - lastNetBytesRecv) / 2; status.NetOutSpeed = (n[0].BytesSent - lastNetBytesSent) / 2 }; lastNetBytesRecv = n[0].BytesRecv; lastNetBytesSent = n[0].BytesSent }
 
 newTrackers := make(map[string]*PingTracker); for _, task := range instr.PingTasks { if val, ok := trackers[task.Name]; ok { newTrackers[task.Name] = val } else { newTrackers[task.Name] = &PingTracker{History: make([]int, 0), HourDelays: make([]float64, 0)} } }; trackers = newTrackers
 var pingResults []PingResult
 tickCount++
-isMinuteTick := (tickCount % 30 == 0) // 每 60 秒结算一次格子
+isMinuteTick := (tickCount % 30 == 0)
 
 for _, task := range instr.PingTasks { 
 delay, success := performPing(task); t := trackers[task.Name]
-
-// 1. 计算平滑实时延迟（供图表使用）
 if success { if t.LastEma == 0 { t.LastEma = delay } else { t.LastEma = t.LastEma * 0.8 + delay * 0.2 } }
-
-// 2. 聚合1分钟内的数据
 if success { t.TickSum += delay; t.TickCount++ } else { t.TickFails++ }
-
-// 3. 满一分钟时：画格子 + 计算1小时均值
 if isMinuteTick {
-if t.TickCount > 0 { 
-t.History = append(t.History, 1)
-t.HourDelays = append(t.HourDelays, t.TickSum / float64(t.TickCount))
-} else { 
-t.History = append(t.History, 0) 
-}
+if t.TickCount > 0 { t.History = append(t.History, 1); t.HourDelays = append(t.HourDelays, t.TickSum / float64(t.TickCount)) } else { t.History = append(t.History, 0) }
 if len(t.History) > 60 { t.History = t.History[1:] }
 if len(t.HourDelays) > 60 { t.HourDelays = t.HourDelays[1:] }
 t.TickSum = 0; t.TickCount = 0; t.TickFails = 0
 }
-
-// 4. 统计1小时内的总平均延迟
 var hourAvg float64 = 0
 if len(t.HourDelays) > 0 { var sum float64 = 0; for _, v := range t.HourDelays { sum += v }; hourAvg = sum / float64(len(t.HourDelays)) }
-
 fails := 0; for _, v := range t.History { if v == 0 { fails++ } }
 loss := 0.0; if len(t.History) > 0 { loss = float64(fails) / float64(len(t.History)) * 100.0 }
-
 pingResults = append(pingResults, PingResult{TargetName: task.Name, CurrentDelay: t.LastEma, AvgDelay: hourAvg, LossRate: loss, History: t.History})
 }
 status.PingStatuses = pingResults; if err := conn.WriteJSON(status); err != nil { return }; time.Sleep(2 * time.Second)
