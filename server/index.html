@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-                    <style>
+                        <style>
         body { font-family: 'Noto Sans SC', sans-serif; transition: background 0.8s ease; background-size: cover; background-attachment: fixed; background-position: center; min-height: 100vh; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         
@@ -20,14 +20,12 @@
         .glass-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 12px; }
         .glass-card:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25); }
 
-        /* ==================== 1. 极致黑夜模式 (深蓝星辰 & 霜面白边高级通透感) ==================== */
+        /* ==================== 1. 极致黑夜模式 (保持绝美的深蓝星辰) ==================== */
         body.theme-dark { 
-            /* 绝美深蓝星空群山壁纸，带有极具纵深感的光影 */
             background-image: linear-gradient(rgba(10, 15, 30, 0.3), rgba(10, 15, 30, 0.6)), url('https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1920&auto=format&fit=crop'); 
             color: #f1f5f9; 
         }
         .theme-dark .glass-card { 
-            /* 【核心优化】放弃黑底，改用极微弱的纯白霜感 (0.03透明度) + 超强模糊 + 0.15的高光白边，打造顶级通透感 */
             background: rgba(255, 255, 255, 0.03); 
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); 
             border: 1px solid rgba(255, 255, 255, 0.15); 
@@ -36,33 +34,31 @@
         .theme-dark .panel-bg { background: rgba(0, 0, 0, 0.3); border-top: 1px solid rgba(255, 255, 255, 0.08); }
         .theme-dark .progress-track { background: rgba(255, 255, 255, 0.1); }
         
-        /* 黑夜字体：保留黑色文字阴影，保证在任何星光下都清晰无比 */
         .theme-dark .text-gray-100 { color: #ffffff !important; font-weight: 700; letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
         .theme-dark .text-gray-200 { color: #f8fafc !important; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
         .theme-dark .text-gray-300 { color: #e2e8f0 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
         .theme-dark .text-gray-400 { color: #94a3b8 !important; }
 
-        /* ==================== 2. 昼模式 (Komari 风格 - 唯美二次元樱花 & 护眼) ==================== */
+        /* ==================== 2. 昼模式 (Komari 风格 - 唯美柔和动漫云彩 & 极致护眼) ==================== */
         body.theme-komari { 
-            /* 换成一张非常唯美的粉蓝调樱花动漫风风景，加了5%-10%的微遮罩防眩光 */
-            background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.1)), url('https://images.unsplash.com/photo-1522383225653-ed111181a951?q=80&w=1920&auto=format&fit=crop'); 
+            /* 【核心优化】换成了粉蓝渐变的温柔云彩，并加上了 25% 的暗灰蓝滤镜，像戴了偏光太阳镜，绝对不刺眼 */
+            background-image: linear-gradient(rgba(30, 41, 59, 0.25), rgba(30, 41, 59, 0.25)), url('https://images.unsplash.com/photo-1500964757637-c85e8a162699?q=80&w=1920&auto=format&fit=crop'); 
             color: #1e293b; 
         }
         .theme-komari .glass-card { 
-            /* 保持你满意的柔和白底和模糊度 */
-            background: rgba(255, 255, 255, 0.65); 
-            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); 
-            border: 1px solid rgba(255, 255, 255, 0.6); 
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); 
+            /* 【核心优化】卡片底色降低了耀眼的纯白感，改用带有一点温润灰的透白，更轻盈护眼 */
+            background: rgba(250, 250, 250, 0.6); 
+            backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); 
+            border: 1px solid rgba(255, 255, 255, 0.5); 
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06); 
         }
         .theme-komari .panel-bg { background: rgba(255, 255, 255, 0.4); border-top: 1px solid rgba(0, 0, 0, 0.05); }
         .theme-komari .progress-track { background: rgba(0, 0, 0, 0.08); }
         
-        /* 昼模式字体：高对比深色 */
+        /* 昼模式字体：高对比深色保持清晰 */
         .theme-komari .text-gray-100 { color: #0f172a !important; font-weight: 800; letter-spacing: 0.5px; }
         .theme-komari .text-gray-200 { color: #1e293b !important; font-weight: 700; }
         .theme-komari .text-gray-300 { color: #334155 !important; font-weight: 600; }
-        .theme-komari .text-komari-accent { color: #475569 !important; font-weight: 700; } 
         .theme-komari .text-gray-400 { color: #475569 !important; font-weight: 700; } 
         
         /* 昼模式弹窗（折线图） */
@@ -72,6 +68,7 @@
         .theme-komari .hover\:text-white:hover { color: #000 !important; }
         .theme-komari .text-white.shadow { color: #fff !important; }
     </style>
+
 
 
 
