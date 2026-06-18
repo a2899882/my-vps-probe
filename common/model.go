@@ -23,3 +23,11 @@ NetInTransfer uint64 `json:"net_in_transfer"`
 NetOutTransfer uint64 `json:"net_out_transfer"`; CountryCode string `json:"country_code"`
 PingStatuses []PingResult `json:"ping_statuses"`
 }
+
+type PingResult struct {
+TargetName   string  `json:"target_name"`
+CurrentDelay float64 `json:"current_delay"`
+AvgDelay     float64 `json:"avg_delay"`
+LossRate     float64 `json:"loss_rate"`
+History      []int   `json:"history"`
+}
