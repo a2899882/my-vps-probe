@@ -50,7 +50,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/etc/probe/probe-agent -server ${CLEAN_SERVER} -token ${TOKEN}
+ExecStart=/etc/probe/probe-agent -server ${SERVER} -token ${TOKEN}
 Restart=always
 RestartSec=3
 User=root
