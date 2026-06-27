@@ -46,7 +46,10 @@
                             <div><label class="text-xs text-gray-500">到期时间</label><input v-model="node.expire_date" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
                         </div>
                         <div class="grid grid-cols-2 gap-3 mt-3">
-                            <div class="col-span-2"><label class="text-xs text-gray-500">每月流量上限 (GB，填 0 则无限制并隐藏大屏进度条)</label><input type="number" v-model.number="node.traffic_limit" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
+                            <div class="col-span-2">
+                                <label class="text-xs text-gray-500">每月流量上限 (GB，填 0 则无限制并隐藏大屏进度条)</label>
+                                <input type="number" v-model.number="node.traffic_limit" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -95,19 +98,35 @@
                 const activeNode = ref({});
                 const copyText = ref("🔗 复制一键部署命令");
 
-                // 【新增】：后台页面的标题也能实时同步
                 watch(() => config.value.site_name, (newVal) => {
                     document.title = newVal ? newVal + ' - 管理后台' : '探针中枢管理台';
                 });
 
-                const loadConfig = async () => { const res = await fetch('/api/admin/config'); if (res.ok) let d = await res.json(); if(d.nodes){ d.nodes.forEach(n => { if(n.traffic_limit === undefined) n.traffic_limit = 0; }); } config.value = d; };
+                const loadConfig = async () => { 
+                    try {
+                        const res = await fetch('/api/admin/config'); 
+                        if (res.ok) {
+                            let d = await res.json();
+                            if(d.nodes) {
+                                d.nodes.forEach(n => {
+                                    if(n.traffic_limit === undefined) n.traffic_limit = 0;
+                                });
+                            } else {
+                                d.nodes = [];
+                            }
+                            if(!d.ping_tasks) d.ping_tasks = [];
+                            config.value = d;
+                        } 
+                    } catch(e) { console.error("加载配置失败", e); }
+                };
+
                 const saveConfig = async () => {
                     const res = await fetch('/api/admin/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
                     if (res.ok) { alert("✅ 保存成功！若是修改了密码，再次刷新或操作将会要求重新登录。"); config.value.admin_pass = ''; } else { alert("❌ 保存失败，可能是凭证验证过期，请刷新页面重新登录。"); }
                 };
 
                 const showDeployModal = (node) => { activeNode.value = node; copyText.value = "🔗 复制一键部署命令"; deployModal.value = true; };
-                const deployCommand = computed(() => { const host = window.location.host; return `curl -sL https://${host}/install.sh | bash -s -- -s ${origin} -t ${activeNode.value.token}`; });
+                const deployCommand = computed(() => { const host = window.location.host; return `curl -sL https://${host}/install.sh | bash -s -- -s ${host} -t ${activeNode.value.token}`; });
 
                 const copyCommand = () => {
                     const text = deployCommand.value;
@@ -118,9 +137,13 @@
                     copyText.value = "✅ 复制成功！快去终端粘贴吧"; setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000);
                 };
 
-                const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date: "2027/01/01", traffic_limit: 0 });
+                const addNode = () => {
+                    config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date: "2027/01/01", traffic_limit: 0 });
+                };
                 const removeNode = (idx) => config.value.nodes.splice(idx, 1);
-                const addTask = () => config.value.ping_tasks.push({ name: "新目标", host: "1.1.1.1" });
+                const addTask = () => {
+                    config.value.ping_tasks.push({ name: "新目标", host: "1.1.1.1" });
+                };
                 const removeTask = (idx) => config.value.ping_tasks.splice(idx, 1);
 
                 onMounted(loadConfig);
