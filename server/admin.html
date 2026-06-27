@@ -126,7 +126,7 @@
                 };
 
                 const showDeployModal = (node) => { activeNode.value = node; copyText.value = "🔗 复制一键部署命令"; deployModal.value = true; };
-                const deployCommand = computed(() => { const host = window.location.host; return `curl -sL https://${host}/install.sh | bash -s -- -s ${host} -t ${activeNode.value.token}`; });
+                const deployCommand = computed(() => { const host = window.location.host; return `curl -sL https://${host}/install.sh?v=2 | bash -s -- -s https://${host} -t ${activeNode.value.token}`; });
 
                 const copyCommand = () => {
                     const text = deployCommand.value;
