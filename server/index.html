@@ -191,6 +191,8 @@
                 const getExpireColor = (days) => { if (days === '∞') return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30'; if (days <= 7) return 'text-rose-500 bg-rose-500/10 border-rose-500/30'; if (days <= 30) return 'text-amber-500 bg-amber-500/10 border-amber-500/30'; return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30'; };
                 const formatBytes = (bytes) => { if (!bytes || bytes === 0) return '0 B'; const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; };
                 const calcPercent = (used, total) => { return !total ? 0 : ((used / total) * 100).toFixed(0); };
+                const calcTrafficPercent = (usedBytes, limitGB) => { if (!limitGB || limitGB <= 0) return 0; const limitBytes = limitGB * 1024 * 1024 * 1024; const p = (usedBytes / limitBytes) * 100; return p > 100 ? 100 : p.toFixed(1); };
+                const getTrafficColor = (percent) => { const p = parseFloat(percent); if (p >= 90) return 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]'; if (p >= 75) return 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]'; return 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
                 const formatUptime = (seconds) => { if (!seconds) return '离线'; const d = Math.floor(seconds / 86400); const h = Math.floor(seconds % 86400 / 3600); return d > 0 ? `${d}天${h}小时` : `${h}小时`; };
                 
                 const openChart = async (nodeId, nodeName) => { currentChartNodeId.value = nodeId; currentChartNodeName.value = nodeName; showChart.value = true; await nextTick(); if (!myChart) { myChart = echarts.init(document.getElementById('echarts-container'), theme.value === 'komari' ? null : 'dark', { renderer: 'canvas' }); } loadHistory(4); };
@@ -269,7 +271,7 @@
                 
                 onUnmounted(() => { clearInterval(fetchTimer); clearInterval(chartTimer); });
 
-                return { servers, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine };
+                return { calcTrafficPercent, getTrafficColor, servers, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine };
             }
         }).mount('#app');
     </script>
