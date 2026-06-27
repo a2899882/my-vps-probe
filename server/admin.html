@@ -100,7 +100,7 @@
                     document.title = newVal ? newVal + ' - 管理后台' : '探针中枢管理台';
                 });
 
-                const loadConfig = async () => { const res = await fetch('/api/admin/config'); if (res.ok) config.value = await res.json(); };
+                const loadConfig = async () => { const res = await fetch('/api/admin/config'); if (res.ok) let d = await res.json(); if(d.nodes){ d.nodes.forEach(n => { if(n.traffic_limit === undefined) n.traffic_limit = 0; }); } config.value = d; };
                 const saveConfig = async () => {
                     const res = await fetch('/api/admin/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
                     if (res.ok) { alert("✅ 保存成功！若是修改了密码，再次刷新或操作将会要求重新登录。"); config.value.admin_pass = ''; } else { alert("❌ 保存失败，可能是凭证验证过期，请刷新页面重新登录。"); }
