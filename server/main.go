@@ -37,7 +37,9 @@ func main() {
 loadConfig(); initDB(); defer db.Close()
 http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/index.html") })
 http.HandleFunc("/admin", basicAuth(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/admin.html") }))
-http.HandleFunc("/install.sh", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "install.sh") })
+http.HandleFunc("/probe-agent-amd64", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/probe-agent-amd64") })
+	http.HandleFunc("/probe-agent-arm64", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/probe-agent-arm64") })
+	http.HandleFunc("/install.sh", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "install.sh") })
 http.HandleFunc("/download/agent.go", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "agent/main.go") })
 http.HandleFunc("/api/admin/config", basicAuth(func(w http.ResponseWriter, r *http.Request) {
 w.Header().Set("Content-Type", "application/json")
