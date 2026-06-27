@@ -19,133 +19,105 @@
         </header>
 
         <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-6 flex flex-wrap gap-4 items-end">
-            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">网站标题名称</label><input v-model="config.site_name" placeholder="极简探针看板" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-indigo-500 outline-none w-full"></div>
-            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">后台登录账号</label><input v-model="config.admin_user" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-indigo-500 outline-none w-full"></div>
-            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">后台登录新密码</label><input type="password" v-model="config.admin_pass" placeholder="留空则不修改密码" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-indigo-500 outline-none placeholder-gray-600 w-full"></div>
-            <div class="text-xs text-yellow-500 pb-2 w-full mt-1">⚠️ 提示：修改了账号或密码后，再次点击任何操作都会要求重新登录。</div>
+            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">网站标题名称</label><input v-model="config.site_name" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white outline-none w-full"></div>
+            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">后台登录账号</label><input v-model="config.admin_user" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white outline-none w-full"></div>
+            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">后台登录新密码</label><input type="password" v-model="config.admin_pass" placeholder="留空则不修改密码" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white outline-none w-full"></div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-indigo-400">🖥️ 被控节点 (小鸡) 管理</h2>
-                    <button @click="addNode" class="bg-indigo-600/20 text-indigo-400 px-3 py-1 rounded hover:bg-indigo-600/40 text-sm transition">+ 新增节点</button>
-                </div>
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-indigo-400">🖥️ 被控节点 (小鸡) 管理</h2><button @click="addNode" class="bg-indigo-600/20 text-indigo-400 px-3 py-1 rounded hover:bg-indigo-600/40 text-sm transition">+ 新增节点</button></div>
                 <div class="space-y-4">
                     <div v-for="(node, index) in config.nodes" :key="index" class="bg-gray-900 p-4 rounded-lg border border-gray-700 relative group">
-                        <div class="absolute top-2 right-2 flex gap-2">
-                            <button @click="showDeployModal(node)" class="bg-green-600/20 text-green-400 px-2 py-1 rounded text-xs hover:bg-green-600/40 transition">🚀 一键部署</button>
-                            <button @click="removeNode(index)" class="text-red-500 opacity-50 hover:opacity-100 text-xs px-1">✖</button>
-                        </div>
+                        <div class="absolute top-2 right-2 flex gap-2"><button @click="showDeployModal(node)" class="bg-green-600/20 text-green-400 px-2 py-1 rounded text-xs">🚀 一键部署</button><button @click="removeNode(index)" class="text-red-500 opacity-50 hover:opacity-100 text-xs px-1">✖</button></div>
                         <div class="grid grid-cols-2 gap-3 mb-2 mt-6">
-                            <div><label class="text-xs text-gray-500">节点 ID (需唯一)</label><input v-model="node.id" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
-                            <div><label class="text-xs text-gray-500">显示名称</label><input v-model="node.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
+                            <div><label class="text-xs text-gray-500">节点 ID (需唯一)</label><input v-model="node.id" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
+                            <div><label class="text-xs text-gray-500">显示名称</label><input v-model="node.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
-                            <div><label class="text-xs text-gray-500">通信 Token</label><input v-model="node.token" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
-                            <div><label class="text-xs text-gray-500">到期时间</label><input v-model="node.expire_date" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
+                            <div><label class="text-xs text-gray-500">通信 Token</label><input v-model="node.token" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
+                            <div><label class="text-xs text-gray-500">到期时间</label><input v-model="node.expire_date_display" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
                         </div>
-                        <div class="grid grid-cols-2 gap-3 mt-3">
-                            <div class="col-span-2">
-                                <label class="text-xs text-gray-500">每月流量上限 (GB，填 0 则无限制并隐藏大屏进度条)</label>
-                                <input type="number" v-model.number="node.traffic_limit" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none">
-                            </div>
+                        <div class="mt-3">
+                            <label class="text-xs text-gray-500 block mb-1">每月流量上限 (GB，填 0 则隐藏大屏进度条)</label>
+                            <input type="number" v-model.number="node.traffic_limit" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white">
                         </div>
                     </div>
                 </div>
             </div>
-
             <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-green-400">🎯 全局 Ping 监测目标</h2>
-                    <button @click="addTask" class="bg-green-600/20 text-green-400 px-3 py-1 rounded hover:bg-green-600/40 text-sm transition">+ 新增目标</button>
-                </div>
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-green-400">🎯 全局 Ping 监测目标</h2><button @click="addTask" class="bg-green-600/20 text-green-400 px-3 py-1 rounded hover:bg-green-600/40 text-sm transition">+ 新增目标</button></div>
                 <div class="space-y-4">
                     <div v-for="(task, index) in config.ping_tasks" :key="index" class="bg-gray-900 p-4 rounded-lg border border-gray-700 flex items-center gap-3">
-                        <div class="flex-1"><label class="text-xs text-gray-500">目标名称</label><input v-model="task.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-green-500 outline-none"></div>
-                        <div class="flex-1"><label class="text-xs text-gray-500">IP或域名</label><input v-model="task.host" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-green-500 outline-none"></div>
+                        <div class="flex-1"><label class="text-xs text-gray-500">目标名称</label><input v-model="task.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
+                        <div class="flex-1"><label class="text-xs text-gray-500">IP或域名</label><input v-model="task.host" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
                         <button @click="removeTask(index)" class="mt-4 text-red-500 hover:text-red-400">✖</button>
                     </div>
                 </div>
             </div>
         </div>
-
+        
         <div v-if="deployModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="deployModal = false">
             <div class="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-2xl mx-4 shadow-2xl overflow-hidden">
-                <div class="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
-                    <h3 class="font-bold text-gray-200">一键部署指令 - <span class="text-indigo-400">{{ activeNode.name }}</span></h3>
-                    <button @click="deployModal = false" class="text-gray-400 hover:text-white">✖</button>
-                </div>
+                <div class="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center"><h3 class="font-bold text-gray-200">一键部署指令 - {{ activeNode.name }}</h3><button @click="deployModal = false" class="text-gray-400 hover:text-white">✖</button></div>
                 <div class="p-6">
-                    <p class="text-sm text-gray-400 mb-4">请登录到您的被控端终端，复制并运行以下命令：</p>
-                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 font-mono text-sm text-green-400 break-all mb-4 relative">
-                        {{ deployCommand }}
-                    </div>
-                    <button @click="copyCommand" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg shadow transition">
-                        {{ copyText }}
-                    </button>
+                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 font-mono text-sm text-green-400 break-all mb-4 relative">{{ deployCommand }}</div>
+                    <button @click="copyCommand" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg shadow">{{ copyText }}</button>
                 </div>
             </div>
         </div>
     </div>
-
     <script>
-        const { createApp, ref, onMounted, computed, watch } = Vue;
+        const { createApp, ref, onMounted, computed } = Vue;
         createApp({
             setup() {
                 const config = ref({ site_name: '', admin_user: '', admin_pass: '', nodes: [], ping_tasks: [] });
-                const deployModal = ref(false);
-                const activeNode = ref({});
-                const copyText = ref("🔗 复制一键部署命令");
-
-                watch(() => config.value.site_name, (newVal) => {
-                    document.title = newVal ? newVal + ' - 管理后台' : '探针中枢管理台';
-                });
-
+                const deployModal = ref(false); const activeNode = ref({}); const copyText = ref("🔗 复制一键部署命令");
+                
                 const loadConfig = async () => { 
-                    try {
+                    try { 
                         const res = await fetch('/api/admin/config'); 
-                        if (res.ok) {
-                            let d = await res.json();
+                        if (res.ok) { 
+                            let d = await res.json(); 
                             if(d.nodes) {
-                                d.nodes.forEach(n => {
-                                    if(n.expire_date && n.expire_date.includes("|")){ let p = n.expire_date.split("|"); n.expire_date = p[0]; n.traffic_limit = parseInt(p[1])||0; } else { n.traffic_limit = n.traffic_limit || 0; }
-                                });
+                                d.nodes.forEach(n => { 
+                                    if(n.expire_date && n.expire_date.includes('|')) {
+                                        let parts = n.expire_date.split('|');
+                                        n.expire_date_display = parts[0] || '2027/01/01';
+                                        n.traffic_limit = parseInt(parts[1]) || 0;
+                                    } else {
+                                        n.expire_date_display = n.expire_date || '2027/01/01';
+                                        n.traffic_limit = 0;
+                                    }
+                                }); 
                             } else {
                                 d.nodes = [];
                             }
                             if(!d.ping_tasks) d.ping_tasks = [];
-                            config.value = d;
+                            config.value = d; 
                         } 
-                    } catch(e) { console.error("加载配置失败", e); }
+                    } catch(e) {} 
                 };
-
-                const saveConfig = async () => {
-                    const res = await fetch('/api/admin/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify((() => { let p = JSON.parse(JSON.stringify(config.value)); p.nodes.forEach(n => { if(n.traffic_limit > 0) { n.expire_date = (n.expire_date||"").split("|")[0] + "|" + n.traffic_limit; } else { n.expire_date = (n.expire_date||"").split("|")[0]; } }); return p; })()) });
-                    if (res.ok) { alert("✅ 保存成功！若是修改了密码，再次刷新或操作将会要求重新登录。"); config.value.admin_pass = ''; } else { alert("❌ 保存失败，可能是凭证验证过期，请刷新页面重新登录。"); }
+                
+                const saveConfig = async () => { 
+                    const payload = JSON.parse(JSON.stringify(config.value));
+                    payload.nodes.forEach(n => {
+                        n.expire_date = (n.expire_date_display || '2027/01/01') + (n.traffic_limit > 0 ? '|' + n.traffic_limit : '');
+                        // 🌟 终极防报错：彻底删除可能导致 Go 解析崩溃的游离字段！
+                        delete n.traffic_limit;
+                        delete n.expire_date_display;
+                    });
+                    const res = await fetch('/api/admin/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); 
+                    if (res.ok) { alert("✅ 保存成功！完美生效！"); config.value.admin_pass = ''; } else { alert("❌ 保存失败！"); } 
                 };
-
-                const showDeployModal = (node) => { activeNode.value = node; copyText.value = "🔗 复制一键部署命令"; deployModal.value = true; };
-                const deployCommand = computed(() => { const host = window.location.host; return `curl -sL https://${host}/install.sh | bash -s -- -s ${host} -t ${activeNode.value.token}`; });
-
-                const copyCommand = () => {
-                    const text = deployCommand.value;
-                    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text); } else {
-                        const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; textArea.style.opacity = "0";
-                        document.body.appendChild(textArea); textArea.select(); document.execCommand("copy"); textArea.remove();
-                    }
-                    copyText.value = "✅ 复制成功！快去终端粘贴吧"; setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000);
-                };
-
-                const addNode = () => {
-                    config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date: "2027/01/01", traffic_limit: 0 });
-                };
+                
+                const showDeployModal = (node) => { activeNode.value = node; deployModal.value = true; copyText.value = "🔗 复制一键部署命令"; };
+                const deployCommand = computed(() => `curl -sL https://${window.location.host}/install.sh?v=2 | bash -s -- -s https://${window.location.host} -t ${activeNode.value.token}`);
+                const copyCommand = () => { navigator.clipboard.writeText(deployCommand.value); copyText.value = "✅ 复制成功！"; setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000); };
+                const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date_display: "2027/01/01", traffic_limit: 0 });
                 const removeNode = (idx) => config.value.nodes.splice(idx, 1);
-                const addTask = () => {
-                    config.value.ping_tasks.push({ name: "新目标", host: "1.1.1.1" });
-                };
+                const addTask = () => config.value.ping_tasks.push({ name: "新目标", host: "1.1.1.1" });
                 const removeTask = (idx) => config.value.ping_tasks.splice(idx, 1);
-
                 onMounted(loadConfig);
                 return { config, deployModal, activeNode, copyText, deployCommand, showDeployModal, copyCommand, addNode, removeNode, addTask, removeTask, saveConfig };
             }
