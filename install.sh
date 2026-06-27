@@ -15,27 +15,27 @@ fi
 
 echo "🚀 开始极速部署被控端 (本地主控全闭环版)..."
 
-# 强制清理 HTTP 头并拼接绝对安全的 HTTPS
 CLEAN_SERVER=$(echo "$SERVER" | sed 's/http:\/\///g' | sed 's/https:\/\///g')
 BASE_URL="https://${CLEAN_SERVER}"
 
 ARCH=$(uname -m)
-# 【核心魔法】：加入 ?v=2 强行击穿云厂商 CDN 缓存的旧 404 页面！
 if [ "$ARCH" = "x86_64" ]; then
-    DL_URL="${BASE_URL}/probe-agent-amd64?v=2"
+    DL_URL="${BASE_URL}/probe-agent-amd64?v=4"
 elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    DL_URL="${BASE_URL}/probe-agent-arm64?v=2"
+    DL_URL="${BASE_URL}/probe-agent-arm64?v=4"
 else
     echo "❌ 暂不支持的架构: $ARCH"
     exit 1
 fi
 
-echo "📥 正在击穿网络缓存，拉取核心成品 ..."
+echo "📥 正在拉取核心成品 ($DL_URL) ..."
 mkdir -p /etc/probe
-curl -sL "$DL_URL" -o /etc/probe/probe-agent
 
-if [ ! -s "/etc/probe/probe-agent" ] || grep -q "404" /etc/probe/probe-agent; then
-    echo "❌ 核心程序拉取失败！请检查主控端文件。"
+# 【核心修复】：获取下载请求的真实 HTTP 状态码，绝对不再去扫文件内容！
+HTTP_CODE=$(curl -sL -w "%{http_code}" "$DL_URL" -o /etc/probe/probe-agent)
+
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "❌ 核心程序拉取失败！HTTP 状态码: $HTTP_CODE"
     rm -f /etc/probe/probe-agent
     exit 1
 fi
