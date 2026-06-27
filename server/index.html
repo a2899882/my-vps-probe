@@ -84,7 +84,7 @@
                     </div>
                 </div>
                 <div class="mb-3 relative z-20">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getExpireColor(calcDaysLeft(node.expire_date))">余 {{ calcDaysLeft(node.expire_date) }} 天</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getExpireColor(calcDaysLeft(node.expire_date_display))">余 {{ calcDaysLeft(node.expire_date_display) }} 天</span>
                 </div>
                 <div class="flex gap-4 mb-4 text-[11px] font-bold opacity-90 relative z-20 text-gray-200">
                     <span class="text-[#3b82f6] flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>{{ node.status.cpu_cores }} Cores</span>
@@ -132,7 +132,7 @@
                 </div>
 
                 <div class="pt-3 mt-3 border-t border-white/10 flex justify-between text-[11px] font-bold text-gray-400 relative z-20">
-                    <span>到期: <span class="text-gray-300">{{ node.expire_date || '未知' }}</span></span>
+                    <span>到期: <span class="text-gray-300">{{ node.expire_date_display || '未知' }}</span></span>
                     <span>在线: <span class="text-[#6366f1]">{{ formatUptime(node.status.uptime) }}</span></span>
                 </div>
             </div>
@@ -181,7 +181,20 @@
                         const data = await res.json(); 
                         siteName.value = data.site_name || '探针看板'; 
                         document.title = siteName.value; 
-                        servers.value = data.nodes || [];
+                        
+                        let fetchedNodes = data.nodes || [];
+                        fetchedNodes.forEach(n => {
+                            // 🌟 核心拆解：大屏自动解析走私来的流量限制
+                            if(n.expire_date && n.expire_date.includes('|')) {
+                                let parts = n.expire_date.split('|');
+                                n.expire_date_display = parts[0];
+                                n.traffic_limit = parseInt(parts[1]) || 0;
+                            } else {
+                                n.expire_date_display = n.expire_date || '未知';
+                                n.traffic_limit = 0;
+                            }
+                        });
+                        servers.value = fetchedNodes;
                         
                         const tasksMap = {};
                         if(data.nodes) {
@@ -233,9 +246,6 @@
                                     chartData.push(null); 
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
-                                    
-                                    // 🌟 3. 核心修复：完美复刻 Komari 丢包断线逻辑！
-                                    // 如果这一分钟内发生了任何丢包（失败数 > 0），强行塞入 null，让图表线条断开！
                                     if (pt.count > 0 && pt.fails === 0) { 
                                         const avg = pt.sum / pt.count; chartData.push(avg); totalDelay += avg * pt.count; totalValid += pt.count; 
                                     } else { 
@@ -244,8 +254,6 @@
                                 } 
                             }); 
                             const avgD = totalValid > 0 ? (totalDelay / totalValid) : 0; const avgL = totalPoints > 0 ? (totalFails / totalPoints) * 100 : 0; stats[target] = { color: c, active: true, avgDelay: avgD, avgLoss: avgL }; 
-                            
-                            // 设置 connectNulls: false 允许断线显示
                             seriesData.push({ name: target, type: 'line', smooth: true, connectNulls: false, symbol: 'none', itemStyle: { color: c }, lineStyle: { width: 2.5 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: c + '33' }, { offset: 1, color: c + '00' }]) }, data: chartData }); 
                         }); 
                         chartStats.value = stats; 
