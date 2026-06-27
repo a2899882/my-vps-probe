@@ -45,6 +45,9 @@
                             <div><label class="text-xs text-gray-500">通信 Token</label><input v-model="node.token" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
                             <div><label class="text-xs text-gray-500">到期时间</label><input v-model="node.expire_date" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
                         </div>
+                        <div class="grid grid-cols-2 gap-3 mt-3">
+                            <div class="col-span-2"><label class="text-xs text-gray-500">每月流量上限 (GB，填 0 则无限制并隐藏大屏进度条)</label><input type="number" v-model.number="node.traffic_limit" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-indigo-500 outline-none"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -115,7 +118,7 @@
                     copyText.value = "✅ 复制成功！快去终端粘贴吧"; setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000);
                 };
 
-                const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date: "2027/01/01" });
+                const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), expire_date: "2027/01/01", traffic_limit: 0 });
                 const removeNode = (idx) => config.value.nodes.splice(idx, 1);
                 const addTask = () => config.value.ping_tasks.push({ name: "新目标", host: "1.1.1.1" });
                 const removeTask = (idx) => config.value.ping_tasks.splice(idx, 1);
