@@ -51,7 +51,7 @@
                     <svg v-if="theme === 'komari'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                     <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
                 </button>
-                <a href="/admin" target="_blank" class="hover:opacity-60 transition"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
+                <a href="/admin" target="_blank" class="hover:opacity-60 transition"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
             </div>
         </header>
 
@@ -120,12 +120,16 @@
                         <div v-for="(task, tIdx) in pingTasks" :key="tIdx" class="flex items-center text-[10px] font-mono">
                             <span class="w-12 text-gray-300 font-bold truncate">{{ task.name }}</span>
                             <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
-                                <template v-if="getHistory(node, task)">
+                                <template v-if="getHistory(node, task) && getHistory(node, task).length > 0">
                                     <div v-for="(ping, pIdx) in getHistory(node, task)" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-1'" :title="'Delay: ' + ping.delay + 'ms'"></div>
                                 </template>
-                                <template v-else><div class="flex-1 bg-gray-500/20 h-1"></div></template>
+                                <template v-else>
+                                    <div class="flex-1 bg-gray-500/20 h-1"></div>
+                                </template>
                             </div>
-                            <span class="w-12 text-right text-gray-400">{{ (getHistory(node, task) && getHistory(node, task).length > 0 && getHistory(node, task)[getHistory(node, task).length-1].delay > 0) ? getHistory(node, task)[getHistory(node, task).length-1].delay + 'ms' : '-- ms' }}</span>
+                            <span class="w-12 text-right text-gray-400">
+                                {{ (getHistory(node, task) && getHistory(node, task).length > 0 && getHistory(node, task)[getHistory(node, task).length-1].delay > 0) ? getHistory(node, task)[getHistory(node, task).length-1].delay + 'ms' : '-- ms' }}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -183,23 +187,21 @@
                         
                         let fetchedNodes = data.nodes || [];
                         fetchedNodes.forEach(n => {
-                            if(n.expire_date && n.expire_date.includes('|')) {
-                                let parts = n.expire_date.split('|');
+                            if(n.expire_date && String(n.expire_date).includes('|')) {
+                                let parts = String(n.expire_date).split('|');
                                 n.expire_date = parts[0];
                             }
                         });
                         servers.value = fetchedNodes;
                         
                         let pTasks = data.ping_tasks || [];
-                        if (pTasks.length === 0) {
+                        if (pTasks.length === 0 && data.nodes) {
                             const tasksMap = {};
-                            if(data.nodes) {
-                                data.nodes.forEach(n => {
-                                    if(n.status && n.status.ping_history) {
-                                        Object.keys(n.status.ping_history).forEach(k => { tasksMap[k] = k; });
-                                    }
-                                });
-                            }
+                            data.nodes.forEach(n => {
+                                if(n.status && n.status.ping_history) {
+                                    Object.keys(n.status.ping_history).forEach(k => { tasksMap[k] = k; });
+                                }
+                            });
                             pTasks = Object.keys(tasksMap).map(k => ({ name: k, host: k }));
                         }
                         if (pTasks.length === 0) {
@@ -227,9 +229,16 @@
                 };
                 const getTrafficColor = (p) => { const pf = parseFloat(p); return pf >= 90 ? 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]' : pf >= 75 ? 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]' : 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
                 
+                // 🌟 强力保证 Ping 数据绝对读取成功 🌟
                 const getHistory = (node, task) => {
                     if(!node || !node.status || !node.status.ping_history) return null;
-                    return node.status.ping_history[task.name] || node.status.ping_history[task.host] || null;
+                    let hist = node.status.ping_history[task.name] || node.status.ping_history[task.host];
+                    if (!hist) {
+                        for (let k in node.status.ping_history) {
+                            if (k.includes(task.name) || task.name.includes(k)) return node.status.ping_history[k];
+                        }
+                    }
+                    return hist || null;
                 };
 
                 const calcDaysLeft = (dateStr) => { if (!dateStr || dateStr.trim() === '') return '∞'; const diff = new Date(dateStr).getTime() - new Date().getTime(); return diff <= 0 ? 0 : Math.ceil(diff / (1000 * 60 * 60 * 24)); };
@@ -251,8 +260,9 @@
                             const fullTimeStr = item.time.substring(0, 16).replace('T', ' '); 
                             if (!timeMap[fullTimeStr]) timeMap[fullTimeStr] = {}; 
                             if (!timeMap[fullTimeStr][item.target]) timeMap[fullTimeStr][item.target] = { sum: 0, count: 0, fails: 0 }; 
-                            // 记录有效Ping或失败丢包
-                            if (item.delay > 0) { 
+                            
+                            // 🌟 精准识别 TCP 丢包 🌟
+                            if (item.delay && item.delay > 0) { 
                                 timeMap[fullTimeStr][item.target].sum += item.delay; 
                                 timeMap[fullTimeStr][item.target].count += 1; 
                             } else { 
@@ -271,20 +281,22 @@
                                     chartData.push(null); 
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
-                                    // 🌟 4. 彻底还原 Komari 的丢包断线逻辑！
-                                    // 只要该分钟内有失败丢包（fails > 0），立刻推送 null 将线条物理折断！
-                                    if (pt.count > 0 && pt.fails === 0) { 
-                                        const avg = pt.sum / pt.count; chartData.push(avg); totalDelay += avg * pt.count; totalValid += pt.count; 
-                                    } else { 
+                                    
+                                    // 🌟 4. Komari 同款断线！只要当分钟有丢包或0成功，强行塞入 null 让线条断开！🌟
+                                    if (pt.fails > 0 || pt.count === 0) { 
                                         chartData.push(null); 
+                                    } else { 
+                                        const avg = pt.sum / pt.count; chartData.push(avg); totalDelay += avg * pt.count; totalValid += pt.count; 
                                     } 
                                 } 
                             }); 
                             const avgD = totalValid > 0 ? (totalDelay / totalValid) : 0; const avgL = totalPoints > 0 ? (totalFails / totalPoints) * 100 : 0; stats[target] = { color: c, active: true, avgDelay: avgD, avgLoss: avgL }; 
+                            
+                            // 🌟 connectNulls: false 强制断线特效生效 🌟
                             seriesData.push({ name: target, type: 'line', smooth: true, connectNulls: false, symbol: 'none', itemStyle: { color: c }, lineStyle: { width: 2.5 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: c + '33' }, { offset: 1, color: c + '00' }]) }, data: chartData }); 
                         }); 
                         chartStats.value = stats; 
-                        const option = { backgroundColor: 'transparent', tooltip: { trigger: 'axis', axisPointer: { type: 'cross', label: { backgroundColor: isLight ? '#64748b' : '#334155' } }, backgroundColor: isLight ? 'rgba(255,255,255,0.95)' : 'rgba(15,23,42,0.95)', textStyle: { color: isLight ? '#0f172a' : '#f8fafc', fontWeight: 'bold' }, borderColor: isLight ? '#e2e8f0' : '#334155', borderWidth: 1, padding: 12, valueFormatter: (value) => value ? value.toFixed(1) + ' ms' : '-- ms' }, legend: { show: false }, grid: { left: '1%', right: '3%', bottom: '2%', top: '5%', containLabel: true }, xAxis: { type: 'category', data: timeData, boundaryGap: false, axisLine: { lineStyle: { color: isLight ? '#94a3b8' : '#475569' } }, axisLabel: { color: isLight ? '#64748b' : '#94a3b8', margin: 12 } }, yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: isLight ? '#64748b' : '#94a3b8' }, splitLine: { lineStyle: { color: isLight ? '#e2e8f0' : '#1e293b', type: 'dashed' } }, axisLabel: { color: isLight ? '#64748b' : '#94a3b8' } }, series: seriesData }; 
+                        const option = { backgroundColor: 'transparent', tooltip: { trigger: 'axis', axisPointer: { type: 'cross', label: { backgroundColor: isLight ? '#64748b' : '#334155' } }, backgroundColor: isLight ? 'rgba(255,255,255,0.95)' : 'rgba(15,23,42,0.95)', textStyle: { color: isLight ? '#0f172a' : '#f8fafc', fontWeight: 'bold' }, borderColor: isLight ? '#e2e8f0' : '#334155', borderWidth: 1, padding: 12, valueFormatter: (value) => value ? value.toFixed(1) + ' ms' : '-- ms' }, legend: { show: false }, grid: { left: '1%', right: '3%', bottom: '2%', top: '5%', containLabel: true }, xAxis: { type: 'category', data: timeData, boundaryGap: false, axisLine: { lineStyle: { color: isLight ? '#94a3b8' : '#475569' } }, axisLabel: { color: isLight ? '#64748b' : margin: 12 } }, yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: isLight ? '#64748b' : '#94a3b8' }, splitLine: { lineStyle: { color: isLight ? '#e2e8f0' : '#1e293b', type: 'dashed' } }, axisLabel: { color: isLight ? '#64748b' : '#94a3b8' } }, series: seriesData }; 
                         myChart.setOption(option, true); 
                     } catch (e) {} 
                     if(showLoading && myChart) myChart.hideLoading(); 
