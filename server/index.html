@@ -51,7 +51,7 @@
                     <svg v-if="theme === 'komari'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                     <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
                 </button>
-                <a href="/admin" target="_blank" class="hover:opacity-60 transition"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
+                <a href="/admin" target="_blank" class="hover:opacity-60 transition"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
             </div>
         </header>
 
@@ -81,7 +81,7 @@
                 </div>
 
                 <div class="mb-3 relative z-20">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getExpireColor(calcDaysLeft(getExpireDate(node.expire_date)))">余 {{ calcDaysLeft(getExpireDate(node.expire_date)) }} 天</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getExpireColor(calcDaysLeft(node.expire_date_display))">余 {{ calcDaysLeft(node.expire_date_display) }} 天</span>
                 </div>
 
                 <div class="flex gap-4 mb-4 text-[11px] font-bold opacity-90 relative z-20 text-gray-200">
@@ -104,9 +104,9 @@
                     <div class="flex justify-between items-center"><span class="text-gray-400">负载</span><span class="font-mono text-gray-200">{{ ((node.status && node.status.load_1)||0).toFixed(2) }} <span class="opacity-30 mx-1">|</span> 0.00 <span class="opacity-30 mx-1">|</span> 0.00</span></div>
                 </div>
 
-                <div v-if="getTrafficLimit(node.expire_date) > 0" class="pt-2 mb-2 border-t border-white/5 relative z-20">
+                <div v-if="node.traffic_limit > 0" class="pt-2 mb-2 border-t border-white/5 relative z-20">
                     <div class="flex justify-between items-center mb-1.5 text-[10.5px] font-bold">
-                        <span class="text-gray-400">当月流量 <span class="opacity-60 text-[9px]">({{ getTrafficLimit(node.expire_date) }}GB)</span></span>
+                        <span class="text-gray-400">当月流量 <span class="opacity-60 text-[9px]">({{ node.traffic_limit }}GB)</span></span>
                         <span class="font-mono" :class="getTrafficPercent(node) >= 90 ? 'text-red-500 font-bold' : 'text-gray-200'">{{ getTrafficUsedStr(node) }} <span class="opacity-30 mx-0.5">|</span> {{ getTrafficPercent(node) }}%</span>
                     </div>
                     <div class="flex-1 progress-track bg-black/10">
@@ -120,7 +120,7 @@
                         <div v-for="(task, tIdx) in pingTasks" :key="tIdx" class="flex items-center text-[10px] font-mono">
                             <span class="w-12 text-gray-300 font-bold truncate">{{ task.name }}</span>
                             <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
-                                <template v-if="getHistory(node, task) && getHistory(node, task).length > 0">
+                                <template v-if="getHistory(node, task).length > 0">
                                     <div v-for="(ping, pIdx) in getHistory(node, task)" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-1'" :title="'Delay: ' + ping.delay + 'ms'"></div>
                                 </template>
                                 <template v-else>
@@ -128,14 +128,14 @@
                                 </template>
                             </div>
                             <span class="w-12 text-right text-gray-400">
-                                {{ (getHistory(node, task) && getHistory(node, task).length > 0 && getHistory(node, task)[getHistory(node, task).length-1].delay > 0) ? getHistory(node, task)[getHistory(node, task).length-1].delay + 'ms' : '-- ms' }}
+                                {{ (getHistory(node, task).length > 0 && getHistory(node, task)[getHistory(node, task).length-1].delay > 0) ? getHistory(node, task)[getHistory(node, task).length-1].delay + 'ms' : '-- ms' }}
                             </span>
                         </div>
                     </div>
                 </div>
 
                 <div class="pt-3 mt-3 border-t border-white/10 flex justify-between text-[11px] font-bold text-gray-400 relative z-20">
-                    <span>到期: <span class="text-gray-300">{{ getExpireDate(node.expire_date) }}</span></span>
+                    <span>到期: <span class="text-gray-300">{{ node.expire_date_display }}</span></span>
                     <span>在线: <span class="text-[#6366f1]">{{ formatUptime((node.status && node.status.uptime)||0) }}</span></span>
                 </div>
             </div>
@@ -187,13 +187,19 @@
                         
                         let fetchedNodes = data.nodes || [];
                         fetchedNodes.forEach(n => {
+                            // 🌟 防覆盖：安全的分割数据走私逻辑 🌟
                             if(n.expire_date && String(n.expire_date).includes('|')) {
                                 let parts = String(n.expire_date).split('|');
-                                n.expire_date = parts[0];
+                                n.expire_date_display = parts[0];
+                                n.traffic_limit = parseInt(parts[1]) || 0;
+                            } else {
+                                n.expire_date_display = n.expire_date || '未知';
+                                n.traffic_limit = 0;
                             }
                         });
                         servers.value = fetchedNodes;
                         
+                        // 获取 Ping 列表
                         let pTasks = data.ping_tasks || [];
                         if (pTasks.length === 0 && data.nodes) {
                             const tasksMap = {};
@@ -205,7 +211,7 @@
                             pTasks = Object.keys(tasksMap).map(k => ({ name: k, host: k }));
                         }
                         if (pTasks.length === 0) {
-                            pTasks = [{ name: '广东电信', host: '广东电信' }, { name: '广东联通', host: '广东联通' }, { name: '广东移动', host: '广东移动' }];
+                            pTasks = [{ name: '广东电信', host: 'gd-ct' }, { name: '广东联通', host: 'gd-cu' }, { name: '广东移动', host: 'gd-cm' }];
                         }
                         pingTasks.value = pTasks;
                     } catch (e) {} 
@@ -218,26 +224,24 @@
                 const totalSpeedIn = computed(() => servers.value.reduce((acc, curr) => acc + ((curr.status && curr.status.net_in_speed) || 0), 0)); 
                 const totalSpeedOut = computed(() => servers.value.reduce((acc, curr) => acc + ((curr.status && curr.status.net_out_speed) || 0), 0));
                 
-                const getExpireDate = (d) => { return d ? String(d).split('|')[0] : '未知'; };
-                const getTrafficLimit = (d) => { return d && String(d).includes('|') ? parseInt(String(d).split('|')[1]) : 0; };
                 const formatBytes = (bytes) => { if (!bytes || bytes === 0) return '0 B'; const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; };
                 const getTrafficUsedStr = (node) => { return formatBytes(((node.status && node.status.net_out_transfer)||0) + ((node.status && node.status.net_in_transfer)||0)); };
                 const getTrafficPercent = (node) => { 
-                    const limit = getTrafficLimit(node.expire_date); if (!limit) return 0; 
+                    if (!node.traffic_limit) return 0; 
                     const used = ((node.status && node.status.net_out_transfer)||0) + ((node.status && node.status.net_in_transfer)||0); 
-                    return Math.min((used / (limit * 1024 * 1024 * 1024)) * 100, 100).toFixed(1); 
+                    return Math.min((used / (node.traffic_limit * 1024 * 1024 * 1024)) * 100, 100).toFixed(1); 
                 };
                 const getTrafficColor = (p) => { const pf = parseFloat(p); return pf >= 90 ? 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]' : pf >= 75 ? 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]' : 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
                 
+                // 🌟 核心：强力获取 Ping 数据，绝不落空 🌟
                 const getHistory = (node, task) => {
-                    if(!node || !node.status || !node.status.ping_history) return null;
+                    if(!node || !node.status || !node.status.ping_history) return [];
                     let hist = node.status.ping_history[task.name] || node.status.ping_history[task.host];
-                    if (!hist) {
-                        for (let k in node.status.ping_history) {
-                            if (k.includes(task.name) || task.name.includes(k)) return node.status.ping_history[k];
-                        }
+                    if (hist) return hist;
+                    for (let k in node.status.ping_history) {
+                        if (k === task.name || k === task.host || k.includes(task.name)) return node.status.ping_history[k];
                     }
-                    return hist || null;
+                    return [];
                 };
 
                 const calcDaysLeft = (dateStr) => { if (!dateStr || dateStr.trim() === '') return '∞'; const diff = new Date(dateStr).getTime() - new Date().getTime(); return diff <= 0 ? 0 : Math.ceil(diff / (1000 * 60 * 60 * 24)); };
@@ -280,7 +284,7 @@
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
                                     
-                                    // 🌟 核心：只要这1分钟内有失败，或者全部为0，立刻推送 null 折断线条！🌟
+                                    // 🌟 4. Komari 同款硬核断线！只要这一分钟内有丢包（失败），强制塞入 null 断开连线！🌟
                                     if (pt.fails > 0 || pt.count === 0) { 
                                         chartData.push(null); 
                                     } else { 
@@ -290,7 +294,6 @@
                             }); 
                             const avgD = totalValid > 0 ? (totalDelay / totalValid) : 0; const avgL = totalPoints > 0 ? (totalFails / totalPoints) * 100 : 0; stats[target] = { color: c, active: true, avgDelay: avgD, avgLoss: avgL }; 
                             
-                            // ❗ 这一句是重中之重，加上了正确的标点符号，并且保留了 connectNulls: false 断线属性 ❗
                             seriesData.push({ name: target, type: 'line', smooth: true, connectNulls: false, symbol: 'none', itemStyle: { color: c }, lineStyle: { width: 2.5 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: c + '33' }, { offset: 1, color: c + '00' }]) }, data: chartData }); 
                         }); 
                         chartStats.value = stats; 
@@ -303,7 +306,7 @@
                 onMounted(() => { const body = document.body; body.className = theme.value === 'komari' ? 'theme-komari' : 'theme-dark'; watch(theme, (newVal) => { body.className = newVal === 'komari' ? 'theme-komari' : 'theme-dark'; if(myChart){ myChart.dispose(); myChart = echarts.init(document.getElementById('echarts-container'), null, { renderer: 'canvas' }); loadHistory(chartHours.value, false); }}); fetchData(); fetchTimer = setInterval(fetchData, 2000); chartTimer = setInterval(() => { if (showChart.value && currentChartNodeId.value) { loadHistory(chartHours.value, false); } }, 10000); });
                 onUnmounted(() => { clearInterval(fetchTimer); clearInterval(chartTimer); });
                 
-                return { servers, pingTasks, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine, getExpireDate, getTrafficLimit, getTrafficUsedStr, getTrafficPercent, getTrafficColor, getHistory };
+                return { servers, pingTasks, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine, getTrafficUsedStr, getTrafficPercent, getTrafficColor, getHistory };
             }
         }).mount('#app');
     </script>
