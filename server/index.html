@@ -51,7 +51,7 @@
                     <svg v-if="theme === 'komari'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                     <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
                 </button>
-                <a href="/admin" target="_blank" class="hover:opacity-60 transition"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
+                <a href="/admin" target="_blank" class="hover:opacity-60 transition"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
             </div>
         </header>
 
@@ -117,27 +117,20 @@
                 <div class="mt-auto relative z-20">
                     <div class="text-[10px] text-gray-400 font-bold mb-1 border-t border-white/10 pt-2">连通率监测 (60格=60分钟)</div>
                     <div class="space-y-1">
-                        <template v-if="node.status && node.status.ping_history && Object.keys(node.status.ping_history).length > 0">
-                            <div v-for="(hist, taskName) in node.status.ping_history" :key="taskName" class="flex items-center text-[10px] font-mono">
-                                <span class="w-12 text-gray-300 font-bold truncate" :title="taskName">{{ taskName }}</span>
-                                <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
-                                    <template v-if="hist && hist.length > 0">
-                                        <div v-for="(ping, pIdx) in hist" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" 
-                                             :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-1'" 
-                                             :title="'Delay: ' + ping.delay + 'ms'"></div>
-                                    </template>
-                                    <template v-else>
-                                        <div class="flex-1 bg-gray-500/20 h-1"></div>
-                                    </template>
-                                </div>
-                                <span class="w-12 text-right text-gray-400">
-                                    {{ (hist && hist.length > 0 && hist[hist.length-1].delay > 0) ? hist[hist.length-1].delay + 'ms' : '-- ms' }}
-                                </span>
+                        <div v-for="(task, tIdx) in pingTasks" :key="tIdx" class="flex items-center text-[10px] font-mono">
+                            <span class="w-12 text-gray-300 font-bold truncate">{{ task.name }}</span>
+                            <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
+                                <template v-if="getHistory(node, task).length > 0">
+                                    <div v-for="(ping, pIdx) in getHistory(node, task)" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-1'" :title="'Delay: ' + ping.delay + 'ms'"></div>
+                                </template>
+                                <template v-else>
+                                    <div class="flex-1 bg-gray-500/20 h-1"></div>
+                                </template>
                             </div>
-                        </template>
-                        <template v-else>
-                            <div class="text-[10px] font-mono text-gray-500 py-1">暂无监测数据，请等待节点汇报...</div>
-                        </template>
+                            <span class="w-12 text-right text-gray-400">
+                                {{ (getHistory(node, task).length > 0 && getHistory(node, task)[getHistory(node, task).length-1].delay > 0) ? getHistory(node, task)[getHistory(node, task).length-1].delay + 'ms' : '-- ms' }}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -180,7 +173,7 @@
             setup() {
                 const servers = ref([]); const siteName = ref('探针看板'); const theme = ref(localStorage.getItem('probe_theme') || 'komari');
                 const showChart = ref(false); const currentChartNodeId = ref(''); const currentChartNodeName = ref(''); const chartHours = ref(4); const chartStats = ref({});
-                let myChart = null; const currentTime = ref('');
+                const pingTasks = ref([]); let myChart = null; const currentTime = ref('');
                 setInterval(() => { currentTime.value = new Date().toLocaleTimeString('zh-CN', {hour12: false}); }, 1000);
                 const toggleTheme = () => { theme.value = theme.value === 'komari' ? 'dark' : 'komari'; }; 
                 watch(theme, (newVal) => localStorage.setItem('probe_theme', newVal));
@@ -191,15 +184,13 @@
                         const data = await res.json(); 
                         siteName.value = data.site_name || '探针看板'; 
                         document.title = siteName.value; 
+                        servers.value = data.nodes || [];
                         
-                        let fetchedNodes = data.nodes || [];
-                        fetchedNodes.forEach(n => {
-                            if(n.expire_date && String(n.expire_date).includes('|')) {
-                                let parts = String(n.expire_date).split('|');
-                                n.expire_date = parts[0];
-                            }
-                        });
-                        servers.value = fetchedNodes;
+                        let pTasks = data.ping_tasks || [];
+                        if (pTasks.length === 0) {
+                            pTasks = [{ name: '广东电信', host: 'gd-ct' }, { name: '广东联通', host: 'gd-cu' }, { name: '广东移动', host: 'gd-cm' }];
+                        }
+                        pingTasks.value = pTasks;
                     } catch (e) {} 
                 };
 
@@ -221,6 +212,17 @@
                 };
                 const getTrafficColor = (p) => { const pf = parseFloat(p); return pf >= 90 ? 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]' : pf >= 75 ? 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]' : 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
                 
+                // 🌟 强力提取函数：再也不会因为名字不对而画不出格子了！ 🌟
+                const getHistory = (node, task) => {
+                    if(!node || !node.status || !node.status.ping_history) return [];
+                    let hist = node.status.ping_history[task.name] || node.status.ping_history[task.host];
+                    if (hist) return hist;
+                    for (let k in node.status.ping_history) {
+                        if (k === task.name || k === task.host || k.includes(task.name)) return node.status.ping_history[k];
+                    }
+                    return [];
+                };
+
                 const calcDaysLeft = (dateStr) => { if (!dateStr || dateStr.trim() === '') return '∞'; const diff = new Date(dateStr).getTime() - new Date().getTime(); return diff <= 0 ? 0 : Math.ceil(diff / (1000 * 60 * 60 * 24)); };
                 const getExpireColor = (days) => { if (days === '∞') return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; if (days <= 7) return 'text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30'; if (days <= 30) return 'text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30'; return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; };
                 const calcPercent = (used, total) => { return !total ? 0 : ((used / total) * 100).toFixed(0); };
@@ -232,18 +234,14 @@
                 
                 const loadHistory = async (hours, showLoading = true) => { 
                     chartHours.value = hours; const isLight = theme.value === 'komari';
-                    if(showLoading && myChart) myChart.showLoading({ text: '正在提取高质量数据...', color: '#6366f1', textColor: isLight ? '#0f172a' : '#f8fafc', maskColor: isLight ? 'rgba(255, 255, 255, 0.5)' : 'rgba(15, 23, 42, 0.5)' }); 
+                    if(showLoading && myChart) myChart.showLoading({ text: '正在渲染高质量数据...', color: '#6366f1', textColor: isLight ? '#0f172a' : '#f8fafc', maskColor: isLight ? 'rgba(255, 255, 255, 0.5)' : 'rgba(15, 23, 42, 0.5)' }); 
                     try { 
                         const res = await fetch(`/api/ping_history?server_id=${currentChartNodeId.value}&hours=${hours}`); 
-                        const data = await res.json() || []; const timeMap = {}; const targets = new Set(); const fullTimeMap = {};
-                        
+                        const data = await res.json() || []; const timeMap = {}; const targets = new Set(); 
                         data.forEach(item => { 
                             const fullTimeStr = item.time.substring(0, 16).replace('T', ' '); 
-                            fullTimeMap[fullTimeStr] = true;
                             if (!timeMap[fullTimeStr]) timeMap[fullTimeStr] = {}; 
                             if (!timeMap[fullTimeStr][item.target]) timeMap[fullTimeStr][item.target] = { sum: 0, count: 0, fails: 0 }; 
-                            
-                            // 记录有效Ping或失败丢包
                             if (item.delay && item.delay > 0) { 
                                 timeMap[fullTimeStr][item.target].sum += item.delay; 
                                 timeMap[fullTimeStr][item.target].count += 1; 
@@ -252,33 +250,18 @@
                             } 
                             targets.add(item.target); 
                         }); 
-                        
-                        // 🌟 4. Komari 级硬核防平滑逻辑：如果数据库在某分钟缺失了数据，强行插入缝隙让图表断开！🌟
-                        const sortedFullTimes = Object.keys(fullTimeMap).sort(); 
-                        const continuousTimes = [];
-                        for (let i = 0; i < sortedFullTimes.length; i++) {
-                            continuousTimes.push(sortedFullTimes[i]);
-                            if (i < sortedFullTimes.length - 1) {
-                                const t1 = new Date(sortedFullTimes[i].replace(' ', 'T') + ':00Z').getTime();
-                                const t2 = new Date(sortedFullTimes[i+1].replace(' ', 'T') + ':00Z').getTime();
-                                if (t2 - t1 > 90000) { // 如果间隔超过 1.5 分钟，插入断点时间
-                                    continuousTimes.push(new Date(t1 + 60000).toISOString().substring(0, 16).replace('T', ' '));
-                                }
-                            }
-                        }
-                        
-                        const timeData = continuousTimes.map(ft => ft.substring(11, 16)); const targetList = Array.from(targets); 
+                        const sortedFullTimes = Object.keys(timeMap).sort(); const timeData = sortedFullTimes.map(ft => ft.substring(11, 16)); const targetList = Array.from(targets); 
                         const colors = ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#0ea5e9', '#8b5cf6']; const stats = {}; const seriesData = []; 
                         
                         targetList.forEach((target, idx) => { 
                             const c = colors[idx % colors.length]; const chartData = []; let totalValid = 0, totalDelay = 0, totalFails = 0, totalPoints = 0; 
-                            continuousTimes.forEach(ft => { 
-                                const pt = timeMap[ft] ? timeMap[ft][target] : null; 
+                            sortedFullTimes.forEach(ft => { 
+                                const pt = timeMap[ft][target]; 
                                 if (!pt) { 
-                                    chartData.push(null); // 遇到断点，立刻推入 null 强制断线
+                                    chartData.push(null); 
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
-                                    // 只要有一丁点失败丢包，立刻物理折断线条！
+                                    // 🌟 4. Komari 级硬核断线特效：只要这一分钟有丢包失败，折线图当场物理断开缝隙！🌟
                                     if (pt.fails > 0 || pt.count === 0) { 
                                         chartData.push(null); 
                                     } else { 
@@ -287,7 +270,6 @@
                                 } 
                             }); 
                             const avgD = totalValid > 0 ? (totalDelay / totalValid) : 0; const avgL = totalPoints > 0 ? (totalFails / totalPoints) * 100 : 0; stats[target] = { color: c, active: true, avgDelay: avgD, avgLoss: avgL }; 
-                            
                             seriesData.push({ name: target, type: 'line', smooth: true, connectNulls: false, symbol: 'none', itemStyle: { color: c }, lineStyle: { width: 2.5 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: c + '33' }, { offset: 1, color: c + '00' }]) }, data: chartData }); 
                         }); 
                         chartStats.value = stats; 
@@ -300,7 +282,7 @@
                 onMounted(() => { const body = document.body; body.className = theme.value === 'komari' ? 'theme-komari' : 'theme-dark'; watch(theme, (newVal) => { body.className = newVal === 'komari' ? 'theme-komari' : 'theme-dark'; if(myChart){ myChart.dispose(); myChart = echarts.init(document.getElementById('echarts-container'), null, { renderer: 'canvas' }); loadHistory(chartHours.value, false); }}); fetchData(); fetchTimer = setInterval(fetchData, 2000); chartTimer = setInterval(() => { if (showChart.value && currentChartNodeId.value) { loadHistory(chartHours.value, false); } }, 10000); });
                 onUnmounted(() => { clearInterval(fetchTimer); clearInterval(chartTimer); });
                 
-                return { servers, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine, getExpireDate, getTrafficLimit, getTrafficUsedStr, getTrafficPercent, getTrafficColor };
+                return { servers, pingTasks, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine, getExpireDate, getTrafficLimit, getTrafficUsedStr, getTrafficPercent, getTrafficColor, getHistory };
             }
         }).mount('#app');
     </script>
