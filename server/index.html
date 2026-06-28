@@ -229,7 +229,6 @@
                 };
                 const getTrafficColor = (p) => { const pf = parseFloat(p); return pf >= 90 ? 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]' : pf >= 75 ? 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]' : 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
                 
-                // 🌟 强力保证 Ping 数据绝对读取成功 🌟
                 const getHistory = (node, task) => {
                     if(!node || !node.status || !node.status.ping_history) return null;
                     let hist = node.status.ping_history[task.name] || node.status.ping_history[task.host];
@@ -261,7 +260,6 @@
                             if (!timeMap[fullTimeStr]) timeMap[fullTimeStr] = {}; 
                             if (!timeMap[fullTimeStr][item.target]) timeMap[fullTimeStr][item.target] = { sum: 0, count: 0, fails: 0 }; 
                             
-                            // 🌟 精准识别 TCP 丢包 🌟
                             if (item.delay && item.delay > 0) { 
                                 timeMap[fullTimeStr][item.target].sum += item.delay; 
                                 timeMap[fullTimeStr][item.target].count += 1; 
@@ -282,7 +280,7 @@
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
                                     
-                                    // 🌟 4. Komari 同款断线！只要当分钟有丢包或0成功，强行塞入 null 让线条断开！🌟
+                                    // 🌟 核心：只要这1分钟内有失败，或者全部为0，立刻推送 null 折断线条！🌟
                                     if (pt.fails > 0 || pt.count === 0) { 
                                         chartData.push(null); 
                                     } else { 
@@ -292,11 +290,11 @@
                             }); 
                             const avgD = totalValid > 0 ? (totalDelay / totalValid) : 0; const avgL = totalPoints > 0 ? (totalFails / totalPoints) * 100 : 0; stats[target] = { color: c, active: true, avgDelay: avgD, avgLoss: avgL }; 
                             
-                            // 🌟 connectNulls: false 强制断线特效生效 🌟
+                            // ❗ 这一句是重中之重，加上了正确的标点符号，并且保留了 connectNulls: false 断线属性 ❗
                             seriesData.push({ name: target, type: 'line', smooth: true, connectNulls: false, symbol: 'none', itemStyle: { color: c }, lineStyle: { width: 2.5 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: c + '33' }, { offset: 1, color: c + '00' }]) }, data: chartData }); 
                         }); 
                         chartStats.value = stats; 
-                        const option = { backgroundColor: 'transparent', tooltip: { trigger: 'axis', axisPointer: { type: 'cross', label: { backgroundColor: isLight ? '#64748b' : '#334155' } }, backgroundColor: isLight ? 'rgba(255,255,255,0.95)' : 'rgba(15,23,42,0.95)', textStyle: { color: isLight ? '#0f172a' : '#f8fafc', fontWeight: 'bold' }, borderColor: isLight ? '#e2e8f0' : '#334155', borderWidth: 1, padding: 12, valueFormatter: (value) => value ? value.toFixed(1) + ' ms' : '-- ms' }, legend: { show: false }, grid: { left: '1%', right: '3%', bottom: '2%', top: '5%', containLabel: true }, xAxis: { type: 'category', data: timeData, boundaryGap: false, axisLine: { lineStyle: { color: isLight ? '#94a3b8' : '#475569' } }, axisLabel: { color: isLight ? '#64748b' : margin: 12 } }, yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: isLight ? '#64748b' : '#94a3b8' }, splitLine: { lineStyle: { color: isLight ? '#e2e8f0' : '#1e293b', type: 'dashed' } }, axisLabel: { color: isLight ? '#64748b' : '#94a3b8' } }, series: seriesData }; 
+                        const option = { backgroundColor: 'transparent', tooltip: { trigger: 'axis', axisPointer: { type: 'cross', label: { backgroundColor: isLight ? '#64748b' : '#334155' } }, backgroundColor: isLight ? 'rgba(255,255,255,0.95)' : 'rgba(15,23,42,0.95)', textStyle: { color: isLight ? '#0f172a' : '#f8fafc', fontWeight: 'bold' }, borderColor: isLight ? '#e2e8f0' : '#334155', borderWidth: 1, padding: 12, valueFormatter: (value) => value ? value.toFixed(1) + ' ms' : '-- ms' }, legend: { show: false }, grid: { left: '1%', right: '3%', bottom: '2%', top: '5%', containLabel: true }, xAxis: { type: 'category', data: timeData, boundaryGap: false, axisLine: { lineStyle: { color: isLight ? '#94a3b8' : '#475569' } }, axisLabel: { color: isLight ? '#64748b' : '#94a3b8', margin: 12 } }, yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: isLight ? '#64748b' : '#94a3b8' }, splitLine: { lineStyle: { color: isLight ? '#e2e8f0' : '#1e293b', type: 'dashed' } }, axisLabel: { color: isLight ? '#64748b' : '#94a3b8' } }, series: seriesData }; 
                         myChart.setOption(option, true); 
                     } catch (e) {} 
                     if(showLoading && myChart) myChart.hideLoading(); 
