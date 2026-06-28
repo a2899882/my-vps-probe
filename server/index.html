@@ -81,7 +81,7 @@
                 </div>
 
                 <div class="mb-3 relative z-20">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getExpireColor(calcDaysLeft(node.expire_date))">余 {{ calcDaysLeft(node.expire_date) }} 天</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getExpireColor(calcDaysLeft(node._safe_expire_date))">余 {{ calcDaysLeft(node._safe_expire_date) }} 天</span>
                 </div>
 
                 <div class="flex gap-4 mb-4 text-[11px] font-bold opacity-90 relative z-20 text-gray-200">
@@ -104,9 +104,9 @@
                     <div class="flex justify-between items-center"><span class="text-gray-400">负载</span><span class="font-mono text-gray-200">{{ ((node.status && node.status.load_1)||0).toFixed(2) }} <span class="opacity-30 mx-1">|</span> 0.00 <span class="opacity-30 mx-1">|</span> 0.00</span></div>
                 </div>
 
-                <div v-if="node.traffic_limit > 0" class="pt-2 mb-2 border-t border-white/5 relative z-20">
+                <div v-if="node._safe_traffic_limit > 0" class="pt-2 mb-2 border-t border-white/5 relative z-20">
                     <div class="flex justify-between items-center mb-1.5 text-[10.5px] font-bold">
-                        <span class="text-gray-400">当月流量 <span class="opacity-60 text-[9px]">({{ node.traffic_limit }}GB)</span></span>
+                        <span class="text-gray-400">当月流量 <span class="opacity-60 text-[9px]">({{ node._safe_traffic_limit }}GB)</span></span>
                         <span class="font-mono" :class="getTrafficPercent(node) >= 90 ? 'text-red-500 font-bold' : 'text-gray-200'">{{ getTrafficUsedStr(node) }} <span class="opacity-30 mx-0.5">|</span> {{ getTrafficPercent(node) }}%</span>
                     </div>
                     <div class="flex-1 progress-track bg-black/10">
@@ -137,7 +137,7 @@
                 </div>
 
                 <div class="pt-3 mt-3 border-t border-white/10 flex justify-between text-[11px] font-bold text-gray-400 relative z-20">
-                    <span>到期: <span class="text-gray-300">{{ node.expire_date || '未知' }}</span></span>
+                    <span>到期: <span class="text-gray-300">{{ node._safe_expire_date }}</span></span>
                     <span>在线: <span class="text-[#6366f1]">{{ formatUptime((node.status && node.status.uptime)||0) }}</span></span>
                 </div>
             </div>
@@ -187,16 +187,24 @@
                         siteName.value = data.site_name || '探针看板'; 
                         document.title = siteName.value; 
                         
-                        servers.value = data.nodes || [];
+                        let fetchedNodes = data.nodes || [];
+                        fetchedNodes.forEach(n => {
+                            // 🌟 终极防崩溃提取法，绝不产生 NaN！
+                            if (n.expire_date && String(n.expire_date).includes('|')) {
+                                let parts = String(n.expire_date).split('|');
+                                n._safe_expire_date = parts[0] || '2027/01/01';
+                                n._safe_traffic_limit = parseInt(parts[1]) || 0;
+                            } else {
+                                n._safe_expire_date = n.expire_date || '2027/01/01';
+                                n._safe_traffic_limit = 0;
+                            }
+                        });
+                        servers.value = fetchedNodes;
                         
-                        // 强制读取后台的 Ping 配置
+                        // 强制读取后台 Ping 列表
                         let pTasks = data.ping_tasks || [];
                         if (pTasks.length === 0) {
-                            pTasks = [
-                                { name: '广东电信', host: 'gd-ct' }, 
-                                { name: '广东联通', host: 'gd-cu' }, 
-                                { name: '广东移动', host: 'gd-cm' }
-                            ];
+                            pTasks = [{ name: '广东电信', host: 'gd-ct' }, { name: '广东联通', host: 'gd-cu' }, { name: '广东移动', host: 'gd-cm' }];
                         }
                         pingTasks.value = pTasks;
                     } catch (e) {} 
@@ -212,12 +220,13 @@
                 const formatBytes = (bytes) => { if (!bytes || bytes === 0) return '0 B'; const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; };
                 const getTrafficUsedStr = (node) => { return formatBytes(((node.status && node.status.net_out_transfer)||0) + ((node.status && node.status.net_in_transfer)||0)); };
                 const getTrafficPercent = (node) => { 
-                    if (!node.traffic_limit) return 0; 
+                    if (!node._safe_traffic_limit) return 0; 
                     const used = ((node.status && node.status.net_out_transfer)||0) + ((node.status && node.status.net_in_transfer)||0); 
-                    return Math.min((used / (node.traffic_limit * 1024 * 1024 * 1024)) * 100, 100).toFixed(1); 
+                    return Math.min((used / (node._safe_traffic_limit * 1024 * 1024 * 1024)) * 100, 100).toFixed(1); 
                 };
                 const getTrafficColor = (p) => { const pf = parseFloat(p); return pf >= 90 ? 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]' : pf >= 75 ? 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]' : 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
                 
+                // 🌟 强力提取Ping历史 🌟
                 const getHistory = (node, task) => {
                     if(!node || !node.status || !node.status.ping_history) return [];
                     let hist = node.status.ping_history[task.name] || node.status.ping_history[task.host];
@@ -228,8 +237,8 @@
                     return [];
                 };
 
-                const calcDaysLeft = (dateStr) => { if (!dateStr || dateStr.trim() === '') return '∞'; const diff = new Date(dateStr).getTime() - new Date().getTime(); return diff <= 0 ? 0 : Math.ceil(diff / (1000 * 60 * 60 * 24)); };
-                const getExpireColor = (days) => { if (days === '∞') return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; if (days <= 7) return 'text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30'; if (days <= 30) return 'text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30'; return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; };
+                const calcDaysLeft = (dateStr) => { if (!dateStr || dateStr.trim() === '' || dateStr === '未知') return '∞'; const diff = new Date(dateStr).getTime() - new Date().getTime(); if(isNaN(diff)) return '∞'; return diff <= 0 ? 0 : Math.ceil(diff / (1000 * 60 * 60 * 24)); };
+                const getExpireColor = (days) => { if (days === '∞' || isNaN(days)) return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; if (days <= 7) return 'text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30'; if (days <= 30) return 'text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30'; return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; };
                 const calcPercent = (used, total) => { return !total ? 0 : ((used / total) * 100).toFixed(0); };
                 const formatUptime = (seconds) => { if (!seconds) return '离线'; const d = Math.floor(seconds / 86400); const h = Math.floor(seconds % 86400 / 3600); return d > 0 ? `${d}天${h}小时` : `${h}小时`; };
                 
@@ -266,7 +275,7 @@
                                     chartData.push(null); 
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
-                                    // 🌟 4. Komari 级强制断流：只要有丢包（fails），折线图强制折断并飙红！🌟
+                                    // 🌟 4. TCP 严格丢包断线逻辑：只要失败1次，强行推入 null 断崖！🌟
                                     if (pt.fails > 0 || pt.count === 0) { 
                                         chartData.push(null); 
                                     } else { 
