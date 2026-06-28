@@ -121,7 +121,9 @@
                             <span class="w-12 text-gray-300 font-bold truncate">{{ task.name }}</span>
                             <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
                                 <template v-if="getHistory(node, task).length > 0">
-                                    <div v-for="(ping, pIdx) in getHistory(node, task)" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-1'" :title="'Delay: ' + ping.delay + 'ms'"></div>
+                                    <div v-for="(ping, pIdx) in getHistory(node, task)" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" 
+                                         :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-[3px]'" 
+                                         :title="'Delay: ' + ping.delay + 'ms'"></div>
                                 </template>
                                 <template v-else>
                                     <div class="flex-1 bg-gray-500/20 h-1"></div>
@@ -194,7 +196,7 @@
                         });
                         servers.value = fetchedNodes;
                         
-                        // 🌟 强力读取后台保存的 Ping 列表配置 🌟
+                        // 🌟 强力读取后台配置：如果有配置就显示，没有就显示默认！ 🌟
                         let pTasks = data.ping_tasks || [];
                         if (pTasks.length === 0) {
                             pTasks = [
