@@ -184,11 +184,24 @@
                         const data = await res.json(); 
                         siteName.value = data.site_name || '探针看板'; 
                         document.title = siteName.value; 
-                        servers.value = data.nodes || [];
                         
+                        let fetchedNodes = data.nodes || [];
+                        fetchedNodes.forEach(n => {
+                            if(n.expire_date && String(n.expire_date).includes('|')) {
+                                let parts = String(n.expire_date).split('|');
+                                n.expire_date = parts[0];
+                            }
+                        });
+                        servers.value = fetchedNodes;
+                        
+                        // 🌟 强力读取后台保存的 Ping 列表配置 🌟
                         let pTasks = data.ping_tasks || [];
                         if (pTasks.length === 0) {
-                            pTasks = [{ name: '广东电信', host: 'gd-ct' }, { name: '广东联通', host: 'gd-cu' }, { name: '广东移动', host: 'gd-cm' }];
+                            pTasks = [
+                                { name: '广东电信', host: 'gd-ct' }, 
+                                { name: '广东联通', host: 'gd-cu' }, 
+                                { name: '广东移动', host: 'gd-cm' }
+                            ];
                         }
                         pingTasks.value = pTasks;
                     } catch (e) {} 
@@ -261,7 +274,7 @@
                                     chartData.push(null); 
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
-                                    // 🌟 4. Komari 级硬核断线特效：只要这一分钟有丢包失败，折线图当场物理断开缝隙！🌟
+                                    // 🌟 4. Komari 级硬核断线特效 🌟
                                     if (pt.fails > 0 || pt.count === 0) { 
                                         chartData.push(null); 
                                     } else { 
