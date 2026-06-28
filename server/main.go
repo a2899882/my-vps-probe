@@ -65,7 +65,7 @@ for { if err := conn.ReadJSON(&st); err != nil { mapMutex.Lock(); st = serverSta
 http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 w.Header().Set("Content-Type", "application/json"); configMutex.RLock(); mapMutex.RLock(); var nodes []FrontendNode
 for _, n := range appConfig.Nodes { nodes = append(nodes, FrontendNode{ NodeConfig: n, Status: serverStatusMap[n.ID] }) }
-json.NewEncoder(w).Encode(map[string]interface{}{ "site_name": appConfig.SiteName, "nodes": nodes }); mapMutex.RUnlock(); configMutex.RUnlock()
+json.NewEncoder(w).Encode(map[string]interface{}{ "site_name": appConfig.SiteName, "nodes": nodes, "ping_tasks": appConfig.PingTasks}); mapMutex.RUnlock(); configMutex.RUnlock()
 })
 http.HandleFunc("/api/ping_history", func(w http.ResponseWriter, r *http.Request) {
 w.Header().Set("Content-Type", "application/json"); serverID := r.URL.Query().Get("server_id"); hours := r.URL.Query().Get("hours"); if hours == "" { hours = "24" }

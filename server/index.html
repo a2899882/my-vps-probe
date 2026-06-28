@@ -205,7 +205,14 @@
                             });
                             pTasks = Object.keys(tasksMap).map(k => ({ name: k, host: k }));
                         }
-                        pingTasks.value = pTasks;
+                        if (pTasks.length === 0) {
+                        pTasks = [
+                            { name: '广东电信', host: 'gd-ct' },
+                            { name: '广东联通', host: 'gd-cu' },
+                            { name: '广东移动', host: 'gd-cm' }
+                        ];
+                    }
+                    pingTasks.value = pTasks;
                     } catch (e) {} 
                 };
 
