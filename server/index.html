@@ -73,7 +73,11 @@
                         <span v-if="node.status && node.status.country_code && node.status.country_code !== 'OT'" :class="['fi', 'fi-' + node.status.country_code.toLowerCase(), 'rounded-sm']"></span><span v-else>🌐</span>
                         {{ node.name }}
                     </div>
-                    <svg class="w-4 h-4 opacity-40 cursor-pointer hover:opacity-100 transition text-gray-300" @click="openChart(node.id, node.name)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    <div class="flex items-center gap-2">
+                        <span v-if="node.status && node.status.is_online" class="w-2.5 h-2.5 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981]"></span>
+                        <span v-else class="w-2.5 h-2.5 rounded-full bg-[#ef4444] shadow-[0_0_8px_#ef4444]"></span>
+                        <svg class="w-4 h-4 opacity-40 cursor-pointer hover:opacity-100 transition text-gray-300" @click="openChart(node.id, node.name)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    </div>
                 </div>
 
                 <div class="mb-3 relative z-20">
@@ -116,12 +120,12 @@
                         <div v-for="(task, tIdx) in pingTasks" :key="tIdx" class="flex items-center text-[10px] font-mono">
                             <span class="w-12 text-gray-300 font-bold truncate">{{ task.name }}</span>
                             <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
-                                <template v-if="node.status && node.status.ping_history && node.status.ping_history[task.name]">
-                                    <div v-for="(ping, pIdx) in node.status.ping_history[task.name]" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-1'" :title="'Delay: ' + ping.delay + 'ms'"></div>
+                                <template v-if="getHistory(node, task)">
+                                    <div v-for="(ping, pIdx) in getHistory(node, task)" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-1'" :title="'Delay: ' + ping.delay + 'ms'"></div>
                                 </template>
                                 <template v-else><div class="flex-1 bg-gray-500/20 h-1"></div></template>
                             </div>
-                            <span class="w-12 text-right text-gray-400">{{ (node.status && node.status.ping_history && node.status.ping_history[task.name] && node.status.ping_history[task.name].length > 0 && node.status.ping_history[task.name][node.status.ping_history[task.name].length-1].delay > 0) ? node.status.ping_history[task.name][node.status.ping_history[task.name].length-1].delay + 'ms' : '-- ms' }}</span>
+                            <span class="w-12 text-right text-gray-400">{{ (getHistory(node, task) && getHistory(node, task).length > 0 && getHistory(node, task)[getHistory(node, task).length-1].delay > 0) ? getHistory(node, task)[getHistory(node, task).length-1].delay + 'ms' : '-- ms' }}</span>
                         </div>
                     </div>
                 </div>
@@ -190,27 +194,17 @@
                         });
                         servers.value = fetchedNodes;
                         
-                        // 🌟 终极获取：100% 对齐原生的获取逻辑，只要有数据绝对秒出 🌟
-                        let pTasks = [];
-                        const tasksMap = {};
-                        let hasHistory = false;
-                        if(data.nodes) {
-                            data.nodes.forEach(n => {
-                                if(n.status && n.status.ping_history) {
-                                    Object.keys(n.status.ping_history).forEach(k => { tasksMap[k] = k; hasHistory = true; });
-                                }
-                            });
-                        }
-                        if (hasHistory) {
+                        let pTasks = data.ping_tasks || [];
+                        if (pTasks.length === 0) {
+                            const tasksMap = {};
+                            if(data.nodes) {
+                                data.nodes.forEach(n => {
+                                    if(n.status && n.status.ping_history) {
+                                        Object.keys(n.status.ping_history).forEach(k => { tasksMap[k] = k; });
+                                    }
+                                });
+                            }
                             pTasks = Object.keys(tasksMap).map(k => ({ name: k, host: k }));
-                        } else if (data.ping_tasks && data.ping_tasks.length > 0) {
-                            pTasks = data.ping_tasks.map(t => ({ name: t.name, host: t.name }));
-                        } else {
-                            pTasks = [
-                                { name: '广东电信', host: '广东电信' },
-                                { name: '广东联通', host: '广东联通' },
-                                { name: '广东移动', host: '广东移动' }
-                            ];
                         }
                         pingTasks.value = pTasks;
                     } catch (e) {} 
@@ -234,6 +228,12 @@
                 };
                 const getTrafficColor = (p) => { const pf = parseFloat(p); return pf >= 90 ? 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]' : pf >= 75 ? 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]' : 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
                 
+                // 🌟 核心：强力获取数据，无论主控怎么抽风都能对上号 🌟
+                const getHistory = (node, task) => {
+                    if(!node || !node.status || !node.status.ping_history) return null;
+                    return node.status.ping_history[task.name] || node.status.ping_history[task.host] || null;
+                };
+
                 const calcDaysLeft = (dateStr) => { if (!dateStr || dateStr.trim() === '') return '∞'; const diff = new Date(dateStr).getTime() - new Date().getTime(); return diff <= 0 ? 0 : Math.ceil(diff / (1000 * 60 * 60 * 24)); };
                 const getExpireColor = (days) => { if (days === '∞') return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; if (days <= 7) return 'text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30'; if (days <= 30) return 'text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30'; return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; };
                 const calcPercent = (used, total) => { return !total ? 0 : ((used / total) * 100).toFixed(0); };
@@ -261,7 +261,7 @@
                                     chartData.push(null); 
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
-                                    // 🌟 核心：Komari 严格 TCP 断线特效 🌟
+                                    // 🌟 Komari 断线特效！
                                     if (pt.count > 0 && pt.fails === 0) { 
                                         const avg = pt.sum / pt.count; chartData.push(avg); totalDelay += avg * pt.count; totalValid += pt.count; 
                                     } else { 
@@ -282,7 +282,7 @@
                 onMounted(() => { const body = document.body; body.className = theme.value === 'komari' ? 'theme-komari' : 'theme-dark'; watch(theme, (newVal) => { body.className = newVal === 'komari' ? 'theme-komari' : 'theme-dark'; if(myChart){ myChart.dispose(); myChart = echarts.init(document.getElementById('echarts-container'), null, { renderer: 'canvas' }); loadHistory(chartHours.value, false); }}); fetchData(); fetchTimer = setInterval(fetchData, 2000); chartTimer = setInterval(() => { if (showChart.value && currentChartNodeId.value) { loadHistory(chartHours.value, false); } }, 10000); });
                 onUnmounted(() => { clearInterval(fetchTimer); clearInterval(chartTimer); });
                 
-                return { servers, pingTasks, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine, getExpireDate, getTrafficLimit, getTrafficUsedStr, getTrafficPercent, getTrafficColor };
+                return { servers, pingTasks, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine, getExpireDate, getTrafficLimit, getTrafficUsedStr, getTrafficPercent, getTrafficColor, getHistory };
             }
         }).mount('#app');
     </script>

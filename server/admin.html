@@ -103,7 +103,7 @@
                     const payload = JSON.parse(JSON.stringify(config.value));
                     payload.nodes.forEach(n => {
                         n.expire_date = (n.expire_date_display || '2027/01/01') + (n.traffic_limit > 0 ? '|' + n.traffic_limit : '');
-                        // 🌟 终极防报错：彻底删除可能导致 Go 解析崩溃的游离字段！
+                        // 🌟 终极防报错：彻底切断冗余字段，保证增删改 100% 成功写入数据库
                         delete n.traffic_limit;
                         delete n.expire_date_display;
                     });
