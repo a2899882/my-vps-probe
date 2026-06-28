@@ -117,22 +117,33 @@
                 <div class="mt-auto relative z-20">
                     <div class="text-[10px] text-gray-400 font-bold mb-1 border-t border-white/10 pt-2">连通率监测 (60格=60分钟)</div>
                     <div class="space-y-1">
-                        <div v-for="(task, tIdx) in pingTasks" :key="tIdx" class="flex items-center text-[10px] font-mono">
-                            <span class="w-12 text-gray-300 font-bold truncate">{{ task.name }}</span>
-                            <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
-                                <template v-if="getHistory(node, task).length > 0">
-                                    <div v-for="(ping, pIdx) in getHistory(node, task)" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" 
-                                         :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-[3px]'" 
-                                         :title="'Delay: ' + ping.delay + 'ms'"></div>
-                                </template>
-                                <template v-else>
-                                    <div class="flex-1 bg-gray-500/20 h-1"></div>
-                                </template>
+                        <template v-if="node.status && node.status.ping_history && Object.keys(node.status.ping_history).length > 0">
+                            <div v-for="(hist, taskName) in node.status.ping_history" :key="taskName" class="flex items-center text-[10px] font-mono">
+                                <span class="w-12 text-gray-300 font-bold truncate" :title="taskName">{{ taskName }}</span>
+                                <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
+                                    <template v-if="hist && hist.length > 0">
+                                        <div v-for="(ping, pIdx) in hist" :key="pIdx" class="flex-1 max-w-[3px] rounded-t-sm transition-all" 
+                                             :class="ping.delay > 0 ? (ping.delay < 100 ? 'bg-[#10b981] h-full' : (ping.delay < 200 ? 'bg-[#f59e0b] h-full' : 'bg-[#ef4444] h-full')) : 'bg-red-600 h-[3px]'" 
+                                             :title="'Delay: ' + ping.delay + 'ms'"></div>
+                                    </template>
+                                    <template v-else>
+                                        <div class="flex-1 bg-gray-500/20 h-1"></div>
+                                    </template>
+                                </div>
+                                <span class="w-12 text-right text-gray-400">
+                                    {{ (hist && hist.length > 0 && hist[hist.length-1].delay > 0) ? hist[hist.length-1].delay + 'ms' : '-- ms' }}
+                                </span>
                             </div>
-                            <span class="w-12 text-right text-gray-400">
-                                {{ (getHistory(node, task).length > 0 && getHistory(node, task)[getHistory(node, task).length-1].delay > 0) ? getHistory(node, task)[getHistory(node, task).length-1].delay + 'ms' : '-- ms' }}
-                            </span>
-                        </div>
+                        </template>
+                        <template v-else>
+                            <div v-for="(task, tIdx) in pingTasks" :key="tIdx" class="flex items-center text-[10px] font-mono">
+                                <span class="w-12 text-gray-300 font-bold truncate">{{ task.name }}</span>
+                                <div class="flex-1 flex gap-[2px] mx-2 h-2.5 items-end">
+                                    <div class="flex-1 bg-gray-500/20 h-1"></div>
+                                </div>
+                                <span class="w-12 text-right text-gray-400">-- ms</span>
+                            </div>
+                        </template>
                     </div>
                 </div>
 
@@ -195,7 +206,7 @@
                                 n._safe_traffic_limit = parseInt(parts[1]) || 0;
                             } else {
                                 n._safe_expire_date = n.expire_date || '2027/01/01';
-                                n._safe_traffic_limit = n.traffic_limit || 0;
+                                n._safe_traffic_limit = 0;
                             }
                         });
                         servers.value = fetchedNodes;
@@ -223,16 +234,6 @@
                     return Math.min((used / (node._safe_traffic_limit * 1024 * 1024 * 1024)) * 100, 100).toFixed(1); 
                 };
                 const getTrafficColor = (p) => { const pf = parseFloat(p); return pf >= 90 ? 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]' : pf >= 75 ? 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]' : 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
-                
-                const getHistory = (node, task) => {
-                    if(!node || !node.status || !node.status.ping_history) return [];
-                    let hist = node.status.ping_history[task.name] || node.status.ping_history[task.host];
-                    if (hist) return hist;
-                    for (let k in node.status.ping_history) {
-                        if (k === task.name || k === task.host || k.includes(task.name)) return node.status.ping_history[k];
-                    }
-                    return [];
-                };
 
                 const calcDaysLeft = (dateStr) => { if (!dateStr || dateStr.trim() === '' || dateStr === '未知') return '∞'; const diff = new Date(dateStr).getTime() - new Date().getTime(); if(isNaN(diff)) return '∞'; return diff <= 0 ? 0 : Math.ceil(diff / (1000 * 60 * 60 * 24)); };
                 const getExpireColor = (days) => { if (days === '∞' || isNaN(days)) return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; if (days <= 7) return 'text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30'; if (days <= 30) return 'text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30'; return 'text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30'; };
@@ -272,6 +273,7 @@
                                     chartData.push(null); 
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
+                                    // 🌟 Komari 级硬核断流：只要失败1次，直接断崖！
                                     if (pt.fails > 0 || pt.count === 0) { 
                                         chartData.push(null); 
                                     } else { 
@@ -292,7 +294,7 @@
                 onMounted(() => { const body = document.body; body.className = theme.value === 'komari' ? 'theme-komari' : 'theme-dark'; watch(theme, (newVal) => { body.className = newVal === 'komari' ? 'theme-komari' : 'theme-dark'; if(myChart){ myChart.dispose(); myChart = echarts.init(document.getElementById('echarts-container'), null, { renderer: 'canvas' }); loadHistory(chartHours.value, false); }}); fetchData(); fetchTimer = setInterval(fetchData, 2000); chartTimer = setInterval(() => { if (showChart.value && currentChartNodeId.value) { loadHistory(chartHours.value, false); } }, 10000); });
                 onUnmounted(() => { clearInterval(fetchTimer); clearInterval(chartTimer); });
                 
-                return { servers, pingTasks, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine, getTrafficUsedStr, getTrafficPercent, getTrafficColor, getHistory };
+                return { servers, siteName, totalNodes, onlineNodes, theme, toggleTheme, showChart, currentChartNodeName, chartHours, chartStats, currentTime, totalNetIn, totalNetOut, totalSpeedIn, totalSpeedOut, calcDaysLeft, getExpireColor, formatBytes, calcPercent, formatUptime, openChart, closeChart, loadHistory, toggleChartLine, getTrafficUsedStr, getTrafficPercent, getTrafficColor };
             }
         }).mount('#app');
     </script>

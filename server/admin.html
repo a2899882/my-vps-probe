@@ -39,7 +39,7 @@
                             <div><label class="text-xs text-gray-500">到期时间</label><input v-model="node._display_date" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
                         </div>
                         <div class="mt-3">
-                            <label class="text-xs text-gray-500 block mb-1">每月流量上限 (GB，填 0 则无限制并隐藏进度条)</label>
+                            <label class="text-xs text-gray-500 block mb-1">每月流量上限 (GB，填 0 则无限制并隐藏大屏进度条)</label>
                             <input type="number" v-model.number="node._display_limit" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white">
                         </div>
                     </div>
@@ -105,15 +105,13 @@
                         n.expire_date = l > 0 ? (d + '|' + l) : d;
                         delete n._display_date;
                         delete n._display_limit;
-                        delete n.traffic_limit;
                     });
                     const res = await fetch('/api/admin/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); 
                     if (res.ok) { alert("✅ 保存成功！完美生效！"); config.value.admin_pass = ''; } else { alert("❌ 保存失败！"); } 
                 };
                 
                 const showDeployModal = (node) => { activeNode.value = node; deployModal.value = true; copyText.value = "🔗 复制一键部署命令"; };
-                // 🌟 CDN 缓存粉碎机：每次点击部署都生成最新时间戳！🌟
-                const deployCommand = computed(() => `curl -sL https://${window.location.host}/install.sh?t=`+Date.now()+` | bash -s -- -s https://${window.location.host} -t ${activeNode.value.token}`);
+                const deployCommand = computed(() => `curl -sL https://${window.location.host}/install.sh | bash -s -- -s https://${window.location.host} -t ${activeNode.value.token}`);
                 const copyCommand = () => { navigator.clipboard.writeText(deployCommand.value); copyText.value = "✅ 复制成功！"; setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000); };
                 const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), _display_date: "2027/01/01", _display_limit: 1000 });
                 const removeNode = (idx) => config.value.nodes.splice(idx, 1);
