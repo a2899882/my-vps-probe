@@ -189,19 +189,17 @@
                         
                         let fetchedNodes = data.nodes || [];
                         fetchedNodes.forEach(n => {
-                            // 🌟 终极防崩溃提取法，绝不产生 NaN！
                             if (n.expire_date && String(n.expire_date).includes('|')) {
                                 let parts = String(n.expire_date).split('|');
                                 n._safe_expire_date = parts[0] || '2027/01/01';
                                 n._safe_traffic_limit = parseInt(parts[1]) || 0;
                             } else {
                                 n._safe_expire_date = n.expire_date || '2027/01/01';
-                                n._safe_traffic_limit = 0;
+                                n._safe_traffic_limit = n.traffic_limit || 0;
                             }
                         });
                         servers.value = fetchedNodes;
                         
-                        // 强制读取后台 Ping 列表
                         let pTasks = data.ping_tasks || [];
                         if (pTasks.length === 0) {
                             pTasks = [{ name: '广东电信', host: 'gd-ct' }, { name: '广东联通', host: 'gd-cu' }, { name: '广东移动', host: 'gd-cm' }];
@@ -226,7 +224,6 @@
                 };
                 const getTrafficColor = (p) => { const pf = parseFloat(p); return pf >= 90 ? 'bg-[#ef4444] shadow-[0_0_8px_#ef4444]' : pf >= 75 ? 'bg-[#f59e0b] shadow-[0_0_8px_#f59e0b]' : 'bg-[#8b5cf6] shadow-[0_0_8px_#8b5cf6]'; };
                 
-                // 🌟 强力提取Ping历史 🌟
                 const getHistory = (node, task) => {
                     if(!node || !node.status || !node.status.ping_history) return [];
                     let hist = node.status.ping_history[task.name] || node.status.ping_history[task.host];
@@ -275,7 +272,6 @@
                                     chartData.push(null); 
                                 } else { 
                                     totalPoints += (pt.count + pt.fails); totalFails += pt.fails; 
-                                    // 🌟 4. TCP 严格丢包断线逻辑：只要失败1次，强行推入 null 断崖！🌟
                                     if (pt.fails > 0 || pt.count === 0) { 
                                         chartData.push(null); 
                                     } else { 
