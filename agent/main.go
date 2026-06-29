@@ -28,10 +28,10 @@ LastDelay float64
 }
 
 var (
-trackers                    = make(map[string]*PingTracker)
-tickCount                   = 0
-serverAddr, token           string
-globalCountryCode           = "OT"
+trackers                           = make(map[string]*PingTracker)
+tickCount                          = 0
+serverAddr, token                  string
+globalCountryCode                  = "OT"
 lastNetBytesRecv, lastNetBytesSent uint64
 )
 
@@ -80,30 +80,13 @@ return
 
 for {
 status := common.ServerStatus{IsOnline: true, CountryCode: globalCountryCode}
-if h, err := host.Info(); err == nil && h != nil {
-status.Uptime = h.Uptime
-}
-if l, err := load.Avg(); err == nil && l != nil {
-status.Load1 = l.Load1
-}
-if c, err := cpu.Percent(0, false); err == nil && len(c) > 0 {
-status.CPUUsage = c[0]
-}
-if cores, err := cpu.Counts(true); err == nil {
-status.CPUCores = cores
-}
-if v, err := mem.VirtualMemory(); err == nil && v != nil {
-status.MemTotal = v.Total
-status.MemUsed = v.Used
-}
-if s, err := mem.SwapMemory(); err == nil && s != nil {
-status.SwapTotal = s.Total
-status.SwapUsed = s.Used
-}
-if d, err := disk.Usage("/"); err == nil && d != nil {
-status.DiskTotal = d.Total
-status.DiskUsed = d.Used
-}
+if h, err := host.Info(); err == nil && h != nil { status.Uptime = h.Uptime }
+if l, err := load.Avg(); err == nil && l != nil { status.Load1 = l.Load1 }
+if c, err := cpu.Percent(0, false); err == nil && len(c) > 0 { status.CPUUsage = c[0] }
+if cores, err := cpu.Counts(true); err == nil { status.CPUCores = cores }
+if v, err := mem.VirtualMemory(); err == nil && v != nil { status.MemTotal = v.Total; status.MemUsed = v.Used }
+if s, err := mem.SwapMemory(); err == nil && s != nil { status.SwapTotal = s.Total; status.SwapUsed = s.Used }
+if d, err := disk.Usage("/"); err == nil && d != nil { status.DiskTotal = d.Total; status.DiskUsed = d.Used }
 if n, err := psnet.IOCounters(false); err == nil && len(n) > 0 {
 status.NetInTransfer = n[0].BytesRecv
 status.NetOutTransfer = n[0].BytesSent
@@ -138,7 +121,7 @@ t.LastDelay = delay
 t.TickSum += delay
 t.TickCount++
 } else {
-t.LastDelay = 0
+t.LastDelay = -1
 t.TickFails++
 }
 
@@ -146,7 +129,7 @@ if isMinuteTick {
 if t.TickCount > 0 {
 t.History = append(t.History, t.TickSum/float64(t.TickCount))
 } else {
-t.History = append(t.History, 0)
+t.History = append(t.History, -1)
 }
 if len(t.History) > 60 {
 t.History = t.History[1:]
@@ -158,9 +141,7 @@ t.TickFails = 0
 
 fails := 0
 for _, v := range t.History {
-if v == 0 {
-fails++
-}
+if v < 0 { fails++ }
 }
 loss := 0.0
 if len(t.History) > 0 {
@@ -170,14 +151,9 @@ loss = float64(fails) / float64(len(t.History)) * 100.0
 var avgDelay float64
 validCount := 0
 for _, v := range t.History {
-if v > 0 {
-avgDelay += v
-validCount++
+if v > 0 { avgDelay += v; validCount++ }
 }
-}
-if validCount > 0 {
-avgDelay /= float64(validCount)
-}
+if validCount > 0 { avgDelay /= float64(validCount) }
 
 pingResults = append(pingResults, common.PingResult{
 TargetName:   task.Name,
@@ -189,23 +165,17 @@ History:      t.History,
 }
 
 status.PingStatuses = pingResults
-if err := conn.WriteJSON(status); err != nil {
-return
-}
+if err := conn.WriteJSON(status); err != nil { return }
 time.Sleep(2 * time.Second)
 }
 }
 
 func tcpPing(host string) (float64, bool) {
 addr := host
-if !strings.Contains(addr, ":") {
-addr = addr + ":80"
-}
+if !strings.Contains(addr, ":") { addr = addr + ":80" }
 start := time.Now()
 conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
-if err != nil {
-return 0, false
-}
+if err != nil { return 0, false }
 conn.Close()
 return float64(time.Since(start).Milliseconds()), true
 }
