@@ -6,7 +6,6 @@ import (
 "time"
 )
 
-// 补全所有原版参数，严防 Agent 编译报错和崩溃！
 type Packet struct {
 Rtt    time.Duration
 IPAddr *net.IPAddr
@@ -46,7 +45,7 @@ func NewPinger(addr string) (*Pinger, error) {
 return &Pinger{
 target:   addr,
 Count:    3,
-Timeout:  time.Second * 1, // 严格 1 秒超时，断流必抓！
+Timeout:  time.Second * 1,
 Interval: time.Millisecond * 300,
 done:     make(chan bool),
 }, nil
@@ -65,13 +64,13 @@ func (p *Pinger) Run() error {
 p.stats.PacketsSent = p.Count
 p.stats.Addr = p.target
 p.stats.Rtts = make([]time.Duration, 0)
-p.stats.IPAddr = &net.IPAddr{IP: net.ParseIP("1.1.1.1")} // 确保序列化不报错
+p.stats.IPAddr = &net.IPAddr{IP: net.ParseIP("1.1.1.1")}
 
 success := 0
 var total time.Duration
 addr := p.target
 if !strings.Contains(addr, ":") {
-addr += ":80" // 强制转为 TCP 80 探测
+addr += ":80"
 }
 
 for i := 0; i < p.Count; i++ {
