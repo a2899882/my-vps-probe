@@ -52,6 +52,7 @@ done:     make(chan bool),
 }
 
 func (p *Pinger) SetPrivileged(b bool) {}
+
 func (p *Pinger) Stop() {
 select {
 case <-p.done:
@@ -65,21 +66,18 @@ p.stats.PacketsSent = p.Count
 p.stats.Addr = p.target
 p.stats.Rtts = make([]time.Duration, 0)
 p.stats.IPAddr = &net.IPAddr{IP: net.ParseIP("1.1.1.1")}
-
 success := 0
 var total time.Duration
 addr := p.target
 if !strings.Contains(addr, ":") {
 addr += ":80"
 }
-
 for i := 0; i < p.Count; i++ {
 select {
 case <-p.done:
 return nil
 default:
 }
-
 start := time.Now()
 conn, err := net.DialTimeout("tcp", addr, p.Timeout)
 if err == nil {
@@ -89,16 +87,11 @@ p.stats.Rtts = append(p.stats.Rtts, rtt)
 success++
 conn.Close()
 if p.OnRecv != nil {
-p.OnRecv(&Packet{
-Rtt:    rtt,
-IPAddr: p.stats.IPAddr,
-Addr:   p.stats.Addr,
-})
+p.OnRecv(&Packet{Rtt: rtt, IPAddr: p.stats.IPAddr, Addr: p.stats.Addr})
 }
 }
 time.Sleep(p.Interval)
 }
-
 p.stats.PacketsRecv = success
 p.stats.PacketLoss = float64(p.Count-success) / float64(p.Count) * 100.0
 if success > 0 {
