@@ -6,7 +6,6 @@ import (
 "time"
 )
 
-// 补全原版 go-ping 所有的字段，让 Agent 序列化时绝不出错！
 type Statistics struct {
 PacketsRecv           int
 PacketsSent           int
@@ -54,14 +53,20 @@ close(p.done)
 func (p *Pinger) Run() error {
 p.stats.PacketsSent = p.Count
 p.stats.Addr = p.target
-p.stats.IPAddr = &net.IPAddr{IP: net.ParseIP("1.1.1.1")}
 p.stats.Rtts = make([]time.Duration, 0)
+
+// 🌟 终极修复：真实解析 IP！保证小鸡测速后能完美映射回面板，红绿格子瞬间复活！
+if ipaddr, err := net.ResolveIPAddr("ip", p.target); err == nil {
+p.stats.IPAddr = ipaddr
+} else {
+p.stats.IPAddr = &net.IPAddr{IP: net.ParseIP("1.1.1.1")}
+}
 
 success := 0
 var total time.Duration
 addr := p.target
 if !strings.Contains(addr, ":") {
-addr += ":80" // 强制转为 TCP 80 端口探测
+addr += ":80" // 强制转为 TCP 80
 }
 
 for i := 0; i < p.Count; i++ {
