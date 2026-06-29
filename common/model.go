@@ -2,7 +2,6 @@ package common
 
 type PingTask struct { Name string `json:"name"`; Host string `json:"host"` }
 type NodeConfig struct { ID string `json:"id"`; Name string `json:"name"`; Token string `json:"token"`; ExpireDate string `json:"expire_date"`; Region string `json:"region"` 
-	TrafficLimit float64 
 }
 type AppConfig struct { SiteName string `json:"site_name"`; AdminUser string `json:"admin_user"`; AdminPass string `json:"admin_pass"`; Nodes []NodeConfig `json:"nodes"`; PingTasks []PingTask `json:"ping_tasks"` }
 type AgentInstruction struct { ServerName string `json:"server_name"`; PingTasks []PingTask `json:"ping_tasks"` }
