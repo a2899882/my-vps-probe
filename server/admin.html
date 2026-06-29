@@ -1,127 +1,270 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>探针管理中心</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>探针管理台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans SC',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;padding:20px;background:#0d1117;color:#e6edf3}
+.mono{font-family:'JetBrains Mono',monospace}
+.card{background:rgba(22,27,34,0.95);border:1px solid rgba(48,54,61,0.8);border-radius:12px;backdrop-filter:blur(10px)}
+.inp{width:100%;padding:8px 12px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s}
+.inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.15)}
+.inp::placeholder{color:#484f58}
+.btn-primary{background:#6366f1;color:#fff;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s}
+.btn-primary:hover{background:#4f46e5;transform:translateY(-1px);box-shadow:0 4px 12px rgba(99,102,241,0.4)}
+.btn-save{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
+.btn-save:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,0.5)}
+.btn-danger{background:rgba(239,68,68,0.1);color:#f87171;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid rgba(239,68,68,0.2);cursor:pointer;transition:all .2s}
+.btn-danger:hover{background:rgba(239,68,68,0.2)}
+.btn-copy{background:rgba(99,102,241,0.12);color:#818cf8;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid rgba(99,102,241,0.2);cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:5px}
+.btn-copy:hover{background:rgba(99,102,241,0.25)}
+.node-card{background:rgba(13,17,23,0.8);border:1px solid rgba(48,54,61,0.6);border-radius:10px;padding:16px;position:relative;transition:border-color .2s}
+.node-card:hover{border-color:#6366f1}
+.ping-card{background:rgba(13,17,23,0.8);border:1px solid rgba(48,54,61,0.6);border-radius:10px;padding:14px;transition:border-color .2s}
+.ping-card:hover{border-color:#10b981}
+.label{font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700}
+.tag-blue{background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.2)}
+.tag-green{background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.2)}
+.copy-code{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#58a6ff;word-break:break-all;position:relative;line-height:1.6}
+.toast{position:fixed;bottom:24px;right:24px;background:#10b981;color:#fff;padding:10px 20px;border-radius:8px;font-weight:700;font-size:13px;z-index:9999;transform:translateY(100px);opacity:0;transition:all .3s}
+.toast.show{transform:translateY(0);opacity:1}
+</style>
 </head>
-<body class="bg-gray-900 text-gray-200 font-sans min-h-screen p-4 md:p-8">
-    <div id="app" class="max-w-5xl mx-auto">
-        <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 pb-4 border-b border-gray-800 gap-4">
-            <h1 class="text-2xl font-bold flex items-center gap-2">⚙️ 探针中枢管理台</h1>
-            <div class="flex items-center gap-3">
-                <a href="/" target="_blank" class="text-indigo-400 hover:text-indigo-300 text-sm font-bold flex items-center gap-1">👉 返回前端首页</a>
-                <button @click="saveConfig" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition">💾 保存并动态下发配置</button>
-            </div>
-        </header>
-
-        <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-6 flex flex-wrap gap-4 items-end">
-            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">网站标题名称</label><input v-model="config.site_name" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white outline-none w-full"></div>
-            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">后台登录账号</label><input v-model="config.admin_user" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white outline-none w-full"></div>
-            <div class="w-full sm:w-auto"><label class="text-xs text-gray-500 block mb-1">后台登录新密码</label><input type="password" v-model="config.admin_pass" placeholder="留空则不修改密码" class="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white outline-none w-full"></div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-indigo-400">🖥️ 被控节点 (小鸡) 管理</h2><button @click="addNode" class="bg-indigo-600/20 text-indigo-400 px-3 py-1 rounded hover:bg-indigo-600/40 text-sm transition">+ 新增节点</button></div>
-                <div class="space-y-4">
-                    <div v-for="(node, index) in config.nodes" :key="index" class="bg-gray-900 p-4 rounded-lg border border-gray-700 relative group">
-                        <div class="absolute top-2 right-2 flex gap-2"><button @click="showDeployModal(node)" class="bg-green-600/20 text-green-400 px-2 py-1 rounded text-xs">🚀 一键部署</button><button @click="removeNode(index)" class="text-red-500 opacity-50 hover:opacity-100 text-xs px-1">✖</button></div>
-                        <div class="grid grid-cols-2 gap-3 mb-2 mt-6">
-                            <div><label class="text-xs text-gray-500">节点 ID (需唯一)</label><input v-model="node.id" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
-                            <div><label class="text-xs text-gray-500">显示名称</label><input v-model="node.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div><label class="text-xs text-gray-500">通信 Token</label><input v-model="node.token" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
-                            <div><label class="text-xs text-gray-500">到期时间</label><input v-model="node._safe_date" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
-                        </div>
-                        <div class="mt-3">
-                            <label class="text-xs text-gray-500 block mb-1">每月流量上限 (GB，填 0 则隐藏大屏进度条)</label>
-                            <input type="number" v-model.number="node._safe_limit" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white">
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-green-400">🎯 全局 Ping 监测目标</h2><button @click="addTask" class="bg-green-600/20 text-green-400 px-3 py-1 rounded hover:bg-green-600/40 text-sm transition">+ 新增目标</button></div>
-                <div class="space-y-4">
-                    <div v-for="(task, index) in config.ping_tasks" :key="index" class="bg-gray-900 p-4 rounded-lg border border-gray-700 flex items-center gap-3">
-                        <div class="flex-1"><label class="text-xs text-gray-500">目标名称</label><input v-model="task.name" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
-                        <div class="flex-1"><label class="text-xs text-gray-500">IP或域名</label><input v-model="task.host" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
-                        <button @click="removeTask(index)" class="mt-4 text-red-500 hover:text-red-400">✖</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div v-if="deployModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="deployModal = false">
-            <div class="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-2xl mx-4 shadow-2xl overflow-hidden">
-                <div class="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center"><h3 class="font-bold text-gray-200">一键部署指令 - {{ activeNode.name }}</h3><button @click="deployModal = false" class="text-gray-400 hover:text-white">✖</button></div>
-                <div class="p-6">
-                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 font-mono text-sm text-green-400 break-all mb-4 relative">{{ deployCommand }}</div>
-                    <button @click="copyCommand" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg shadow">{{ copyText }}</button>
-                </div>
-            </div>
-        </div>
+<body>
+<div id="app" class="max-w-[1200px] mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+        <svg width="18" height="18" fill="none" stroke="#818cf8" stroke-width="2" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <div>
+        <div class="text-[18px] font-black tracking-wide text-white">探针中枢管理台</div>
+        <div class="text-[11px] text-slate-500 font-mono">probe.admin</div>
+      </div>
     </div>
-    <script>
-        const { createApp, ref, onMounted, computed } = Vue;
-        createApp({
-            setup() {
-                const config = ref({ site_name: '', admin_user: '', admin_pass: '', nodes: [], ping_tasks: [] });
-                const deployModal = ref(false); const activeNode = ref({}); const copyText = ref("🔗 复制一键部署命令");
-                
-                const loadConfig = async () => { 
-                    try { 
-                        const res = await fetch('/api/admin/config'); 
-                        if (res.ok) { 
-                            let d = await res.json(); 
-                            if(d.nodes) {
-                                d.nodes.forEach(n => { 
-                                    if(n.expire_date && String(n.expire_date).includes('|')) {
-                                        let parts = String(n.expire_date).split('|');
-                                        n._safe_date = parts[0] || '2027/01/01';
-                                        n._safe_limit = parseInt(parts[1]) || 0;
-                                    } else {
-                                        n._safe_date = n.expire_date || '2027/01/01';
-                                        n._safe_limit = 0;
-                                    }
-                                    if (n._safe_date.includes('NaN')) n._safe_date = '2027/01/01';
-                                }); 
-                            } else { d.nodes = []; }
-                            if(!d.ping_tasks) d.ping_tasks = [];
-                            config.value = d; 
-                        } 
-                    } catch(e) {} 
-                };
-                
-                const saveConfig = async () => { 
-                    const payload = JSON.parse(JSON.stringify(config.value));
-                    payload.nodes.forEach(n => {
-                        let d = n._safe_date || '2027/01/01';
-                        let l = parseInt(n._safe_limit) || 0;
-                        n.expire_date = l > 0 ? (d + '|' + l) : d;
-                        delete n._safe_date;
-                        delete n._safe_limit;
-                    });
-                    const res = await fetch('/api/admin/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); 
-                    if (res.ok) { alert("✅ 保存成功！完美生效！"); config.value.admin_pass = ''; } else { alert("❌ 保存失败！"); } 
-                };
-                
-                const showDeployModal = (node) => { activeNode.value = node; deployModal.value = true; copyText.value = "🔗 复制一键部署命令"; };
-                const deployCommand = computed(() => `curl -sL https://${window.location.host}/install.sh?t=`+Date.now()+` | bash -s -- -s https://${window.location.host} -t ${activeNode.value.token}`);
-                const copyCommand = () => { navigator.clipboard.writeText(deployCommand.value); copyText.value = "✅ 复制成功！"; setTimeout(() => copyText.value = "🔗 复制一键部署命令", 2000); };
-                const addNode = () => config.value.nodes.push({ id: `node-${Date.now()}`, name: "新节点", token: "secret_" + Math.floor(Math.random()*10000), _safe_date: "2027/01/01", _safe_limit: 1000 });
-                const removeNode = (idx) => config.value.nodes.splice(idx, 1);
-                const addTask = () => config.value.ping_tasks.push({ name: "新目标", host: "1.1.1.1" });
-                const removeTask = (idx) => config.value.ping_tasks.splice(idx, 1);
-                onMounted(loadConfig);
-                return { config, deployModal, activeNode, copyText, deployCommand, showDeployModal, copyCommand, addNode, removeNode, addTask, removeTask, saveConfig };
-            }
-        }).mount('#app');
-    </script>
+    <div class="flex items-center gap-3">
+      <a href="/" target="_blank" class="text-slate-400 hover:text-white text-[12px] font-bold transition-colors flex items-center gap-1.5">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        返回前台
+      </a>
+      <button @click="saveConfig" class="btn-save">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        保存并动态下发配置
+      </button>
+    </div>
+  </div>
+
+  <!-- Site settings -->
+  <div class="card p-5 mb-6">
+    <div class="text-[13px] font-bold text-slate-300 mb-4 flex items-center gap-2">
+      <svg width="14" height="14" fill="none" stroke="#818cf8" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      站点基本设置
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <div class="label">网站标题名称</div>
+        <input class="inp" v-model="config.site_name" placeholder="T小K的VPS">
+      </div>
+      <div>
+        <div class="label">后台登录账号</div>
+        <input class="inp" v-model="config.admin_user" placeholder="admin@example.com">
+      </div>
+      <div>
+        <div class="label">后台登录新密码</div>
+        <input class="inp" type="password" v-model="config.admin_pass" placeholder="留空则不修改密码">
+      </div>
+    </div>
+  </div>
+
+  <!-- Two column layout -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- ★ Nodes section ★ -->
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-[13px] font-bold text-slate-300 flex items-center gap-2">
+          <svg width="14" height="14" fill="none" stroke="#60a5fa" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          被控节点 (小鸡) 管理
+          <span class="tag tag-blue">{{ config.nodes.length }} 台</span>
+        </div>
+        <button @click="addNode" class="btn-primary text-[11px] px-3 py-1.5 flex items-center gap-1">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          新增节点
+        </button>
+      </div>
+
+      <!-- Node cards grid - responsive, auto-wrap -->
+      <div class="space-y-3 max-h-[600px] overflow-y-auto pr-1" style="scrollbar-width:thin;scrollbar-color:#30363d transparent">
+        <div v-for="(node,idx) in config.nodes" :key="idx" class="node-card">
+          <!-- Node header -->
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-md bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-[10px] font-black text-blue-400">{{ idx+1 }}</div>
+              <input class="inp text-[13px] font-bold text-white" style="width:160px;background:transparent;border-color:transparent;padding:4px 8px" v-model="node.name" placeholder="节点显示名称" @focus="$event.target.style.borderColor='#6366f1'" @blur="$event.target.style.borderColor='transparent'">
+            </div>
+            <button @click="removeNode(idx)" class="btn-danger">
+              <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              删除
+            </button>
+          </div>
+
+          <!-- Node fields -->
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <div class="label">节点 ID（唯一）</div>
+              <input class="inp text-[11px]" v-model="node.id" placeholder="node-xxxxxxxxxx">
+            </div>
+            <div>
+              <div class="label">通信 Token</div>
+              <input class="inp text-[11px]" v-model="node.secret" placeholder="secret_xxxx">
+            </div>
+            <div>
+              <div class="label">到期时间</div>
+              <input class="inp text-[11px]" v-model="node.expire_date" placeholder="2027/01/01">
+            </div>
+            <div>
+              <div class="label">每月流量上限 (GB)</div>
+              <input class="inp text-[11px]" v-model="node.traffic_limit" type="number" placeholder="0=不限制">
+            </div>
+          </div>
+
+          <!-- One-click deploy command -->
+          <div>
+            <div class="label mb-1.5 flex items-center justify-between">
+              <span>一键部署命令</span>
+              <button @click="copyDeploy(node)" class="btn-copy">
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                复制
+              </button>
+            </div>
+            <div class="copy-code">curl -sL {{ getBaseUrl() }}/install.sh?t={{ node.id }} | bash -s -- -s {{ getBaseUrl() }} -t {{ node.secret }}</div>
+          </div>
+        </div>
+
+        <div v-if="!config.nodes.length" class="text-center py-12 text-slate-500">
+          <svg class="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <div class="text-[13px] font-bold">暂无节点</div>
+          <div class="text-[11px] mt-1">点击「新增节点」添加被控服务器</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ★ Ping targets section ★ -->
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-[13px] font-bold text-slate-300 flex items-center gap-2">
+          <svg width="14" height="14" fill="none" stroke="#34d399" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          全局 TCP Ping 监测目标
+          <span class="tag tag-green">{{ config.ping_targets.length }} 个</span>
+        </div>
+        <button @click="addPing" class="btn-primary text-[11px] px-3 py-1.5 flex items-center gap-1" style="background:#059669">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          新增目标
+        </button>
+      </div>
+
+      <!-- Ping target cards -->
+      <div class="space-y-2.5 max-h-[600px] overflow-y-auto pr-1" style="scrollbar-width:thin;scrollbar-color:#30363d transparent">
+        <div v-for="(pt,idx) in config.ping_targets" :key="idx" class="ping-card flex items-center gap-3">
+          <div class="w-5 h-5 rounded flex items-center justify-center text-[9px] font-black bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 flex-shrink-0">{{ idx+1 }}</div>
+          <div class="flex-1 grid grid-cols-2 gap-2">
+            <div>
+              <div class="label">目标名称</div>
+              <input class="inp text-[11px]" v-model="pt.name" placeholder="广东电信">
+            </div>
+            <div>
+              <div class="label">IP 或域名</div>
+              <input class="inp text-[11px]" v-model="pt.host" placeholder="gd-ct-v4.ip.zstaticcdn.com">
+            </div>
+          </div>
+          <button @click="removePing(idx)" class="btn-danger flex-shrink-0">
+            <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div v-if="!config.ping_targets.length" class="text-center py-10 text-slate-500">
+          <svg class="w-8 h-8 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          <div class="text-[12px]">暂无监测目标</div>
+        </div>
+      </div>
+
+      <!-- Info box -->
+      <div class="mt-4 p-3 rounded-lg border" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.2)">
+        <div class="text-[10px] text-emerald-400 font-bold mb-1">💡 TCP Ping 说明</div>
+        <div class="text-[10px] text-slate-400 leading-relaxed">填写 IP 或域名即可，探针自动使用 <span class="text-emerald-400 font-mono">:80</span> 端口进行 TCP 连接探测。探测结果实时反映在前台连通率格子中。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const {createApp,ref,reactive,onMounted}=Vue;
+createApp({
+  setup(){
+    const config=reactive({site_name:'',admin_user:'',admin_pass:'',nodes:[],ping_targets:[]});
+
+    const showToast=(msg,ok=true)=>{
+      const t=document.getElementById('toast');
+      t.textContent=msg;t.style.background=ok?'#10b981':'#ef4444';
+      t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);
+    };
+
+    const loadConfig=async()=>{
+      try{const r=await fetch('/api/config');const d=await r.json();
+        config.site_name=d.site_name||'';config.admin_user=d.admin_user||'';config.admin_pass='';
+        config.nodes=(d.nodes||[]).map(n=>({
+          id:n.id||'',name:n.name||'',secret:n.secret||'',
+          expire_date:n.expire_date?.split('|')[0]||'2027/01/01',
+          traffic_limit:parseInt(n.expire_date?.split('|')[1])||0
+        }));
+        config.ping_targets=d.ping_targets||[];
+      }catch(e){}
+    };
+
+    const saveConfig=async()=>{
+      try{
+        const payload={
+          site_name:config.site_name,
+          admin_user:config.admin_user,
+          nodes:config.nodes.map(n=>({
+            ...n,
+            expire_date:`${n.expire_date||'2027/01/01'}|${n.traffic_limit||0}`
+          })),
+          ping_targets:config.ping_targets
+        };
+        if(config.admin_pass)payload.admin_pass=config.admin_pass;
+        const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        if(r.ok)showToast('✅ 配置已保存并下发！');
+        else showToast('❌ 保存失败: '+r.status,false);
+      }catch(e){showToast('❌ 网络错误',false);}
+    };
+
+    const addNode=()=>config.nodes.push({id:'node-'+Date.now(),name:'新节点',secret:'secret_'+Math.random().toString(36).slice(2,8),expire_date:'2027/01/01',traffic_limit:0});
+    const removeNode=idx=>config.nodes.splice(idx,1);
+    const addPing=()=>config.ping_targets.push({name:'',host:''});
+    const removePing=idx=>config.ping_targets.splice(idx,1);
+
+    const getBaseUrl=()=>window.location.origin;
+
+    const copyDeploy=async(node)=>{
+      const cmd=`curl -sL ${getBaseUrl()}/install.sh?t=${node.id} | bash -s -- -s ${getBaseUrl()} -t ${node.secret}`;
+      try{await navigator.clipboard.writeText(cmd);showToast('📋 已复制部署命令！');}
+      catch(e){showToast('❌ 复制失败，请手动复制',false);}
+    };
+
+    onMounted(loadConfig);
+    return{config,saveConfig,addNode,removeNode,addPing,removePing,getBaseUrl,copyDeploy};
+  }
+}).mount('#app');
+</script>
 </body>
 </html>

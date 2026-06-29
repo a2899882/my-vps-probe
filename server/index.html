@@ -16,9 +16,8 @@ body{font-family:'Noto Sans SC',sans-serif;-webkit-font-smoothing:antialiased;tr
 .mono{font-family:'JetBrains Mono',monospace}
 .bar-t{transition:width 0.8s cubic-bezier(0.4,0,0.2,1);border-radius:99px;height:100%}
 .bar-track{border-radius:99px;overflow:hidden}
-.card{transition:all 0.3s cubic-bezier(0.4,0,0.2,1);border-radius:14px}
+.card{transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);border-radius:14px}
 .card:hover{transform:translateY(-2px)}
-
 /* DARK */
 body.dark{background-image:url('https://i.yon.li/w/682f73d97eade.png');color:#f8fafc}
 body.dark::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:-1;pointer-events:none}
@@ -28,10 +27,9 @@ body.dark::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.45);
 .dark .t2{color:#e2e8f0;font-weight:700}
 .dark .t3{color:#94a3b8;font-weight:600}
 .dark .divline{border-color:rgba(255,255,255,0.09)}
-.dark .modal-bg{background:rgba(20,26,42,0.97);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,0.07);box-shadow:0 25px 60px rgba(0,0,0,0.6)}
+.dark .modal-bg{background:rgba(20,26,42,0.97);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,0.07)}
 .dark .pill-wrap{background:rgba(255,255,255,0.06)}
 .dark .sbadge{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12)}
-
 /* KOMARI */
 body.komari{background-image:url('https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1920&auto=format&fit=crop');color:#0f172a}
 body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2);z-index:-1;pointer-events:none}
@@ -41,29 +39,20 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
 .komari .t2{color:#1e293b;font-weight:800}
 .komari .t3{color:#475569;font-weight:700}
 .komari .divline{border-color:rgba(0,0,0,0.08)}
-.komari .modal-bg{background:rgba(255,255,255,0.98);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,1);box-shadow:0 25px 60px rgba(0,0,0,0.12)}
+.komari .modal-bg{background:rgba(255,255,255,0.98);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,1)}
 .komari .pill-wrap{background:rgba(0,0,0,0.05)}
 .komari .sbadge{background:rgba(255,255,255,0.7);border:1px solid rgba(0,0,0,0.09)}
-
-/* Spec badge - Komari card style */
+/* spec badges */
 .sbadge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px 3px 7px;border-radius:8px;font-size:11px;font-weight:700;margin-right:5px;margin-bottom:4px;backdrop-filter:blur(6px)}
-
-/* Ping cells: 实心方块，无渐变迷雾 */
-.ping-row{display:flex;gap:2px;align-items:stretch;height:7px}
-.ping-cell{flex:1;border-radius:2px;transition:background-color 0.4s,height 0.3s;min-width:0;height:100%}
-.ping-empty{background:rgba(148,163,184,0.18)}
-.ping-green{background:#10b981}
-.ping-yellow{background:#f59e0b}
-.ping-red{background:#ef4444}
-.ping-dead{background:#dc2626;height:35%!important;align-self:flex-end}
-
+/* ping cells */
+.ping-row{display:flex;gap:2px;align-items:flex-end;height:8px}
+.ping-cell{flex:1;border-radius:2px;min-width:0;transition:background-color 0.5s}
 .btn-act{background:#6366f1!important;color:#fff!important;box-shadow:0 2px 10px rgba(99,102,241,0.4)}
 .offline-bg{background:repeating-linear-gradient(-45deg,transparent,transparent 10px,rgba(239,68,68,0.055) 10px,rgba(239,68,68,0.055) 20px)}
 </style>
 </head>
 <body class="komari">
 <div id="app" class="w-full max-w-[1440px] mx-auto">
-
   <!-- Header -->
   <header class="card flex items-center justify-between px-6 py-3 mb-4">
     <div class="text-[17px] font-black tracking-widest t1">{{ siteName }}</div>
@@ -77,7 +66,6 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
       </a>
     </div>
   </header>
-
   <!-- Stats bar -->
   <div class="card mb-5 px-6 py-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
     <div><div class="text-[10px] t3 mb-1 font-bold uppercase tracking-wider">当前时间</div><div class="text-[14px] t1 mono">{{ currentTime }}</div></div>
@@ -86,13 +74,11 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
     <div><div class="text-[10px] t3 mb-1 font-bold uppercase tracking-wider">流量概览</div><div class="mono font-bold text-[12px]"><span class="text-blue-500">↑ {{ fmtB(totalOut) }}</span><br><span class="text-emerald-500">↓ {{ fmtB(totalIn) }}</span></div></div>
     <div><div class="text-[10px] t3 mb-1 font-bold uppercase tracking-wider">网络速率</div><div class="mono font-bold text-[12px]"><span class="text-blue-500">↑ {{ fmtB(spOut) }}/s</span><br><span class="text-emerald-500">↓ {{ fmtB(spIn) }}/s</span></div></div>
   </div>
-
   <!-- Node grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
     <div v-for="node in servers" :key="node.id" class="card p-4 flex flex-col relative overflow-hidden">
-      <div v-if="!isOnline(node)" class="absolute inset-0 offline-bg pointer-events-none z-0 rounded-[14px]"></div>
-      <div v-if="!isOnline(node)" class="absolute inset-0 border-2 border-red-500/25 rounded-[14px] pointer-events-none z-10"></div>
-
+      <div v-if="!node.status?.is_online" class="absolute inset-0 offline-bg pointer-events-none z-0 rounded-[14px]"></div>
+      <div v-if="!node.status?.is_online" class="absolute inset-0 border-2 border-red-500/25 rounded-[14px] pointer-events-none z-10"></div>
       <!-- Title -->
       <div class="flex justify-between items-center mb-2.5 relative z-20">
         <div class="flex items-center gap-2 font-black text-[15px] t1">
@@ -104,19 +90,17 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
           <button @click="openChart(node.id,node.name)" class="t3 opacity-35 hover:opacity-90 transition-opacity">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           </button>
-          <span v-if="isOnline(node)" class="w-2.5 h-2.5 rounded-full bg-emerald-500" style="box-shadow:0 0 8px #10b981"></span>
+          <span v-if="node.status?.is_online" class="w-2.5 h-2.5 rounded-full bg-emerald-500" style="box-shadow:0 0 8px #10b981"></span>
           <span v-else class="w-2.5 h-2.5 rounded-full bg-red-500" style="box-shadow:0 0 8px #ef4444"></span>
         </div>
       </div>
-
-      <!-- Expire badge -->
+      <!-- Expire -->
       <div class="mb-3 relative z-20">
         <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold border" :class="expCls(node._expire)">
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           余 {{ daysLeft(node._expire) }} 天
         </span>
       </div>
-
       <!-- ★ Komari spec badges ★ -->
       <div class="flex flex-wrap mb-3.5 relative z-20">
         <span class="sbadge">
@@ -132,7 +116,6 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
           <span class="t2">{{ fmtB(node.status?.disk_total||0) }}</span>
         </span>
       </div>
-
       <!-- Progress bars -->
       <div class="space-y-[7px] mb-3.5 relative z-20">
         <div class="flex items-center gap-2">
@@ -156,60 +139,51 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
           <span class="w-9 text-right text-[11px] mono t2">{{ pct(node.status?.disk_used,node.status?.disk_total) }}%</span>
         </div>
       </div>
-
-      <!-- Net/traffic/load -->
+      <!-- Net -->
       <div class="border-t divline pt-2 mb-2 space-y-1 text-[10.5px] relative z-20">
         <div class="flex justify-between"><span class="t3 font-bold">网络</span><span class="mono t2">↑ {{ fmtB(node.status?.net_out_speed||0) }}/s &nbsp;↓ {{ fmtB(node.status?.net_in_speed||0) }}/s</span></div>
         <div class="flex justify-between"><span class="t3 font-bold">流量</span><span class="mono t2">↑ {{ fmtB(node.status?.net_out_transfer||0) }} &nbsp;↓ {{ fmtB(node.status?.net_in_transfer||0) }}</span></div>
         <div class="flex justify-between"><span class="t3 font-bold">负载</span><span class="mono t2">{{ (node.status?.load_1||0).toFixed(2) }} | 0.00 | 0.00</span></div>
       </div>
-
-      <!-- Traffic limit bar -->
+      <!-- Traffic limit -->
       <div v-if="node._traffic>0" class="border-t divline pt-2 mb-2 relative z-20">
         <div class="flex justify-between text-[10px] mb-1.5 font-bold">
           <span class="t3">当月流量 <span class="opacity-50 text-[9px]">({{ node._traffic }}GB)</span></span>
-          <span class="mono" :class="tpct(node)>=90?'text-red-500 font-bold':'t2'">{{ tusedStr(node) }} | {{ tpct(node) }}%</span>
+          <span class="mono" :class="tpct(node)>=90?'text-red-500':'t2'">{{ tusedStr(node) }} | {{ tpct(node) }}%</span>
         </div>
         <div class="bar-track track-bg" style="height:6px"><div class="bar-t" :class="tcolor(tpct(node))" :style="`width:${tpct(node)}%`"></div></div>
       </div>
-
-      <!-- ★ Ping Grid ★ 左→右，新在右，实心方块，颜色跟随延迟 -->
+      <!-- ★★★ Ping connectivity grid ★★★ -->
       <div class="mt-auto relative z-20 border-t divline pt-2.5">
-        <!-- Header row -->
         <div class="flex items-center justify-between mb-2">
           <span class="text-[9px] t3 font-bold flex items-center gap-1">
             连通率监测
             <span style="background:rgba(99,102,241,0.15);color:#818cf8;font-size:7px;padding:1px 5px;border-radius:4px;font-weight:700;letter-spacing:.05em">TCP</span>
             <span class="opacity-40 text-[7px]">60格=60分钟</span>
           </span>
-          <!-- Legend -->
           <span class="flex items-center gap-1 text-[7px] t3 font-bold">
             <span style="width:7px;height:7px;border-radius:2px;background:#10b981;display:inline-block"></span>畅通
             <span style="width:7px;height:7px;border-radius:2px;background:#f59e0b;display:inline-block;margin-left:3px"></span>延迟
             <span style="width:7px;height:7px;border-radius:2px;background:#ef4444;display:inline-block;margin-left:3px"></span>断流
           </span>
         </div>
-        <!-- Each target -->
         <div class="space-y-[7px]">
           <div v-for="task in pingTasks" :key="task.name" class="flex items-center gap-1.5">
             <span class="text-[9px] t2 font-bold flex-shrink-0 truncate" style="width:46px">{{ task.name }}</span>
-            <!-- 60 cells, left=oldest, right=newest -->
+            <!-- 60 cells: oldest=left, newest=right -->
             <div class="ping-row flex-1">
               <div
-                v-for="(cell,ci) in getPadded(getPingHist(node,task),60)"
+                v-for="(cell,ci) in getPadded(getPingHist(node,task))"
                 :key="ci"
-                :class="cellClass(cell)"
-                :title="cell===null?'无数据':(cell<0?'断流':cell+'ms')"
+                class="ping-cell"
+                :style="cellStyle(cell)"
+                :title="cell===null?'无数据':(cell<0?'断流 (TCP timeout)':cell+'ms')"
               ></div>
             </div>
-            <!-- latest ms -->
-            <span class="text-[9px] mono flex-shrink-0 font-bold" style="width:38px;text-align:right" :class="latestMsCls(node,task)">
-              {{ latestMs(node,task) }}
-            </span>
+            <span class="text-[9px] mono flex-shrink-0 font-bold text-right" style="width:38px" :class="latestMsCls(node,task)">{{ latestMs(node,task) }}</span>
           </div>
         </div>
       </div>
-
       <!-- Footer -->
       <div class="pt-2.5 mt-2 border-t divline flex justify-between text-[10.5px] font-bold t3 relative z-20">
         <span>到期: <span class="t2">{{ node._expire }}</span></span>
@@ -217,10 +191,9 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
       </div>
     </div>
   </div>
-
-  <!-- ★ Chart modal ★ 无 areaStyle 迷雾，线条加粗，断流用红色标记线 -->
+  <!-- Chart modal -->
   <div v-if="showChart" class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.6);backdrop-filter:blur(8px)" @click.self="closeChart">
-    <div class="modal-bg rounded-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col">
+    <div class="modal-bg rounded-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col" style="box-shadow:0 25px 60px rgba(0,0,0,0.5)">
       <div class="flex justify-between items-center p-5">
         <h3 class="text-[16px] font-bold t1 flex items-center gap-2">
           <span style="color:#818cf8;font-weight:900">{{ chartName }}</span>
@@ -238,7 +211,6 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
           </button>
         </div>
       </div>
-      <!-- Stat pills -->
       <div class="px-5 pb-3 flex flex-wrap justify-center gap-3">
         <div v-for="(s,name) in chartStats" :key="name"
              class="px-5 py-2.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center min-w-[130px]"
@@ -255,55 +227,34 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
       <div class="px-5 pb-5"><div id="echart" class="w-full" style="height:380px"></div></div>
     </div>
   </div>
-
 </div>
 <script>
 const {createApp,ref,computed,onMounted,onUnmounted,nextTick,watch}=Vue;
 createApp({
   setup(){
-    const servers=ref([]);
-    const siteName=ref('探针看板');
-    const pingTasks=ref([]);
-    const isDark=ref(false);
-    const showChart=ref(false);
-    const chartName=ref('');
-    const chartNodeId=ref('');
-    const chartH=ref(4);
-    const chartStats=ref({});
+    const servers=ref([]),siteName=ref('探针看板'),pingTasks=ref([]);
+    const isDark=ref(localStorage.getItem('probe_theme')==='dark');
+    const showChart=ref(false),chartName=ref(''),chartNodeId=ref(''),chartH=ref(4),chartStats=ref({});
     const currentTime=ref('');
     let myChart=null;
 
-    // theme
-    const savedTheme=localStorage.getItem('probe_theme')||'komari';
-    isDark.value=savedTheme==='dark';
-    const applyTheme=()=>{
-      document.body.className=isDark.value?'dark':'komari';
-      localStorage.setItem('probe_theme',isDark.value?'dark':'komari');
-    };
+    const applyTheme=()=>{document.body.className=isDark.value?'dark':'komari';localStorage.setItem('probe_theme',isDark.value?'dark':'komari');};
     applyTheme();
-    const toggleTheme=()=>{isDark.value=!isDark.value;applyTheme();if(myChart){myChart.dispose();myChart=null;if(showChart.value)nextTick(()=>{myChart=echarts.init(document.getElementById('echart'));loadHist(chartH.value,false);});}};
+    const toggleTheme=()=>{isDark.value=!isDark.value;applyTheme();if(myChart&&showChart.value){myChart.dispose();myChart=null;nextTick(()=>{myChart=echarts.init(document.getElementById('echart'));loadHist(chartH.value,false);});}};
 
     setInterval(()=>{currentTime.value=new Date().toLocaleTimeString('zh-CN',{hour12:false});},1000);
 
-    // fetch
     const fetchData=async()=>{
       try{
-        const r=await fetch('/api/status');
-        const d=await r.json();
-        siteName.value=d.site_name||'探针看板';
-        document.title=siteName.value;
+        const r=await fetch('/api/status');const d=await r.json();
+        siteName.value=d.site_name||'探针看板';document.title=siteName.value;
         const nodes=d.nodes||[];
         nodes.forEach(n=>{
-          n._expire='2027/01/01';
-          n._traffic=0;
-          if(n.expire_date&&String(n.expire_date).includes('|')){
-            const p=String(n.expire_date).split('|');
-            n._expire=p[0]||'2027/01/01';
-            n._traffic=parseInt(p[1])||0;
-          }else{
-            n._expire=n.expire_date||'2027/01/01';
-          }
-          if(String(n._expire).includes('NaN'))n._expire='2027/01/01';
+          n._expire='2027/01/01';n._traffic=0;
+          const raw=String(n.expire_date||'');
+          if(raw.includes('|')){const p=raw.split('|');n._expire=p[0]||'2027/01/01';n._traffic=parseInt(p[1])||0;}
+          else{n._expire=raw||'2027/01/01';}
+          if(n._expire.includes('NaN')||n._expire.trim()==='')n._expire='2027/01/01';
         });
         servers.value=nodes;
         let pt=d.ping_tasks||[];
@@ -312,7 +263,6 @@ createApp({
       }catch(e){}
     };
 
-    // computed
     const totalCount=computed(()=>servers.value.length);
     const onlineCount=computed(()=>servers.value.filter(n=>n.status?.is_online).length);
     const totalIn=computed(()=>servers.value.reduce((a,n)=>a+(n.status?.net_in_transfer||0),0));
@@ -320,7 +270,6 @@ createApp({
     const spIn=computed(()=>servers.value.reduce((a,n)=>a+(n.status?.net_in_speed||0),0));
     const spOut=computed(()=>servers.value.reduce((a,n)=>a+(n.status?.net_out_speed||0),0));
 
-    const isOnline=n=>n.status?.is_online;
     const fmtB=b=>{if(!b||b===0)return'0 B';const k=1024,s=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(k));return+(b/Math.pow(k,i)).toFixed(2)+' '+s[i];};
     const pct=(u,t)=>!t?0:((u/t)*100).toFixed(0);
     const fmtUp=s=>{if(!s)return'离线';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d>0?`${d}天${h}小时`:`${h}小时`;};
@@ -330,72 +279,78 @@ createApp({
     const tusedStr=n=>fmtB((n.status?.net_out_transfer||0)+(n.status?.net_in_transfer||0));
     const tcolor=p=>{const v=parseFloat(p);return v>=90?'bg-red-500':v>=75?'bg-amber-500':'bg-violet-500';};
 
-    // ★ Ping grid helpers ★
-    // Returns raw history array for a task
+    // ★★★ 万能 ping 历史提取器 ★★★
+    // 兼容所有数据格式：{delay:xx}, 纯数字, 0=断流
     const getPingHist=(node,task)=>{
-      if(!node?.status?.ping_history)return[];
-      const ph=node.status.ping_history;
-      if(ph[task.name]&&Array.isArray(ph[task.name]))return ph[task.name];
-      if(ph[task.host]&&Array.isArray(ph[task.host]))return ph[task.host];
-      for(const k in ph){if(k.includes(task.name)||k.includes(task.host))return ph[k];}
+      const ph=node?.status?.ping_history;
+      if(!ph)return[];
+      // 尝试多种 key
+      const keys=[task.name,task.host];
+      for(const k of keys){if(ph[k]&&Array.isArray(ph[k])&&ph[k].length>0)return ph[k];}
+      // 模糊匹配
+      for(const k in ph){
+        const lk=k.toLowerCase(),ln=(task.name||'').toLowerCase(),lh=(task.host||'').toLowerCase();
+        if(lk===ln||lk===lh||lk.includes(ln)||lk.includes(lh))return ph[k];
+      }
       return[];
     };
 
-    // Pad/trim to exactly N cells, oldest→left, newest→right
-    // Each cell: null=no data, -1=dead/断流, number=delay ms
-    const getPadded=(hist,n=60)=>{
-      const cells=[];
-      if(!hist||!hist.length){
-        for(let i=0;i<n;i++)cells.push(null);
-        return cells;
-      }
-      // Convert hist entries to numbers: delay>0=ok, 0 or missing=dead
-      const vals=hist.map(h=>{
-        if(!h)return null;
-        if(typeof h==='object'){
-          if(h.delay>0)return h.delay;
-          return -1; // dead
+    // 把任意格式的一条历史记录转成 delay 数值
+    // 返回: null=无数据, -1=断流, >=1=延迟ms
+    const parseEntry=e=>{
+      if(e===null||e===undefined)return null;
+      if(typeof e==='number')return e>0?e:-1;
+      if(typeof e==='object'){
+        // {delay: xx} 或 {Delay: xx} 或 {rtt: xx} 等各种大小写
+        const keys=Object.keys(e);
+        for(const k of keys){
+          const lk=k.toLowerCase();
+          if(lk==='delay'||lk==='rtt'||lk==='ms'){
+            const v=parseFloat(e[k]);
+            if(!isNaN(v))return v>0?Math.round(v):-1;
+          }
         }
-        if(typeof h==='number')return h>0?h:-1;
-        return null;
-      });
-      // Pad left with null if fewer than N
+        // 也有可能直接是 {0: value}
+        if(keys.length>0){
+          const v=parseFloat(e[keys[0]]);
+          if(!isNaN(v))return v>0?Math.round(v):-1;
+        }
+        return -1;
+      }
+      if(typeof e==='string'){const v=parseFloat(e);return isNaN(v)?null:(v>0?Math.round(v):-1);}
+      return null;
+    };
+
+    // 填充/裁剪为60个格子，oldest=index0=左, newest=index59=右
+    const getPadded=(hist,n=60)=>{
+      const vals=(hist||[]).map(parseEntry);
+      // 左边补 null 到够 n 个
       while(vals.length<n)vals.unshift(null);
-      // Take last N (newest on right)
       return vals.slice(-n);
     };
 
-    // Cell CSS class based on value
-    const cellClass=val=>{
-      if(val===null)return'ping-cell ping-empty';
-      if(val<0)return'ping-cell ping-dead'; // 断流: 短矮红
-      if(val<100)return'ping-cell ping-green';
-      if(val<200)return'ping-cell ping-yellow';
-      return'ping-cell ping-red';
+    // ★ 实心方块样式，无迷雾，靠颜色区分，断流矮红 ★
+    const cellStyle=val=>{
+      if(val===null)return{background:'rgba(148,163,184,0.18)',height:'100%',alignSelf:'stretch'};
+      if(val<0)return{background:'#dc2626',height:'35%',alignSelf:'flex-end',borderRadius:'2px'};
+      if(val<100)return{background:'#10b981',height:'100%',alignSelf:'stretch'};
+      if(val<200)return{background:'#f59e0b',height:'100%',alignSelf:'stretch'};
+      return{background:'#ef4444',height:'100%',alignSelf:'stretch'};
     };
 
     const latestMs=(node,task)=>{
       const h=getPingHist(node,task);
-      if(!h||!h.length)return'-- ms';
-      for(let i=h.length-1;i>=0;i--){
-        const e=h[i];
-        if(!e)continue;
-        const d=typeof e==='object'?e.delay:(typeof e==='number'?e:0);
-        if(d>0)return d+' ms';
-      }
+      for(let i=h.length-1;i>=0;i--){const v=parseEntry(h[i]);if(v!==null&&v>0)return v+' ms';}
       return'-- ms';
     };
-
     const latestMsCls=(node,task)=>{
       const h=getPingHist(node,task);
-      if(!h||!h.length)return'text-slate-400';
       for(let i=h.length-1;i>=0;i--){
-        const e=h[i];
-        if(!e)continue;
-        const d=typeof e==='object'?e.delay:(typeof e==='number'?e:0);
-        if(d<=0)return'text-red-500';
-        if(d<100)return'text-emerald-500';
-        if(d<200)return'text-amber-500';
+        const v=parseEntry(h[i]);
+        if(v===null)continue;
+        if(v<0)return'text-red-500';
+        if(v<100)return'text-emerald-500';
+        if(v<200)return'text-amber-500';
         return'text-red-500';
       }
       return'text-slate-400';
@@ -409,10 +364,7 @@ createApp({
       loadHist(4);
     };
     const closeChart=()=>{showChart.value=false;if(myChart){myChart.dispose();myChart=null;}};
-    const toggleLine=(name)=>{
-      chartStats.value[name].on=!chartStats.value[name].on;
-      myChart?.dispatchAction({type:'legendToggleSelect',name});
-    };
+    const toggleLine=name=>{chartStats.value[name].on=!chartStats.value[name].on;myChart?.dispatchAction({type:'legendToggleSelect',name});};
 
     const loadHist=async(h,showLoad=true)=>{
       chartH.value=h;
@@ -435,93 +387,63 @@ createApp({
         const targetList=[...targets];
         const colors=['#6366f1','#10b981','#f43f5e','#f59e0b','#0ea5e9','#8b5cf6'];
         const stats={};const series=[];
-        // Mark bands for outage
-        const markAreas=[];
-
         targetList.forEach((tgt,idx)=>{
           const c=colors[idx%colors.length];
           const pts=[];let totalD=0,totalV=0,totalF=0,totalP=0;
-          let outageStart=null;
+          const outageBands=[];let oStart=null;
           times.forEach((t,ti)=>{
             const p=timeMap[t][tgt];
             if(!p){pts.push(null);return;}
             totalP+=(p.cnt+p.fails);totalF+=p.fails;
             if(p.fails>0||p.cnt===0){
               pts.push(null);
-              if(outageStart===null)outageStart=ti;
+              if(oStart===null)oStart=ti;
             }else{
-              if(outageStart!==null){
-                markAreas.push([{xAxis:timeLabels[outageStart]},{xAxis:timeLabels[ti-1]||timeLabels[ti]}]);
-                outageStart=null;
-              }
+              if(oStart!==null){outageBands.push([{xAxis:timeLabels[oStart]},{xAxis:timeLabels[Math.max(0,ti-1)]}]);oStart=null;}
               const avg=p.sum/p.cnt;pts.push(avg);totalD+=avg*p.cnt;totalV+=p.cnt;
             }
           });
-          if(outageStart!==null&&times.length>0){
-            markAreas.push([{xAxis:timeLabels[outageStart]},{xAxis:timeLabels[times.length-1]}]);
-          }
-          const avgD=totalV>0?(totalD/totalV):0;
-          const avgL=totalP>0?(totalF/totalP)*100:0;
-          stats[tgt]={color:c,on:true,avgD,avgL};
+          if(oStart!==null&&times.length>0)outageBands.push([{xAxis:timeLabels[oStart]},{xAxis:timeLabels[times.length-1]}]);
+          stats[tgt]={color:c,on:true,avgD:totalV>0?totalD/totalV:0,avgL:totalP>0?(totalF/totalP)*100:0};
           series.push({
             name:tgt,type:'line',smooth:true,connectNulls:false,symbol:'none',
-            itemStyle:{color:c},
-            lineStyle:{width:3,color:c},
-            areaStyle:null, // ★ 彻底关闭迷雾渐变！
-            markArea:{
-              silent:true,
-              itemStyle:{color:'rgba(239,68,68,0.13)'},
-              data:markAreas.map(m=>[m[0],m[1]])
-            },
+            itemStyle:{color:c},lineStyle:{width:3,color:c},
+            areaStyle:null, // ★ 彻底关闭迷雾！
+            markArea:{silent:true,itemStyle:{color:'rgba(239,68,68,0.12)'},data:outageBands},
             data:pts
           });
         });
         chartStats.value=stats;
-
-        const opt={
+        myChart?.setOption({
           backgroundColor:'transparent',
-          tooltip:{
-            trigger:'axis',
-            axisPointer:{type:'cross',label:{backgroundColor:light?'#64748b':'#334155'}},
+          tooltip:{trigger:'axis',axisPointer:{type:'cross',label:{backgroundColor:light?'#64748b':'#334155'}},
             backgroundColor:light?'rgba(255,255,255,0.97)':'rgba(15,23,42,0.97)',
             textStyle:{color:light?'#0f172a':'#f8fafc',fontWeight:'bold'},
-            borderColor:light?'#e2e8f0':'#334155',
-            borderWidth:1,padding:12,
-            valueFormatter:v=>v?v.toFixed(1)+' ms':'断流'
-          },
+            borderColor:light?'#e2e8f0':'#334155',borderWidth:1,padding:12,
+            valueFormatter:v=>v?v.toFixed(1)+' ms':'断流'},
           legend:{show:false},
           grid:{left:'1%',right:'3%',bottom:'2%',top:'5%',containLabel:true},
           xAxis:{type:'category',data:timeLabels,boundaryGap:false,
             axisLine:{lineStyle:{color:light?'#94a3b8':'#475569'}},
             axisLabel:{color:light?'#64748b':'#94a3b8',margin:12}},
-          yAxis:{type:'value',name:'ms',
-            nameTextStyle:{color:light?'#64748b':'#94a3b8'},
+          yAxis:{type:'value',name:'ms',nameTextStyle:{color:light?'#64748b':'#94a3b8'},
             splitLine:{lineStyle:{color:light?'#e2e8f0':'#1e293b',type:'dashed'}},
             axisLabel:{color:light?'#64748b':'#94a3b8'}},
           series
-        };
-        myChart?.setOption(opt,true);
+        },true);
       }catch(e){}
       if(showLoad&&myChart)myChart.hideLoading();
     };
 
-    let fetchT=null,chartT=null;
-    onMounted(()=>{
-      fetchData();
-      fetchT=setInterval(fetchData,2000);
-      chartT=setInterval(()=>{if(showChart.value&&chartNodeId.value)loadHist(chartH.value,false);},10000);
-    });
-    onUnmounted(()=>{clearInterval(fetchT);clearInterval(chartT);});
+    let ft=null,ct=null;
+    onMounted(()=>{fetchData();ft=setInterval(fetchData,2000);ct=setInterval(()=>{if(showChart.value&&chartNodeId.value)loadHist(chartH.value,false);},10000);});
+    onUnmounted(()=>{clearInterval(ft);clearInterval(ct);});
 
-    return{
-      servers,siteName,pingTasks,isDark,toggleTheme,currentTime,
-      showChart,chartName,chartH,chartStats,
+    return{servers,siteName,pingTasks,isDark,toggleTheme,currentTime,showChart,chartName,chartH,chartStats,
       totalCount,onlineCount,totalIn,totalOut,spIn,spOut,
-      isOnline,fmtB,pct,fmtUp,daysLeft,expCls,
-      tpct,tusedStr,tcolor,
-      getPingHist,getPadded,cellClass,latestMs,latestMsCls,
-      openChart,closeChart,loadHist,toggleLine
-    };
+      fmtB,pct,fmtUp,daysLeft,expCls,tpct,tusedStr,tcolor,
+      getPingHist,getPadded,cellStyle,latestMs,latestMsCls,
+      openChart,closeChart,loadHist,toggleLine};
   }
 }).mount('#app');
 </script>
