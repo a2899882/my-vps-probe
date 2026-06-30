@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>探针看板</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -14,81 +14,119 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Noto Sans SC',sans-serif;-webkit-font-smoothing:antialiased;transition:background 0.8s;background-size:cover;background-attachment:fixed;background-position:center;min-height:100vh;padding:16px}
 .mono{font-family:'JetBrains Mono',monospace}
-.bar-t{transition:width 0.8s cubic-bezier(0.4,0,0.2,1);border-radius:99px;height:100%}
-.bar-track{border-radius:99px;overflow:hidden}
-.gcard{transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);border-radius:14px}
-.gcard:hover{transform:translateY(-2px)}
+
+/* ===== 主题：dark ===== */
 body.dark{background-image:url('https://i.yon.li/w/682f73d97eade.png');color:#f8fafc}
 body.dark::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:-1;pointer-events:none}
-.dark .gcard{background:rgba(17,25,40,0.68);backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.11);box-shadow:0 8px 32px rgba(0,0,0,0.35)}
-.dark .track-bg{background:rgba(255,255,255,0.09)}
+.dark .gc{background:rgba(17,25,40,0.68);backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.11);box-shadow:0 8px 32px rgba(0,0,0,0.35)}
 .dark .t1{color:#fff;font-weight:800}
 .dark .t2{color:#e2e8f0;font-weight:700}
 .dark .t3{color:#94a3b8;font-weight:600}
 .dark .divline{border-color:rgba(255,255,255,0.09)}
-.dark .modal-bg{background:rgba(20,26,42,0.97);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,0.07)}
+.dark .modal-bg{background:rgba(18,24,40,0.97);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,0.07)}
 .dark .pill-bg{background:rgba(255,255,255,0.07)}
-.dark .sbadge{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12)}
+.dark .track-bg{background:rgba(255,255,255,0.09)}
+/* badge */
+.dark .spec-badge{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1)}
+
+/* ===== 主题：komari ===== */
 body.komari{background-image:url('https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1920&auto=format&fit=crop');color:#0f172a}
-body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2);z-index:-1;pointer-events:none}
-.komari .gcard{background:rgba(252,253,255,0.82);backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.9);box-shadow:0 8px 28px rgba(0,0,0,0.08)}
-.komari .track-bg{background:rgba(15,23,42,0.1)}
+body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.18);z-index:-1;pointer-events:none}
+.komari .gc{background:rgba(252,253,255,0.84);backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,0.92);box-shadow:0 8px 28px rgba(0,0,0,0.08)}
 .komari .t1{color:#0f172a;font-weight:900}
 .komari .t2{color:#1e293b;font-weight:800}
 .komari .t3{color:#475569;font-weight:700}
-.komari .divline{border-color:rgba(0,0,0,0.08)}
+.komari .divline{border-color:rgba(0,0,0,0.07)}
 .komari .modal-bg{background:rgba(255,255,255,0.98);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,1)}
 .komari .pill-bg{background:rgba(0,0,0,0.06)}
-.komari .sbadge{background:rgba(255,255,255,0.65);border:1px solid rgba(0,0,0,0.09)}
-.sbadge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 7px;border-radius:8px;font-size:11px;font-weight:700;backdrop-filter:blur(6px)}
-/* ping 格子：左→右，高度随延迟变化 */
-.ping-row{display:flex;gap:2px;align-items:flex-end;height:14px}
-.ping-cell{flex:1;border-radius:2px 2px 0 0;min-width:0;transition:height 0.4s,background-color 0.4s}
-.btn-act{background:#6366f1!important;color:#fff!important;box-shadow:0 2px 10px rgba(99,102,241,0.35)}
-.offline-bg{background:repeating-linear-gradient(-45deg,transparent,transparent 10px,rgba(239,68,68,0.06) 10px,rgba(239,68,68,0.06) 20px)}
+.komari .track-bg{background:rgba(15,23,42,0.09)}
+.komari .spec-badge{background:rgba(255,255,255,0.7);border:1px solid rgba(0,0,0,0.09)}
+
+/* ===== 通用组件 ===== */
+.gc{border-radius:14px;transition:transform 0.25s cubic-bezier(0.4,0,0.2,1)}
+.gc:hover{transform:translateY(-2px)}
+.bar-track{border-radius:99px;overflow:hidden}
+.bar{border-radius:99px;transition:width 0.8s cubic-bezier(0.4,0,0.2,1)}
+
+/* ===== 规格徽章 ===== */
+.spec-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;backdrop-filter:blur(6px)}
+
+/* ===== Ping 格子 — 左→右推进，高度随延迟变化 ===== */
+.ping-row{display:flex;align-items:flex-end;gap:1.5px;height:10px;width:100%}
+.ping-cell{
+  flex:1;
+  min-width:0;
+  border-radius:2px 2px 1px 1px;
+  transition:height 0.35s ease,background-color 0.35s ease;
+}
+/* 等待数据 */
+.pc-wait{height:3px!important;background:rgba(148,163,184,0.18)!important}
+/* 断流 — 明显红色，高度6px保证可见 */
+.pc-down{height:6px!important;background:#ef4444!important;box-shadow:0 0 4px rgba(239,68,68,0.5)!important}
+/* 延迟颜色 */
+.pc-g1{height:10px;background:#34d399}   /* <80ms  */
+.pc-g2{height:9px;background:#6ee7b7}    /* 80-120ms */
+.pc-y1{height:7px;background:#fbbf24}    /* 120-200ms */
+.pc-y2{height:5px;background:#f97316}    /* 200-300ms */
+.pc-r1{height:4px;background:#f87171}    /* >300ms */
+
+/* ===== 图表弹窗 ===== */
+.modal-enter{animation:fadeUp .25s ease forwards}
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.btn-act{background:#6366f1!important;color:#fff!important;box-shadow:0 2px 10px rgba(99,102,241,0.35)!important}
+
+/* 离线遮罩 */
+.offline-stripe{background:repeating-linear-gradient(-45deg,transparent,transparent 10px,rgba(239,68,68,0.055) 10px,rgba(239,68,68,0.055) 20px)}
 </style>
 </head>
 <body class="dark">
 <div id="app" class="w-full max-w-[1440px] mx-auto">
 
   <!-- 顶部导航 -->
-  <header class="gcard flex items-center justify-between px-6 py-3 mb-4">
-    <div class="text-[17px] font-black tracking-widest t1">{{ siteName }}</div>
+  <header class="gc flex items-center justify-between px-6 py-3 mb-4">
+    <div class="text-[17px] font-black tracking-widest t1 flex items-center gap-2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      {{ siteName }}
+    </div>
     <div class="flex items-center gap-4">
-      <button @click="toggleTheme" class="t3 hover:opacity-60 transition-opacity">
-        <svg v-if="isDark" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-        <svg v-else width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-14.07 1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2m-4.93-7.07-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>
+      <button @click="toggleTheme" class="t3 hover:opacity-60 transition-opacity" title="切换主题">
+        <svg v-if="isDark" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <svg v-else width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-14.07 1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2m-4.93-7.07-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>
       </button>
-      <a href="/admin" target="_blank" class="t3 hover:opacity-60 transition-opacity">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <a href="/admin" target="_blank" class="t3 hover:opacity-60 transition-opacity" title="管理后台">
+        <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </a>
     </div>
   </header>
 
   <!-- 统计栏 -->
-  <div class="gcard mb-5 px-6 py-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-    <div><div class="text-[10px] t3 mb-1 font-bold uppercase tracking-wider">当前时间</div><div class="text-[14px] t1 mono font-bold">{{ currentTime }}</div></div>
-    <div><div class="text-[10px] t3 mb-1 font-bold uppercase tracking-wider">当前在线</div><div class="text-[14px] t1 mono font-bold"><span class="text-emerald-400">{{ onlineCount }}</span><span class="t3 mx-1 opacity-50">/</span>{{ totalCount }}</div></div>
-    <div><div class="text-[10px] t3 mb-1 font-bold uppercase tracking-wider">点亮地区</div><div class="text-[14px] t1 mono font-bold">{{ totalCount }}</div></div>
-    <div><div class="text-[10px] t3 mb-1 font-bold uppercase tracking-wider">流量概览</div><div class="mono font-bold text-[12px]"><span class="text-blue-400">↑ {{ fmtB(totalOut) }}</span><br><span class="text-emerald-400">↓ {{ fmtB(totalIn) }}</span></div></div>
-    <div><div class="text-[10px] t3 mb-1 font-bold uppercase tracking-wider">网络速率</div><div class="mono font-bold text-[12px]"><span class="text-blue-400">↑ {{ fmtB(spOut) }}/s</span><br><span class="text-emerald-400">↓ {{ fmtB(spIn) }}/s</span></div></div>
+  <div class="gc mb-5 px-6 py-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+    <div><div class="text-[10px] t3 mb-1.5 font-bold uppercase tracking-wider">当前时间</div><div class="text-[13px] t1 mono font-bold">{{ currentTime }}</div></div>
+    <div><div class="text-[10px] t3 mb-1.5 font-bold uppercase tracking-wider">当前在线</div><div class="text-[13px] t1 mono font-bold"><span class="text-emerald-400">{{ onlineCnt }}</span><span class="t3 mx-1 opacity-40">/</span>{{ totalCnt }}</div></div>
+    <div><div class="text-[10px] t3 mb-1.5 font-bold uppercase tracking-wider">点亮地区</div><div class="text-[13px] t1 mono font-bold">{{ totalCnt }}</div></div>
+    <div><div class="text-[10px] t3 mb-1.5 font-bold uppercase tracking-wider">流量概览</div><div class="mono font-bold text-[11px]"><span class="text-blue-400">↑ {{ fmtB(totalOut) }}</span><br><span class="text-emerald-400">↓ {{ fmtB(totalIn) }}</span></div></div>
+    <div><div class="text-[10px] t3 mb-1.5 font-bold uppercase tracking-wider">网络速率</div><div class="mono font-bold text-[11px]"><span class="text-blue-400">↑ {{ fmtB(spOut) }}/s</span><br><span class="text-emerald-400">↓ {{ fmtB(spIn) }}/s</span></div></div>
   </div>
 
-  <!-- 节点卡片 -->
+  <!-- 节点卡片网格 -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
-    <div v-for="node in servers" :key="node.id" class="gcard p-4 flex flex-col relative overflow-hidden">
-      <div v-if="!node.status.is_online" class="absolute inset-0 offline-bg pointer-events-none z-0 rounded-[14px]"></div>
-      <div v-if="!node.status.is_online" class="absolute inset-0 border-2 border-red-500/30 rounded-[14px] pointer-events-none z-10"></div>
+    <div v-for="node in servers" :key="node.id" class="gc p-4 flex flex-col relative overflow-hidden">
+      <!-- 离线条纹 -->
+      <div v-if="!node.status.is_online" class="absolute inset-0 offline-stripe pointer-events-none z-0 rounded-[14px]"></div>
+      <div v-if="!node.status.is_online" class="absolute inset-0 border-2 border-red-500/25 rounded-[14px] pointer-events-none z-10"></div>
 
       <!-- 标题行 -->
-      <div class="flex justify-between items-center mb-2.5 relative z-20">
+      <div class="flex justify-between items-center mb-3 relative z-20">
         <div class="flex items-center gap-2 font-black text-[15px] t1">
-          <span v-if="node.status.country_code && node.status.country_code!=='OT'" :class="['fi','fi-'+node.status.country_code.toLowerCase(),'rounded-sm']" style="width:20px;height:15px;display:inline-block;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></span>
-          <span v-else style="font-size:16px">🌐</span>
+          <span v-if="node.status.country_code && node.status.country_code!=='OT'"
+            :class="['fi','fi-'+node.status.country_code.toLowerCase(),'rounded-sm','shrink-0']"
+            style="width:20px;height:14px;display:inline-block;box-shadow:0 1px 3px rgba(0,0,0,0.25)"></span>
+          <span v-else style="font-size:16px;line-height:1">🌐</span>
           {{ node.name }}
         </div>
         <div class="flex items-center gap-2.5">
-          <button @click="openChart(node.id, node.name)" class="t3 opacity-40 hover:opacity-90 transition-opacity">
+          <!-- 图表按钮 -->
+          <button @click="openChart(node.id,node.name)" class="t3 opacity-40 hover:opacity-90 transition-opacity" title="延迟图表">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           </button>
           <span v-if="node.status.is_online" class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_7px_#34d399]"></span>
@@ -98,109 +136,115 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
 
       <!-- 到期徽章 -->
       <div class="mb-3 relative z-20">
-        <span class="px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1" :class="expireClass(calcDays(node._ed))">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold" :class="expClass(calcDays(node._ed))">
           <svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           余 {{ calcDays(node._ed) }} 天
         </span>
       </div>
 
-      <!-- 规格徽章（图标美化）-->
-      <div class="flex flex-wrap gap-1 mb-3 relative z-20">
-        <span class="sbadge">
-          <svg width="10" height="10" fill="none" stroke="#60a5fa" stroke-width="2.5" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
-          <span class="text-blue-400">{{ node.status.cpu_cores||0 }} vCPU</span>
+      <!-- ★ 规格徽章（Komari 风格，精美小图标）★ -->
+      <div class="flex flex-wrap gap-1.5 mb-3.5 relative z-20">
+        <!-- CPU -->
+        <span class="spec-badge">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="3"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
+          <span style="color:#60a5fa">{{ node.status.cpu_cores||0 }} vCPU</span>
         </span>
-        <span class="sbadge">
-          <svg width="10" height="10" fill="none" stroke="#34d399" stroke-width="2.5" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>
-          <span class="text-emerald-400">{{ fmtB(node.status.mem_total||0) }}</span>
+        <!-- 内存 -->
+        <span class="spec-badge">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"><path d="M6 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6z"/><path d="M9 9h.01M9 12h.01M9 15h.01M12 9h.01M12 12h.01M12 15h.01M15 9h.01M15 12h.01M15 15h.01"/></svg>
+          <span style="color:#34d399">{{ fmtB(node.status.mem_total||0) }}</span>
         </span>
-        <span class="sbadge">
-          <svg width="10" height="10" fill="none" stroke="#a78bfa" stroke-width="2.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          <span class="text-violet-400">{{ fmtB(node.status.disk_total||0) }}</span>
+        <!-- 硬盘 -->
+        <span class="spec-badge">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>
+          <span style="color:#a78bfa">{{ fmtB(node.status.disk_total||0) }}</span>
         </span>
       </div>
 
-      <!-- 进度条 -->
+      <!-- 进度条组 -->
       <div class="space-y-2 mb-3 relative z-20">
         <div class="flex items-center gap-2 text-[11px]">
           <span class="w-7 t3 font-bold">CPU</span>
-          <div class="flex-1 bar-track track-bg h-[5px]"><div class="bar-t bg-blue-400" :style="`width:${node.status.cpu_usage||0}%`"></div></div>
+          <div class="flex-1 bar-track track-bg h-[5px]"><div class="bar bg-blue-400" :style="`width:${node.status.cpu_usage||0}%`"></div></div>
           <span class="w-8 text-right t2 mono font-bold">{{ (node.status.cpu_usage||0).toFixed(0) }}%</span>
         </div>
         <div class="flex items-center gap-2 text-[11px]">
           <span class="w-7 t3 font-bold">内存</span>
-          <div class="flex-1 bar-track track-bg h-[5px]"><div class="bar-t bg-emerald-400" :style="`width:${pct(node.status.mem_used,node.status.mem_total)}%`"></div></div>
+          <div class="flex-1 bar-track track-bg h-[5px]"><div class="bar bg-emerald-400" :style="`width:${pct(node.status.mem_used,node.status.mem_total)}%`"></div></div>
           <span class="w-8 text-right t2 mono font-bold">{{ pct(node.status.mem_used,node.status.mem_total) }}%</span>
         </div>
         <div class="flex items-center gap-2 text-[11px]">
           <span class="w-7 t3 font-bold">SWAP</span>
-          <div class="flex-1 bar-track track-bg h-[5px]"><div class="bar-t bg-amber-400" :style="`width:${pct(node.status.swap_used,node.status.swap_total)}%`"></div></div>
-          <span class="w-8 text-right mono font-bold" :class="node.status.swap_total?'t2':'t3 opacity-50'">{{ node.status.swap_total ? pct(node.status.swap_used,node.status.swap_total)+'%' : 'OFF' }}</span>
+          <div class="flex-1 bar-track track-bg h-[5px]"><div class="bar bg-amber-400" :style="`width:${pct(node.status.swap_used,node.status.swap_total)}%`"></div></div>
+          <span class="w-8 text-right mono font-bold" :class="node.status.swap_total?'t2':'t3 opacity-50'">
+            {{ node.status.swap_total ? pct(node.status.swap_used,node.status.swap_total)+'%' : 'OFF' }}
+          </span>
         </div>
         <div class="flex items-center gap-2 text-[11px]">
           <span class="w-7 t3 font-bold">硬盘</span>
-          <div class="flex-1 bar-track track-bg h-[5px]"><div class="bar-t bg-emerald-400" :style="`width:${pct(node.status.disk_used,node.status.disk_total)}%`"></div></div>
+          <div class="flex-1 bar-track track-bg h-[5px]"><div class="bar bg-emerald-400" :style="`width:${pct(node.status.disk_used,node.status.disk_total)}%`"></div></div>
           <span class="w-8 text-right t2 mono font-bold">{{ pct(node.status.disk_used,node.status.disk_total) }}%</span>
         </div>
       </div>
 
-      <div class="divline border-t mb-2 relative z-20"></div>
+      <div class="divline border-t mb-2.5 relative z-20"></div>
 
-      <!-- 网络信息 -->
+      <!-- 网络/流量/负载 -->
       <div class="space-y-1 mb-2.5 text-[11px] relative z-20">
-        <div class="flex justify-between"><span class="t3 font-bold">网络</span><span class="t2 mono font-bold">↑ {{ fmtB(node.status.net_out_speed||0) }}/s <span class="opacity-30 mx-0.5">|</span> ↓ {{ fmtB(node.status.net_in_speed||0) }}/s</span></div>
-        <div class="flex justify-between"><span class="t3 font-bold">流量</span><span class="t2 mono font-bold">↑ {{ fmtB(node.status.net_out_transfer||0) }} <span class="opacity-30 mx-0.5">|</span> ↓ {{ fmtB(node.status.net_in_transfer||0) }}</span></div>
+        <div class="flex justify-between"><span class="t3 font-bold">网络</span><span class="t2 mono font-bold">↑ {{ fmtB(node.status.net_out_speed||0) }}/s <span class="opacity-25 mx-0.5">|</span> ↓ {{ fmtB(node.status.net_in_speed||0) }}/s</span></div>
+        <div class="flex justify-between"><span class="t3 font-bold">流量</span><span class="t2 mono font-bold">↑ {{ fmtB(node.status.net_out_transfer||0) }} <span class="opacity-25 mx-0.5">|</span> ↓ {{ fmtB(node.status.net_in_transfer||0) }}</span></div>
         <div class="flex justify-between"><span class="t3 font-bold">负载</span><span class="t2 mono font-bold">{{ (node.status.load_1||0).toFixed(2) }} | 0.00 | 0.00</span></div>
       </div>
 
-      <!-- 月流量条 -->
+      <!-- 月流量进度 -->
       <div v-if="node._tl>0" class="mb-2.5 relative z-20">
         <div class="flex justify-between text-[10px] font-bold mb-1">
           <span class="t3">当月流量 <span class="opacity-50 text-[9px]">({{ node._tl }}GB)</span></span>
-          <span class="mono" :class="trafficPct(node)>=90?'text-red-400':'t2'">{{ trafficUsed(node) }} <span class="opacity-30">|</span> {{ trafficPct(node) }}%</span>
+          <span class="mono" :class="trafPct(node)>=90?'text-red-400 font-black':'t2'">{{ trafUsed(node) }} <span class="opacity-25">|</span> {{ trafPct(node) }}%</span>
         </div>
-        <div class="bar-track track-bg h-[5px]"><div class="bar-t" :class="trafficColor(trafficPct(node))" :style="`width:${trafficPct(node)}%`"></div></div>
+        <div class="bar-track track-bg h-[5px]"><div class="bar" :class="trafColor(trafPct(node))" :style="`width:${trafPct(node)}%`"></div></div>
       </div>
 
-      <!-- ===== 连通率监测（核心修正版）===== -->
+      <!-- ★★★ 连通率监测区域 — 终极修正版 ★★★ -->
       <div class="mt-auto relative z-20">
         <div class="divline border-t mb-2"></div>
         <!-- 标题行 + 图例 -->
-        <div class="flex items-center justify-between mb-1.5">
+        <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-1.5">
             <span class="text-[10px] t3 font-bold">连通率监测</span>
-            <span class="text-[9px] px-1.5 py-0.5 rounded font-black" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3)">TCP</span>
-            <span class="text-[9px] t3 opacity-60">60格=60分钟</span>
+            <span class="text-[8px] px-1.5 py-0.5 rounded font-black" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.28)">TCP</span>
+            <span class="text-[9px] t3 opacity-55">60格=60分钟</span>
           </div>
-          <div class="flex items-center gap-1.5 text-[9px] font-bold">
-            <span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#34d399"></span><span class="t3">畅通</span>
-            <span class="w-2.5 h-2.5 rounded-sm inline-block ml-1" style="background:#fbbf24"></span><span class="t3">延迟</span>
-            <span class="w-2.5 h-2.5 rounded-sm inline-block ml-1" style="background:rgba(239,68,68,0.8)"></span><span class="t3">断流</span>
+          <!-- 图例 -->
+          <div class="flex items-center gap-1.5 text-[9px] font-bold t3">
+            <span class="inline-block w-2 h-2 rounded-sm" style="background:#34d399"></span>畅通
+            <span class="inline-block w-2 h-2 rounded-sm ml-1" style="background:#fbbf24"></span>延迟
+            <span class="inline-block w-2 h-2 rounded-sm ml-1" style="background:#ef4444"></span>断流
           </div>
         </div>
-        <!-- 每个 Ping 目标一行 -->
+
+        <!-- Ping 行 — 核心逻辑 -->
         <div class="space-y-1.5">
-          <div v-for="ps in getPingRows(node)" :key="ps.name" class="flex items-center gap-1.5 text-[10px]">
-            <span class="w-[46px] t3 font-bold truncate shrink-0">{{ ps.name }}</span>
-            <!-- 60格，左→右，高度随延迟变化 -->
+          <div v-for="row in pingRows(node)" :key="row.name" class="flex items-center gap-1.5">
+            <!-- 目标名 -->
+            <span class="text-[10px] t3 font-bold shrink-0" style="width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.name }}</span>
+            <!-- 60 格，左→右推进 -->
             <div class="flex-1 ping-row">
-              <div
-                v-for="(val, ci) in ps.cells60"
-                :key="ci"
+              <div v-for="(v,i) in row.cells" :key="i"
                 class="ping-cell"
-                :style="cellStyle(val)"
-                :title="val>0 ? val.toFixed(0)+'ms' : (val===0 ? '断流' : '等待')">
+                :class="cellClass(v)"
+                :title="v>0?v.toFixed(0)+'ms':(v===0?'断流':'等待')">
               </div>
             </div>
-            <!-- 最新延迟 -->
-            <span class="w-[38px] text-right mono font-bold shrink-0" :class="latestClass(ps.latest)">
-              {{ ps.latest > 0 ? ps.latest.toFixed(0)+' ms' : (ps.hasData ? '断流' : '-- ms') }}
+            <!-- 最新延迟值 -->
+            <span class="mono font-bold shrink-0 text-right" style="width:38px;font-size:10px" :class="latCls(row.latest)">
+              {{ row.latest>0 ? row.latest.toFixed(0)+' ms' : (row.hasData ? '断流' : '-- ms') }}
             </span>
           </div>
         </div>
       </div>
 
-      <!-- 底部 -->
+      <!-- 底部到期/在线 -->
       <div class="pt-2.5 mt-2 divline border-t flex justify-between text-[11px] font-bold relative z-20">
         <span class="t3">到期: <span class="t2">{{ node._ed }}</span></span>
         <span class="t3">在线: <span class="text-violet-400">{{ fmtUp(node.status.uptime||0) }}</span></span>
@@ -208,173 +252,186 @@ body.komari::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,0.2)
     </div>
   </div>
 
-  <!-- 图表弹窗 -->
-  <div v-if="showChart" class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.55);backdrop-filter:blur(6px)" @click.self="closeChart">
-    <div class="modal-bg rounded-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col">
-      <div class="flex justify-between items-center p-5 border-b" :style="isDark?'border-color:rgba(255,255,255,0.07)':'border-color:rgba(0,0,0,0.07)'">
-        <h3 class="text-[16px] font-black t1 tracking-wide flex items-center gap-2">
-          <span class="text-violet-400">{{ chartNodeName }}</span> 多链路延迟波动
-          <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ml-1" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3)">TCP PING</span>
+  <!-- ★ 图表弹窗 — 清晰折线 + 断流红区 ★ -->
+  <div v-if="showChart"
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    style="background:rgba(0,0,0,0.58);backdrop-filter:blur(6px)"
+    @click.self="closeChart">
+    <div class="modal-bg rounded-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col modal-enter">
+      <!-- 弹窗标题 -->
+      <div class="flex justify-between items-center px-6 py-4" :style="isDark?'border-bottom:1px solid rgba(255,255,255,0.07)':''">
+        <h3 class="text-[15px] font-black t1 flex items-center gap-2">
+          <span class="text-violet-400">{{ chartName }}</span> 多链路延迟波动
+          <span class="text-[9px] px-2 py-0.5 rounded-full font-black ml-1" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.28)">TCP PING</span>
         </h3>
         <div class="flex items-center gap-4">
-          <div class="flex items-center pill-bg rounded-full p-1">
-            <button v-for="h in [1,4,24]" :key="h" @click="loadChart(h)" :class="chartHours===h?'btn-act':'t3 hover:opacity-80'" class="px-4 py-1.5 rounded-full text-[12px] font-bold transition-all">{{ h }}小时</button>
+          <div class="flex items-center pill-bg rounded-full p-1 gap-0.5">
+            <button v-for="h in [1,4,24]" :key="h" @click="loadChart(h)"
+              :class="chartH===h?'btn-act':'t3 hover:opacity-80'"
+              class="px-4 py-1.5 rounded-full text-[12px] font-bold transition-all">{{ h }}小时</button>
           </div>
           <button @click="closeChart" class="t3 hover:text-red-400 transition-colors">
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
+      <!-- 目标选择器 -->
       <div class="px-6 pt-4 pb-1 flex flex-wrap justify-center gap-3">
-        <div v-for="(s,tgt) in chartStats" :key="tgt" @click="toggleLine(tgt)"
-          class="px-4 py-2 rounded-xl border-2 cursor-pointer transition-all min-w-[120px] text-center"
-          :style="{borderColor:s.on?s.color:'rgba(100,116,139,0.3)',background:s.on?s.color+'18':'transparent',opacity:s.on?1:0.45}">
-          <div class="text-[12px] font-bold mb-1" :style="{color:s.on?s.color:'#64748b'}">{{ tgt }}</div>
-          <div class="text-[11px] mono t3">{{ s.avg>0?s.avg.toFixed(1)+' ms':'-- ms' }} <span class="opacity-30 mx-1">|</span> <span :class="s.loss>0?'text-red-400':''">{{ s.loss.toFixed(1) }}%</span></div>
+        <div v-for="(s,k) in chartStats" :key="k" @click="toggleLine(k)"
+          class="px-4 py-2 rounded-xl border-2 cursor-pointer transition-all min-w-[120px] text-center select-none"
+          :style="{borderColor:s.on?s.c:'rgba(100,116,139,0.3)',background:s.on?s.c+'18':'transparent',opacity:s.on?1:0.4}">
+          <div class="text-[12px] font-bold mb-1" :style="{color:s.on?s.c:(isDark?'#64748b':'#94a3b8')}">{{ k }}</div>
+          <div class="text-[11px] mono t3">{{ s.avg>0?s.avg.toFixed(1)+' ms':'-- ms' }} <span class="opacity-25 mx-1">|</span> <span :class="s.loss>0?'text-red-400 font-black':''">{{ s.loss.toFixed(1) }}%</span></div>
         </div>
       </div>
-      <div class="p-5"><div id="echart-box" class="w-full h-[360px]"></div></div>
+      <!-- 图表区 -->
+      <div class="p-5"><div id="echart-box" style="width:100%;height:360px"></div></div>
     </div>
   </div>
-</div>
 
+</div>
 <script>
 const {createApp,ref,computed,onMounted,onUnmounted,watch,nextTick}=Vue;
 createApp({
   setup(){
     const servers=ref([]),siteName=ref('探针看板'),pingTasks=ref([]);
     const isDark=ref(localStorage.getItem('probe_theme')!=='komari');
-    const currentTime=ref(''),showChart=ref(false),chartNodeId=ref(''),chartNodeName=ref(''),chartHours=ref(4),chartStats=ref({});
-    let eChart=null,fetchTmr=null,chartTmr=null;
+    const currentTime=ref('');
+    const showChart=ref(false),chartId=ref(''),chartName=ref(''),chartH=ref(4),chartStats=ref({});
+    let eChart=null,ftmr=null,ctmr=null;
 
+    /* 主题 */
     const applyTheme=()=>{
       document.body.className=isDark.value?'dark':'komari';
       localStorage.setItem('probe_theme',isDark.value?'dark':'komari');
     };
-    const toggleTheme=()=>{isDark.value=!isDark.value;applyTheme();if(eChart){eChart.dispose();eChart=null;}};
+    const toggleTheme=()=>{
+      isDark.value=!isDark.value;
+      applyTheme();
+      if(eChart){eChart.dispose();eChart=null;}
+    };
 
     setInterval(()=>{currentTime.value=new Date().toLocaleTimeString('zh-CN',{hour12:false});},1000);
 
+    /* 数据获取 */
     const fetchData=async()=>{
       try{
         const d=await fetch('/api/status').then(r=>r.json());
         siteName.value=d.site_name||'探针看板';
         document.title=siteName.value;
-        const nodes=(d.nodes||[]).map(n=>{
-          // expire_date 可能是 "2027/01/01" 或 "2027/01/01|1000"
+        servers.value=(d.nodes||[]).map(n=>{
           let ed='2027/01/01',tl=0;
-          const raw=n.expire_date||'';
+          const raw=String(n.expire_date||'');
           if(raw.includes('|')){
             const p=raw.split('|');
-            ed=(p[0]||'2027/01/01').replace('NaN','2027/01/01');
+            ed=(p[0]||'2027/01/01').replace(/NaN/g,'2027/01/01');
             tl=parseInt(p[1])||0;
-          } else {
-            ed=raw.replace('NaN','2027/01/01')||'2027/01/01';
+          }else{
+            ed=raw.replace(/NaN/g,'2027/01/01')||'2027/01/01';
           }
-          return {...n, _ed:ed, _tl:tl,
-            status: n.status||{is_online:false,ping_statuses:[]}};
+          return{...n,_ed:ed,_tl:tl,status:n.status||{is_online:false,ping_statuses:[]}};
         });
-        servers.value=nodes;
         pingTasks.value=d.ping_tasks||[];
       }catch(e){}
     };
 
-    const onlineCount=computed(()=>servers.value.filter(n=>n.status.is_online).length);
-    const totalCount=computed(()=>servers.value.length);
+    /* 统计 */
+    const onlineCnt=computed(()=>servers.value.filter(n=>n.status.is_online).length);
+    const totalCnt=computed(()=>servers.value.length);
     const totalIn=computed(()=>servers.value.reduce((a,n)=>a+(n.status.net_in_transfer||0),0));
     const totalOut=computed(()=>servers.value.reduce((a,n)=>a+(n.status.net_out_transfer||0),0));
     const spIn=computed(()=>servers.value.reduce((a,n)=>a+(n.status.net_in_speed||0),0));
     const spOut=computed(()=>servers.value.reduce((a,n)=>a+(n.status.net_out_speed||0),0));
 
+    /* 工具函数 */
     const fmtB=b=>{if(!b||b===0)return'0 B';const k=1024,s=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(k));return(b/Math.pow(k,i)).toFixed(2)+' '+s[i]};
     const pct=(u,t)=>(!t||t===0)?0:Math.min(((u||0)/t)*100,100).toFixed(0);
-    const calcDays=d=>{if(!d||d==='未知'||d==='')return'∞';const diff=new Date(d.replace(/\//g,'-'))-new Date();if(isNaN(diff))return'∞';return diff<0?0:Math.ceil(diff/86400000)};
-    const expireClass=d=>{
-      if(d==='∞'||isNaN(+d))return'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30';
-      if(+d<=7)return'text-red-400 bg-red-500/10 border border-red-500/30';
-      if(+d<=30)return'text-amber-400 bg-amber-500/10 border border-amber-500/30';
-      return'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30';
+    const calcDays=d=>{if(!d||d.trim()===''||d==='未知')return'∞';const diff=new Date(d.replace(/\//g,'-'))-new Date();if(isNaN(diff))return'∞';return diff<0?0:Math.ceil(diff/86400000)};
+    const expClass=d=>{
+      if(d==='∞'||isNaN(+d))return'text-emerald-400 bg-emerald-500/10 border border-emerald-500/25';
+      if(+d<=7)return'text-red-400 bg-red-500/10 border border-red-500/25';
+      if(+d<=30)return'text-amber-400 bg-amber-500/10 border border-amber-500/25';
+      return'text-emerald-400 bg-emerald-500/10 border border-emerald-500/25';
     };
     const fmtUp=s=>{if(!s)return'离线';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d>0?`${d}天${h}小时`:`${h}小时`};
-    const trafficUsed=n=>fmtB((n.status.net_out_transfer||0)+(n.status.net_in_transfer||0));
-    const trafficPct=n=>{if(!n._tl)return 0;const u=(n.status.net_out_transfer||0)+(n.status.net_in_transfer||0);return Math.min((u/(n._tl*1024*1024*1024))*100,100).toFixed(1)};
-    const trafficColor=p=>{const v=parseFloat(p);return v>=90?'bg-red-400':v>=75?'bg-amber-400':'bg-violet-400'};
+    const trafUsed=n=>fmtB((n.status.net_out_transfer||0)+(n.status.net_in_transfer||0));
+    const trafPct=n=>{if(!n._tl)return 0;const u=(n.status.net_out_transfer||0)+(n.status.net_in_transfer||0);return Math.min((u/(n._tl*1024*1024*1024))*100,100).toFixed(1)};
+    const trafColor=p=>{const v=parseFloat(p);return v>=90?'bg-red-400':v>=75?'bg-amber-400':'bg-violet-400'};
 
-    // ===== 核心：解析 ping_statuses，生成60格数据 =====
-    // ping_statuses 是 []PingResult
-    // PingResult.history 是 []float64，0=断流，-1或无数据=空
-    const getPingRows=(node)=>{
+    /* ★ 核心：60格逻辑，左→右推进 ★
+       ping_statuses[].history 是 []float64
+       0 = 断流，>0 = 延迟ms，-1 = 等待
+    */
+    const pingRows=node=>{
       const ps=node.status.ping_statuses||[];
-      if(!ps.length){
-        // 用 pingTasks 生成空行
-        return pingTasks.value.map(t=>({name:t.name,cells60:new Array(60).fill(-1),latest:0,hasData:false}));
-      }
-      return ps.map(p=>{
+      const tasks=pingTasks.value;
+      // 如果 ping_statuses 有数据则用，否则用 tasks 生成空行
+      const source=ps.length>0?ps:tasks.map(t=>({target_name:t.name,history:[]}));
+      return source.map(p=>{
         const hist=p.history||[];
         const TOTAL=60;
-        // 取最新60个，不足则前面补-1（等待）
-        const cells60=new Array(TOTAL).fill(-1);
+        // 构建60格：位置0=最旧，位置59=最新（左→右）
+        const cells=new Array(TOTAL).fill(-1); // -1=等待/无数据
         const start=Math.max(0,hist.length-TOTAL);
         const offset=TOTAL-Math.min(hist.length,TOTAL);
         for(let i=start;i<hist.length;i++){
-          cells60[offset+(i-start)]=hist[i]; // float64，0=断流
+          cells[offset+(i-start)]=hist[i];
         }
         const latest=hist.length>0?hist[hist.length-1]:0;
-        return{name:p.target_name,cells60,latest,hasData:hist.length>0};
+        return{name:p.target_name,cells,latest,hasData:hist.length>0};
       });
     };
 
-    // 格子样式：高度和颜色都随延迟变化
-    const cellStyle=(val)=>{
-      if(val<0)return{height:'2px',background:'rgba(148,163,184,0.12)',borderRadius:'2px'}; // 等待
-      if(val===0)return{height:'3px',background:'rgba(239,68,68,0.75)',borderRadius:'2px'}; // 断流
-      let h,bg;
-      if(val<80){h='14px';bg='#34d399';}       // 绿满格
-      else if(val<120){h='12px';bg='#6ee7b7';} // 浅绿
-      else if(val<200){h='9px';bg='#fbbf24';}  // 黄
-      else if(val<300){h='6px';bg='#f97316';}  // 橙
-      else{h='4px';bg='#f87171';}              // 红
-      return{height:h,background:bg,borderRadius:'2px 2px 0 0'};
+    /* 格子 CSS class — 高度随延迟动态变化 */
+    const cellClass=v=>{
+      if(v<0)return'pc-wait';           // 等待
+      if(v===0)return'pc-down';         // 断流（红色可见格）
+      if(v<80)return'pc-g1';            // 极速绿
+      if(v<120)return'pc-g2';           // 正常绿
+      if(v<200)return'pc-y1';           // 黄色偏高
+      if(v<300)return'pc-y2';           // 橙色高延迟
+      return'pc-r1';                    // 红色极高
     };
-
-    const latestClass=v=>{
+    const latCls=v=>{
       if(v<=0)return'text-red-400 font-black';
       if(v<100)return'text-emerald-400 font-bold';
       if(v<200)return'text-amber-400 font-bold';
       return'text-red-400 font-bold';
     };
 
-    // ===== 图表 =====
+    /* ★ 图表逻辑 — 清晰折线 + 断流红背景，无迷雾 ★ */
     const openChart=async(id,name)=>{
-      chartNodeId.value=id;chartNodeName.value=name;showChart.value=true;
+      chartId.value=id;chartName.value=name;showChart.value=true;
       await nextTick();
       if(!eChart)eChart=echarts.init(document.getElementById('echart-box'));
       loadChart(4);
     };
     const closeChart=()=>{showChart.value=false;if(eChart){eChart.dispose();eChart=null;}};
-    const toggleLine=t=>{
-      if(chartStats.value[t]){chartStats.value[t].on=!chartStats.value[t].on;}
-      eChart?.dispatchAction({type:'legendToggleSelect',name:t});
+    const toggleLine=k=>{
+      if(chartStats.value[k])chartStats.value[k].on=!chartStats.value[k].on;
+      eChart?.dispatchAction({type:'legendToggleSelect',name:k});
     };
 
-    const getBreakAreas=(data,labels)=>{
-      const areas=[];let start=-1;
+    /* 获取断流区间（用于 markArea 红色背景） */
+    const getBreaks=(data,labels)=>{
+      const areas=[];let s=-1;
       for(let i=0;i<data.length;i++){
-        if((data[i]===null||data[i]===0)&&start<0)start=i;
-        else if(data[i]!==null&&data[i]!==0&&start>=0){areas.push([{xAxis:labels[start]},{xAxis:labels[i-1]}]);start=-1;}
+        const down=(data[i]===null||data[i]===0||data[i]<=0);
+        if(down&&s<0)s=i;
+        else if(!down&&s>=0){areas.push([{xAxis:labels[s]},{xAxis:labels[i-1]}]);s=-1;}
       }
-      if(start>=0&&labels.length>0)areas.push([{xAxis:labels[start]},{xAxis:labels[labels.length-1]}]);
+      if(s>=0&&labels.length>0)areas.push([{xAxis:labels[s]},{xAxis:labels[labels.length-1]}]);
       return areas;
     };
 
     const loadChart=async(h)=>{
-      chartHours.value=h;
+      chartH.value=h;
       const light=!isDark.value;
-      if(eChart)eChart.showLoading({text:'加载中...',color:'#6366f1',textColor:light?'#0f172a':'#f8fafc',maskColor:light?'rgba(255,255,255,0.5)':'rgba(15,23,42,0.5)'});
+      eChart?.showLoading({text:'加载中...',color:'#6366f1',textColor:light?'#0f172a':'#f8fafc',maskColor:light?'rgba(255,255,255,0.4)':'rgba(10,15,30,0.5)'});
       try{
-        const data=await fetch(`/api/ping_history?server_id=${chartNodeId.value}&hours=${h}`).then(r=>r.json())||[];
+        const raw=await fetch(`/api/ping_history?server_id=${chartId.value}&hours=${h}`).then(r=>r.json())||[];
         const tMap={};const targets=new Set();
-        data.forEach(item=>{
+        raw.forEach(item=>{
           const t=item.time.substring(0,16).replace('T',' ');
           if(!tMap[t])tMap[t]={};
           const tgt=item.target;
@@ -384,52 +441,83 @@ createApp({
           targets.add(tgt);
         });
         const times=Object.keys(tMap).sort();
-        const tLabels=times.map(t=>t.substring(11,16));
-        const colors=['#6366f1','#10b981','#f43f5e','#f59e0b','#0ea5e9','#8b5cf6'];
+        const labels=times.map(t=>t.substring(11,16));
+        const COLORS=['#818cf8','#34d399','#f43f5e','#fbbf24','#38bdf8','#c084fc'];
         const stats={};const series=[];
         Array.from(targets).forEach((tgt,i)=>{
-          const c=colors[i%colors.length];
-          let tDelay=0,tCnt=0,tFail=0,tPts=0;
+          const c=COLORS[i%COLORS.length];
+          let tD=0,tC=0,tF=0,tP=0;
           const sd=times.map(t=>{
             const p=tMap[t][tgt];
             if(!p)return null;
-            tPts+=(p.cnt+p.fail);tFail+=p.fail;
+            tP+=(p.cnt+p.fail);tF+=p.fail;
             if(p.fail>0||p.cnt===0)return null;
-            const avg=p.sum/p.cnt;tDelay+=avg*p.cnt;tCnt+=p.cnt;
+            const avg=p.sum/p.cnt;tD+=avg*p.cnt;tC+=p.cnt;
             return avg;
           });
-          stats[tgt]={color:c,on:true,avg:tCnt>0?tDelay/tCnt:0,loss:tPts>0?tFail/tPts*100:0};
+          stats[tgt]={c,on:true,avg:tC>0?tD/tC:0,loss:tP>0?tF/tP*100:0};
           series.push({
-            name:tgt,type:'line',smooth:true,connectNulls:false,symbol:'none',
-            itemStyle:{color:c},lineStyle:{width:2.5,color:c},
-            areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:c+'35'},{offset:1,color:c+'00'}])},
-            markArea:{silent:true,itemStyle:{color:'rgba(239,68,68,0.07)'},data:getBreakAreas(sd,tLabels)},
+            name:tgt,type:'line',smooth:true,connectNulls:false,
+            symbol:'circle',symbolSize:4,
+            showSymbol:false, // 默认不显示点，hover时显示
+            itemStyle:{color:c},
+            lineStyle:{width:2.5,color:c},
+            // ★ 去除迷雾：areaStyle 完全移除，改用极淡描边
+            areaStyle:null,
+            emphasis:{focus:'series',lineStyle:{width:3}},
+            // ★ 断流区用红色半透明背景标注
+            markArea:{
+              silent:true,
+              itemStyle:{color:'rgba(239,68,68,0.08)',borderWidth:0},
+              label:{show:false},
+              data:getBreaks(sd,labels).map(([s,e])=>[s,e])
+            },
             data:sd
           });
         });
         chartStats.value=stats;
+        const ax={color:light?'#94a3b8':'#475569'};
         eChart.setOption({
           backgroundColor:'transparent',
-          tooltip:{trigger:'axis',axisPointer:{type:'cross',lineStyle:{color:'rgba(148,163,184,0.4)'}},backgroundColor:light?'rgba(255,255,255,0.95)':'rgba(15,23,42,0.95)',textStyle:{color:light?'#0f172a':'#f8fafc',fontWeight:'bold'},borderColor:light?'#e2e8f0':'#334155',padding:10,valueFormatter:v=>v&&v>0?v.toFixed(1)+' ms':'断流'},
+          tooltip:{
+            trigger:'axis',
+            axisPointer:{type:'cross',lineStyle:{color:'rgba(148,163,184,0.35)',type:'dashed'}},
+            backgroundColor:light?'rgba(255,255,255,0.97)':'rgba(15,20,40,0.97)',
+            textStyle:{color:light?'#0f172a':'#f8fafc',fontWeight:'bold',fontSize:12},
+            borderColor:light?'#e2e8f0':'#2d3748',
+            padding:[8,12],
+            valueFormatter:v=>v&&v>0?v.toFixed(1)+' ms':'<span style="color:#ef4444">断流</span>'
+          },
           legend:{show:false},
-          grid:{left:'1%',right:'3%',bottom:'2%',top:'6%',containLabel:true},
-          xAxis:{type:'category',data:tLabels,boundaryGap:false,axisLine:{lineStyle:{color:light?'#94a3b8':'#475569'}},axisLabel:{color:light?'#64748b':'#94a3b8',fontSize:11}},
-          yAxis:{type:'value',name:'ms',nameTextStyle:{color:light?'#64748b':'#94a3b8'},splitLine:{lineStyle:{color:light?'#e2e8f0':'#1e293b',type:'dashed'}},axisLabel:{color:light?'#64748b':'#94a3b8'}},
+          grid:{left:'1%',right:'3%',bottom:'3%',top:'8%',containLabel:true},
+          xAxis:{type:'category',data:labels,boundaryGap:false,
+            axisLine:{lineStyle:{color:ax.color}},
+            axisLabel:{color:ax.color,fontSize:11},
+            splitLine:{show:false}
+          },
+          yAxis:{type:'value',name:'ms',nameTextStyle:{color:ax.color,fontSize:11},
+            splitLine:{lineStyle:{color:light?'rgba(226,232,240,0.8)':'rgba(30,41,59,0.8)',type:'dashed'}},
+            axisLabel:{color:ax.color,fontSize:11},
+            min:0
+          },
           series
         },true);
       }catch(e){}
-      if(eChart)eChart.hideLoading();
+      eChart?.hideLoading();
     };
 
     onMounted(()=>{
       applyTheme();
       fetchData();
-      fetchTmr=setInterval(fetchData,2000);
-      chartTmr=setInterval(()=>{if(showChart.value&&chartNodeId.value)loadChart(chartHours.value);},10000);
+      ftmr=setInterval(fetchData,2000);
+      ctmr=setInterval(()=>{if(showChart.value&&chartId.value)loadChart(chartH.value);},10000);
     });
-    onUnmounted(()=>{clearInterval(fetchTmr);clearInterval(chartTmr)});
+    onUnmounted(()=>{clearInterval(ftmr);clearInterval(ctmr);});
 
-    return{servers,siteName,pingTasks,isDark,toggleTheme,currentTime,showChart,chartNodeName,chartHours,chartStats,onlineCount,totalCount,totalIn,totalOut,spIn,spOut,fmtB,pct,calcDays,expireClass,fmtUp,trafficUsed,trafficPct,trafficColor,getPingRows,cellStyle,latestClass,openChart,closeChart,loadChart,toggleLine};
+    return{servers,siteName,pingTasks,isDark,toggleTheme,currentTime,showChart,chartName,chartH,chartStats,
+      onlineCnt,totalCnt,totalIn,totalOut,spIn,spOut,
+      fmtB,pct,calcDays,expClass,fmtUp,trafUsed,trafPct,trafColor,
+      pingRows,cellClass,latCls,openChart,closeChart,loadChart,toggleLine};
   }
 }).mount('#app');
 </script>
