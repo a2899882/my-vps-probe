@@ -9,117 +9,140 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans SC',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+body{font-family:'Noto Sans SC',sans-serif;background:#0a0d14;color:#e2e8f0;min-height:100vh}
 .mono{font-family:'JetBrains Mono',monospace}
-.glass{background:rgba(255,255,255,0.04);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:14px}
-.inp{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:9px 13px;color:#e2e8f0;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color 0.2s}
+.glass{background:rgba(255,255,255,0.035);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.07);border-radius:14px}
+.inp{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:9px;padding:8px 12px;color:#e2e8f0;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color 0.2s,box-shadow 0.2s}
 .inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.15)}
-.inp::placeholder{color:rgba(148,163,184,0.4)}
-.lbl{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px}
-.btn-pri{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:700;font-size:13px;padding:10px 22px;border-radius:10px;border:none;cursor:pointer;transition:opacity 0.2s,transform 0.1s;box-shadow:0 4px 15px rgba(99,102,241,0.3)}
-.btn-pri:hover{opacity:0.9;transform:translateY(-1px)}
-.btn-pri:active{transform:translateY(0)}
-.btn-sec{background:rgba(99,102,241,0.12);color:#818cf8;font-weight:700;font-size:12px;padding:7px 14px;border-radius:8px;border:1px solid rgba(99,102,241,0.25);cursor:pointer;transition:all 0.2s}
-.btn-sec:hover{background:rgba(99,102,241,0.2);border-color:rgba(99,102,241,0.4)}
-.btn-green{background:rgba(16,185,129,0.12);color:#34d399;font-weight:700;font-size:12px;padding:7px 14px;border-radius:8px;border:1px solid rgba(16,185,129,0.25);cursor:pointer;transition:all 0.2s}
-.btn-green:hover{background:rgba(16,185,129,0.22)}
-.btn-del{background:rgba(239,68,68,0.1);color:#f87171;padding:6px 10px;border-radius:7px;border:1px solid rgba(239,68,68,0.2);cursor:pointer;font-size:11px;font-weight:700;transition:all 0.2s}
-.btn-del:hover{background:rgba(239,68,68,0.2)}
-/* node card */
-.node-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:16px;position:relative;transition:border-color 0.2s}
-.node-card:hover{border-color:rgba(99,102,241,0.3)}
-/* ping target card */
-.ping-card{background:rgba(16,185,129,0.04);border:1px solid rgba(16,185,129,0.15);border-radius:11px;padding:14px;position:relative;transition:border-color 0.2s}
+.inp::placeholder{color:rgba(148,163,184,0.35)}
+.lbl{font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px}
+.btn-save{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:700;font-size:13px;padding:10px 22px;border-radius:10px;border:none;cursor:pointer;transition:opacity 0.2s,transform 0.1s;box-shadow:0 4px 18px rgba(99,102,241,0.3);display:flex;align-items:center;gap:7px}
+.btn-save:hover{opacity:0.88;transform:translateY(-1px)}
+.btn-add{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;transition:all 0.2s;border:none}
+.btn-add-blue{background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.25)}
+.btn-add-blue:hover{background:rgba(99,102,241,0.22)}
+.btn-add-green{background:rgba(16,185,129,0.1);color:#34d399;border:1px solid rgba(16,185,129,0.25)}
+.btn-add-green:hover{background:rgba(16,185,129,0.2)}
+.btn-del{background:transparent;border:1px solid rgba(239,68,68,0.2);color:#f87171;padding:4px 9px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;transition:all 0.2s}
+.btn-del:hover{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.4)}
+.node-card{background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.065);border-radius:12px;padding:16px;transition:border-color 0.2s}
+.node-card:hover{border-color:rgba(99,102,241,0.35)}
+.ping-card{background:rgba(16,185,129,0.03);border:1px solid rgba(16,185,129,0.12);border-radius:12px;padding:14px;transition:border-color 0.2s}
 .ping-card:hover{border-color:rgba(16,185,129,0.35)}
-.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700}
-.copy-btn{padding:4px 8px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all 0.2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.copy-btn:hover{background:rgba(99,102,241,0.2);color:#818cf8;border-color:rgba(99,102,241,0.3)}
-.divider{border:none;border-top:1px solid rgba(255,255,255,0.06);margin:20px 0}
+.cnt-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800}
+.copy-area{font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 10px;color:#94a3b8;word-break:break-all;line-height:1.5;cursor:pointer;transition:border-color 0.2s}
+.copy-area:hover{border-color:rgba(99,102,241,0.4);color:#818cf8}
+.toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;align-items:center;gap:10px;padding:12px 20px;border-radius:12px;font-weight:700;font-size:13px;box-shadow:0 8px 25px rgba(0,0,0,0.4);transition:all 0.3s;pointer-events:none}
 </style>
 </head>
 <body>
 <div id="app" class="min-h-screen">
+
   <!-- 顶栏 -->
-  <header class="sticky top-0 z-40 flex items-center justify-between px-6 py-4" style="background:rgba(15,17,23,0.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.07)">
+  <header class="sticky top-0 z-40 flex items-center justify-between px-6 py-4" style="background:rgba(10,13,20,0.94);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.06)">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
         <svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       </div>
       <div>
-        <div class="text-[15px] font-black tracking-wide text-white">探针中枢管理台</div>
-        <div class="text-[10px] text-slate-500 font-mono">probe.admin</div>
+        <div class="text-[15px] font-black text-white tracking-wide">探针中枢管理台</div>
+        <div class="text-[10px] text-slate-600 mono">probe.admin</div>
       </div>
     </div>
     <div class="flex items-center gap-3">
-      <a href="/" target="_blank" class="text-slate-400 hover:text-white text-[12px] font-bold transition-colors flex items-center gap-1.5">
+      <a href="/" target="_blank" class="text-slate-500 hover:text-slate-200 text-[12px] font-bold transition-colors flex items-center gap-1.5">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         返回前端首页
       </a>
-      <button @click="saveConfig" class="btn-pri flex items-center gap-2">
+      <button @click="saveConfig" class="btn-save">
         <svg width="13" height="13" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         保存并动态下发配置
       </button>
     </div>
   </header>
 
-  <main class="max-w-[1200px] mx-auto px-5 py-7 space-y-6">
+  <main class="max-w-[1200px] mx-auto px-5 py-7 space-y-5">
+
     <!-- 站点基本设置 -->
     <div class="glass p-5">
       <div class="flex items-center gap-2 mb-4">
-        <div class="w-1.5 h-5 rounded-full bg-violet-500"></div>
+        <span class="w-1.5 h-5 rounded-full block" style="background:#8b5cf6"></span>
         <span class="text-[14px] font-black text-white">站点基本设置</span>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div><div class="lbl">网站标题名称</div><input v-model="cfg.site_name" class="inp" placeholder="T小K的VPS"></div>
-        <div><div class="lbl">后台登录账号</div><input v-model="cfg.username" class="inp" placeholder="admin@example.com"></div>
-        <div><div class="lbl">后台登录新密码</div><input v-model="cfg.password" type="password" class="inp" placeholder="留空则不修改密码"></div>
+        <div>
+          <div class="lbl">网站标题名称</div>
+          <input v-model="cfg.site_name" class="inp" placeholder="T小K的VPS">
+        </div>
+        <div>
+          <div class="lbl">后台登录账号</div>
+          <input v-model="cfg.admin_user" class="inp" placeholder="admin@example.com">
+        </div>
+        <div>
+          <div class="lbl">后台登录新密码</div>
+          <input v-model="cfg.admin_pass" type="password" class="inp" placeholder="留空则不修改密码">
+        </div>
       </div>
     </div>
 
-    <!-- 两栏布局：节点 + Ping目标 -->
+    <!-- 双栏：节点 + Ping目标 -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
       <!-- 被控节点 -->
       <div class="glass p-5 flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
-            <div class="w-1.5 h-5 rounded-full bg-blue-500"></div>
-            <span class="text-[14px] font-black text-white">被控节点（小鸡）管理</span>
-            <span class="tag" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.25)">{{ cfg.nodes.length }} 台</span>
+            <span class="w-1.5 h-5 rounded-full block" style="background:#3b82f6"></span>
+            <span class="text-[14px] font-black text-white">被控节点管理</span>
+            <span class="cnt-badge" style="background:rgba(59,130,246,0.14);color:#60a5fa;border:1px solid rgba(59,130,246,0.25)">{{ cfg.nodes.length }} 台</span>
           </div>
-          <button @click="addNode" class="btn-sec flex items-center gap-1.5">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <button @click="addNode" class="btn-add btn-add-blue">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             新增节点
           </button>
         </div>
-        <!-- 节点卡片列表 -->
-        <div v-if="cfg.nodes.length===0" class="flex-1 flex flex-col items-center justify-center py-12 text-slate-600">
-          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-3 opacity-40"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+
+        <div v-if="!cfg.nodes.length" class="flex-1 flex flex-col items-center justify-center py-14 text-slate-600">
+          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24" class="mb-3 opacity-30"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <div class="text-[13px] font-bold mb-1">暂无节点</div>
           <div class="text-[11px]">点击「新增节点」添加被控服务器</div>
         </div>
-        <div v-else class="space-y-3 overflow-y-auto" style="max-height:600px;padding-right:2px">
+
+        <div v-else class="space-y-3 overflow-y-auto pr-0.5" style="max-height:620px">
           <div v-for="(node,i) in cfg.nodes" :key="i" class="node-card">
-            <div class="flex items-start justify-between mb-3">
+            <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black" style="background:rgba(99,102,241,0.2);color:#818cf8">{{ i+1 }}</div>
-                <input v-model="node.name" class="inp font-black text-white" style="width:160px;padding:5px 10px" placeholder="节点显示名称">
+                <span class="w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-black mono shrink-0" style="background:rgba(99,102,241,0.18);color:#818cf8">{{ i+1 }}</span>
+                <input v-model="node.name" class="inp font-black text-white" style="width:150px;padding:5px 10px;font-family:'Noto Sans SC',sans-serif" placeholder="节点显示名称">
               </div>
               <button @click="removeNode(i)" class="btn-del">✕ 删除</button>
             </div>
-            <div class="grid grid-cols-2 gap-2 mb-2.5">
-              <div><div class="lbl">节点ID（唯一）</div><input v-model="node.id" class="inp mono text-[11px]" placeholder="node-xxxxxxxx"></div>
-              <div><div class="lbl">通信 Token</div><input v-model="node.secret" class="inp mono text-[11px]" placeholder="secret_xxxx"></div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <div class="lbl">节点 ID（唯一）</div>
+                <input v-model="node.id" class="inp mono text-[11px]" placeholder="node-xxxxxxxxxxxxxxx">
+              </div>
+              <div>
+                <div class="lbl">通信 Token</div>
+                <input v-model="node.token" class="inp mono text-[11px]" placeholder="secret_xxxx">
+              </div>
             </div>
-            <div class="grid grid-cols-2 gap-2 mb-2.5">
-              <div><div class="lbl">到期时间</div><input v-model="node.expire_date" class="inp mono text-[11px]" placeholder="2027/01/01"></div>
-              <div><div class="lbl">月流量上限 GB（0=不限）</div><input v-model.number="node.traffic_limit" type="number" class="inp mono text-[11px]" placeholder="0"></div>
+            <div class="grid grid-cols-2 gap-2 mb-3">
+              <div>
+                <div class="lbl">到期时间</div>
+                <input v-model="node.expire_date" class="inp mono text-[11px]" placeholder="2027/01/01">
+              </div>
+              <div>
+                <div class="lbl">月流量上限 GB（0=不限）</div>
+                <input v-model.number="node.traffic_limit" type="number" min="0" class="inp mono text-[11px]" placeholder="0">
+              </div>
             </div>
             <!-- 一键部署命令 -->
             <div>
-              <div class="lbl mb-1.5">一键部署命令（复制到小鸡 SSH 执行）</div>
-              <button @click="copyDeploy(node)" class="copy-btn w-full text-left mono text-[10px] py-2 px-3">
-                📋 curl -sL {{ location.origin }}/install.sh?t={{ node.id }}&amp;{{ node.id }} | bash -s -- -s {{ location.origin }} -t {{ node.secret }}
-              </button>
+              <div class="lbl mb-1.5">一键部署（复制到被控 SSH 执行）</div>
+              <div class="copy-area" @click="copyCmd(node)" :title="'点击复制'">
+                📋 curl -sL {{ origin }}/install.sh?t={{ node.id }} | bash -s -- -s {{ origin }} -t {{ node.token }}
+              </div>
             </div>
           </div>
         </div>
@@ -129,116 +152,165 @@ body{font-family:'Noto Sans SC',sans-serif;background:#0f1117;color:#e2e8f0;min-
       <div class="glass p-5 flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
-            <div class="w-1.5 h-5 rounded-full bg-emerald-500"></div>
-            <span class="text-[14px] font-black text-white">全局 TCP Ping 监测目标</span>
-            <span class="tag" style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25)">{{ cfg.ping_targets.length }} 个</span>
+            <span class="w-1.5 h-5 rounded-full block" style="background:#10b981"></span>
+            <span class="text-[14px] font-black text-white">TCP Ping 监测目标</span>
+            <span class="cnt-badge" style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25)">{{ cfg.ping_tasks.length }} 个</span>
           </div>
-          <button @click="addPing" class="btn-green flex items-center gap-1.5">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <button @click="addPing" class="btn-add btn-add-green">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             新增目标
           </button>
         </div>
-        <div v-if="cfg.ping_targets.length===0" class="flex-1 flex flex-col items-center justify-center py-12 text-slate-600">
-          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-3 opacity-40"><circle cx="12" cy="12" r="10"/><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+
+        <div v-if="!cfg.ping_tasks.length" class="flex-1 flex flex-col items-center justify-center py-14 text-slate-600">
+          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24" class="mb-3 opacity-30"><circle cx="12" cy="12" r="10"/><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           <div class="text-[13px] font-bold mb-1">暂无监测目标</div>
           <div class="text-[11px]">点击「新增目标」添加 TCP Ping 目标</div>
         </div>
+
         <div v-else class="space-y-3">
-          <div v-for="(pt,i) in cfg.ping_targets" :key="i" class="ping-card">
+          <div v-for="(pt,i) in cfg.ping_tasks" :key="i" class="ping-card">
             <div class="flex items-center justify-between mb-2.5">
               <div class="flex items-center gap-2">
-                <div class="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black" style="background:rgba(16,185,129,0.2);color:#34d399">{{ i+1 }}</div>
-                <span class="text-[11px] font-bold" style="color:#34d399">监测目标 #{{ i+1 }}</span>
+                <span class="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black mono shrink-0" style="background:rgba(16,185,129,0.18);color:#34d399">{{ i+1 }}</span>
+                <span class="text-[11px] font-bold" style="color:#34d399">目标 #{{ i+1 }}</span>
               </div>
               <button @click="removePing(i)" class="btn-del">✕</button>
             </div>
             <div class="grid grid-cols-2 gap-2">
-              <div><div class="lbl">目标名称</div><input v-model="pt.name" class="inp text-[12px]" placeholder="广东电信"></div>
-              <div><div class="lbl">IP 或域名</div><input v-model="pt.host" class="inp mono text-[11px]" placeholder="gd-ct-v4.ip.zstaticcdn.com"></div>
+              <div>
+                <div class="lbl">显示名称</div>
+                <input v-model="pt.name" class="inp text-[12px]" style="font-family:'Noto Sans SC',sans-serif" placeholder="广东电信">
+              </div>
+              <div>
+                <div class="lbl">IP 或域名</div>
+                <input v-model="pt.host" class="inp mono text-[11px]" placeholder="gd-ct-v4.ip.zstaticcdn.com">
+              </div>
             </div>
           </div>
         </div>
-        <!-- TCP Ping 说明 -->
-        <div class="mt-4 p-3 rounded-xl" style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15)">
-          <div class="text-[11px] font-black text-emerald-400 mb-1">⚡ TCP Ping 说明</div>
-          <div class="text-[11px] text-slate-400 leading-relaxed">填写 IP 或域名即可，探针会自动追加 <code class="mono text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-emerald-300">:80</code> 端口进行 TCP 连接探测。探测结果实时反映在前台的连通率格子中。</div>
+
+        <!-- TCP 说明卡片 -->
+        <div class="mt-4 p-3.5 rounded-xl" style="background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.14)">
+          <div class="text-[11px] font-black text-emerald-400 mb-1.5 flex items-center gap-1.5">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            TCP Ping 模式说明
+          </div>
+          <div class="text-[11px] text-slate-500 leading-relaxed">
+            填写 IP 或域名，探针自动追加 <code class="mono text-[10px] px-1.5 py-0.5 rounded" style="background:rgba(255,255,255,0.07);color:#34d399">:80</code> 进行 TCP 连接探测，绕过 ICMP 封锁。结果实时反映在前台连通率格子（绿/黄/红，断流=极矮红格）。
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- 提示信息 -->
-    <div v-if="msg" class="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl font-bold text-[13px] shadow-2xl transition-all" :class="msgOk?'bg-emerald-500 text-white':'bg-red-500 text-white'">
-      <svg v-if="msgOk" width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-      <svg v-else width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      {{ msg }}
-    </div>
   </main>
+
+  <!-- Toast 消息 -->
+  <div v-if="toast.msg" class="toast" :style="toast.ok?'background:#059669;color:#fff':'background:#dc2626;color:#fff'">
+    <svg v-if="toast.ok" width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    <svg v-else width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    {{ toast.msg }}
+  </div>
 </div>
+
 <script>
-const {createApp,ref,onMounted}=Vue;
+const {createApp,ref,reactive,onMounted}=Vue;
 createApp({
   setup(){
-    const cfg=ref({site_name:'',username:'',password:'',nodes:[],ping_targets:[]});
-    const msg=ref(''),msgOk=ref(true);
-    const location=window.location;
+    const origin=window.location.origin;
+    // cfg 字段名必须与 Go AppConfig / NodeConfig 完全对应
+    const cfg=reactive({site_name:'',admin_user:'',admin_pass:'',nodes:[],ping_tasks:[]});
+    const toast=reactive({msg:'',ok:true});
+    let toastTmr=null;
 
-    const showMsg=(text,ok=true)=>{msg.value=text;msgOk.value=ok;setTimeout(()=>msg.value='',3500)};
-
-    const loadConfig=async()=>{
-      try{
-        const d=await fetch('/api/config').then(r=>r.json());
-        cfg.value.site_name=d.site_name||'';
-        cfg.value.username=d.username||'';
-        cfg.value.password='';
-        // 节点
-        cfg.value.nodes=(d.nodes||[]).map(n=>{
-          let ed='2027/01/01',tl=0;
-          if(n.expire_date&&String(n.expire_date).includes('|')){
-            const p=String(n.expire_date).split('|');
-            ed=p[0]||'2027/01/01';tl=parseInt(p[1])||0;
-          } else {ed=n.expire_date||'2027/01/01';}
-          return{id:n.id||'',name:n.name||'',secret:n.secret||'',expire_date:ed,traffic_limit:tl};
-        });
-        // ping targets
-        cfg.value.ping_targets=(d.ping_tasks||[]).map(p=>({name:p.name||'',host:p.host||''}));
-      }catch(e){showMsg('配置加载失败：'+e.message,false);}
+    const showToast=(msg,ok=true)=>{
+      toast.msg=msg;toast.ok=ok;
+      clearTimeout(toastTmr);
+      toastTmr=setTimeout(()=>toast.msg='',3500);
     };
 
-    const saveConfig=async()=>{
-      const payload={
-        site_name:cfg.value.site_name,
-        username:cfg.value.username,
-        nodes:cfg.value.nodes.map(n=>({
-          id:n.id,name:n.name,secret:n.secret,
-          expire_date:n.expire_date+'|'+n.traffic_limit
-        })),
-        ping_tasks:cfg.value.ping_targets.map(p=>({name:p.name,host:p.host}))
-      };
-      if(cfg.value.password)payload.password=cfg.value.password;
+    // 读取配置：/api/admin/config  GET  需要 Basic Auth（浏览器已处理，因为页面由 basicAuth 保护）
+    const loadConfig=async()=>{
       try{
-        const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-        if(r.ok){showMsg('✅ 配置保存成功，已动态下发！',true);}
-        else{showMsg('保存失败：HTTP '+r.status,false);}
-      }catch(e){showMsg('保存失败：'+e.message,false);}
+        const r=await fetch('/api/admin/config',{credentials:'include'});
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        const d=await r.json();
+        cfg.site_name=d.site_name||'';
+        cfg.admin_user=d.admin_user||'';
+        cfg.admin_pass=''; // 密码不回显
+        // 节点：expire_date 可能是 "2027/01/01|1000" 格式
+        cfg.nodes=(d.nodes||[]).map(n=>{
+          let ed=n.expire_date||'2027/01/01',tl=0;
+          if(ed.includes('|')){const p=ed.split('|');ed=p[0];tl=parseInt(p[1])||0;}
+          return{id:n.id||'',name:n.name||'',token:n.token||'',region:n.region||'',expire_date:ed,traffic_limit:tl};
+        });
+        cfg.ping_tasks=(d.ping_tasks||[]).map(p=>({name:p.name||'',host:p.host||''}));
+      }catch(e){
+        showToast('配置加载失败: '+e.message,false);
+      }
+    };
+
+    // 保存配置：/api/admin/config  POST
+    const saveConfig=async()=>{
+      // 合并 expire_date 和 traffic_limit
+      const nodes=cfg.nodes.map(n=>({
+        id:n.id,
+        name:n.name,
+        token:n.token,
+        region:n.region||'',
+        expire_date:n.traffic_limit>0?(n.expire_date+'|'+n.traffic_limit):n.expire_date
+      }));
+      const payload={
+        site_name:cfg.site_name,
+        admin_user:cfg.admin_user,
+        nodes,
+        ping_tasks:cfg.ping_tasks.map(p=>({name:p.name,host:p.host}))
+      };
+      // 只有填了新密码才发送
+      if(cfg.admin_pass.trim())payload.admin_pass=cfg.admin_pass.trim();
+
+      try{
+        const r=await fetch('/api/admin/config',{
+          method:'POST',
+          credentials:'include',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(payload)
+        });
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        const d=await r.json();
+        if(d.status==='ok'){showToast('✅ 配置已保存并动态下发！',true);}
+        else throw new Error(JSON.stringify(d));
+      }catch(e){
+        showToast('保存失败: '+e.message,false);
+      }
     };
 
     const addNode=()=>{
-      const uid='node-'+Math.floor(Math.random()*9e15);
-      const sec='secret_'+Math.floor(Math.random()*9000+1000);
-      cfg.value.nodes.push({id:uid,name:'新节点',secret:sec,expire_date:'2027/01/01',traffic_limit:0});
+      const ts=Date.now();
+      cfg.nodes.push({
+        id:'node-'+ts,
+        name:'新节点',
+        token:'secret_'+Math.floor(Math.random()*9000+1000),
+        region:'',
+        expire_date:'2027/01/01',
+        traffic_limit:0
+      });
     };
-    const removeNode=i=>cfg.value.nodes.splice(i,1);
-    const addPing=()=>cfg.value.ping_targets.push({name:'',host:''});
-    const removePing=i=>cfg.value.ping_targets.splice(i,1);
+    const removeNode=i=>cfg.nodes.splice(i,1);
+    const addPing=()=>cfg.ping_tasks.push({name:'',host:''});
+    const removePing=i=>cfg.ping_tasks.splice(i,1);
 
-    const copyDeploy=async(node)=>{
-      const cmd=`curl -sL ${window.location.origin}/install.sh?t=${node.id} | bash -s -- -s ${window.location.origin} -t ${node.secret}`;
-      try{await navigator.clipboard.writeText(cmd);showMsg('📋 一键部署命令已复制！',true);}
-      catch{showMsg('复制失败，请手动复制',false);}
+    const copyCmd=async(node)=>{
+      const cmd=`curl -sL ${origin}/install.sh?t=${node.id} | bash -s -- -s ${origin} -t ${node.token}`;
+      try{
+        await navigator.clipboard.writeText(cmd);
+        showToast('📋 一键部署命令已复制！',true);
+      }catch{
+        showToast('复制失败，请手动选中复制',false);
+      }
     };
 
     onMounted(loadConfig);
-    return{cfg,msg,msgOk,location,saveConfig,addNode,removeNode,addPing,removePing,copyDeploy};
+    return{origin,cfg,toast,saveConfig,addNode,removeNode,addPing,removePing,copyCmd};
   }
 }).mount('#app');
 </script>
