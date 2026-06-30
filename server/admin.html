@@ -13,45 +13,40 @@
 body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-height:100vh;padding:20px}
 .mono{font-family:'JetBrains Mono',monospace}
 .glass{background:rgba(255,255,255,0.038);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,0.075);border-radius:14px}
-.inp{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color 0.2s,box-shadow 0.2s}
-.inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.15)}
-.inp::placeholder{color:rgba(148,163,184,0.3)}
-.lbl{font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;display:block}
-.btn-save{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:800;font-size:13px;padding:10px 24px;border-radius:10px;border:none;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,0.3);display:inline-flex;align-items:center;gap:7px;transition:opacity 0.18s,transform 0.12s}
-.btn-save:hover{opacity:0.88;transform:translateY(-1px)}
-.btn-add{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;transition:all 0.18s;border:1px solid transparent}
-.btn-blue{background:rgba(99,102,241,0.1);color:#818cf8;border-color:rgba(99,102,241,0.25)}
-.btn-blue:hover{background:rgba(99,102,241,0.2);border-color:rgba(99,102,241,0.45)}
-.btn-green{background:rgba(16,185,129,0.09);color:#34d399;border-color:rgba(16,185,129,0.25)}
-.btn-green:hover{background:rgba(16,185,129,0.18);border-color:rgba(16,185,129,0.45)}
-.btn-del{background:transparent;border:1px solid rgba(239,68,68,0.18);color:#f87171;padding:4px 10px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;transition:all 0.18s}
-.btn-del:hover{background:rgba(239,68,68,0.14);border-color:rgba(239,68,68,0.4)}
-.btn-copy{background:transparent;border:1px solid rgba(99,102,241,0.2);color:#818cf8;padding:4px 10px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;transition:all 0.18s}
-.btn-copy:hover{background:rgba(99,102,241,0.12)}
+.inp{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s,box-shadow .2s}
+.inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.inp::placeholder{color:rgba(148,163,184,.3)}
+.lbl{font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:block}
+.btn-save{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:800;font-size:13px;padding:10px 24px;border-radius:10px;border:none;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,.3);display:inline-flex;align-items:center;gap:7px;transition:opacity .18s,transform .12s}
+.btn-save:hover{opacity:.88;transform:translateY(-1px)}
+.btn-add{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;transition:all .18s;border:1px solid transparent}
+.btn-blue{background:rgba(99,102,241,.1);color:#818cf8;border-color:rgba(99,102,241,.25)}
+.btn-blue:hover{background:rgba(99,102,241,.2);border-color:rgba(99,102,241,.45)}
+.btn-green{background:rgba(16,185,129,.09);color:#34d399;border-color:rgba(16,185,129,.25)}
+.btn-green:hover{background:rgba(16,185,129,.18);border-color:rgba(16,185,129,.45)}
+.btn-del{background:transparent;border:1px solid rgba(239,68,68,.18);color:#f87171;padding:4px 10px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;transition:all .18s}
+.btn-del:hover{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.4)}
+.btn-copy{background:transparent;border:1px solid rgba(99,102,241,.2);color:#818cf8;padding:4px 10px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;transition:all .18s}
+.btn-copy:hover{background:rgba(99,102,241,.12)}
 .node-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-.node-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:15px;transition:border-color 0.2s,box-shadow 0.2s}
-.node-card:hover{border-color:rgba(99,102,241,0.35);box-shadow:0 4px 20px rgba(99,102,241,0.1)}
-.drag-handle{cursor:grab;color:rgba(148,163,184,0.35);transition:color 0.18s;display:flex;align-items:center;padding:2px}
-.drag-handle:hover{color:rgba(148,163,184,0.8)}
-.drag-handle:active{cursor:grabbing}
-.sortable-ghost{opacity:0.3;border:2px dashed rgba(99,102,241,0.5)!important}
-.sortable-chosen{box-shadow:0 8px 30px rgba(99,102,241,0.2)!important}
-.ping-card{background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px}
-.deploy-code{background:rgba(0,0,0,0.4);border:1px solid rgba(99,102,241,0.15);border-radius:7px;padding:8px 12px;font-size:11px;color:#a5b4fc;font-family:'JetBrains Mono',monospace;word-break:break-all;line-height:1.6;max-height:64px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.node-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:15px;transition:border-color .2s,box-shadow .2s}
+.node-card:hover{border-color:rgba(99,102,241,.35);box-shadow:0 4px 20px rgba(99,102,241,.1)}
+.drag-handle{cursor:grab;color:rgba(148,163,184,.35);transition:color .18s;display:flex;align-items:center;padding:2px}
+.drag-handle:hover{color:rgba(148,163,184,.8)}
+.sortable-ghost{opacity:.3;border:2px dashed rgba(99,102,241,.5)!important}
+.ping-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px}
+.deploy-code{background:rgba(0,0,0,.4);border:1px solid rgba(99,102,241,.15);border-radius:7px;padding:8px 12px;font-size:11px;color:#a5b4fc;font-family:'JetBrains Mono',monospace;word-break:break-all;line-height:1.6;max-height:64px;overflow:hidden}
 .toast{position:fixed;bottom:28px;right:28px;padding:12px 20px;border-radius:10px;font-weight:700;font-size:13px;z-index:9999;pointer-events:none;animation:tIn .3s ease}
-.tok{background:rgba(16,185,129,0.92);color:#fff}
-.terr{background:rgba(239,68,68,0.92);color:#fff}
+.tok{background:rgba(16,185,129,.92);color:#fff}
+.terr{background:rgba(239,68,68,.92);color:#fff}
 @keyframes tIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-
-/* ===== 登录弹窗 ===== */
-.login-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);z-index:999;display:flex;align-items:center;justify-content:center}
-.login-box{background:#0f1623;border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:36px;width:380px;box-shadow:0 24px 60px rgba(0,0,0,0.6);animation:loginIn .3s cubic-bezier(0.34,1.56,0.64,1)}
-@keyframes loginIn{from{opacity:0;transform:scale(0.93)}to{opacity:1;transform:scale(1)}}
-.login-inp{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:11px 14px;color:#e2e8f0;font-size:14px;outline:none;transition:border-color 0.2s,box-shadow 0.2s;font-family:'JetBrains Mono',monospace}
-.login-inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.18)}
-.login-btn{width:100%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:800;font-size:14px;padding:12px;border-radius:10px;border:none;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,0.3);transition:opacity .18s,transform .12s;margin-top:8px}
-.login-btn:hover{opacity:0.88;transform:translateY(-1px)}
-.login-btn:active{transform:translateY(0)}
+.login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(10px);z-index:999;display:flex;align-items:center;justify-content:center}
+.login-box{background:#0f1623;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:40px;width:400px;box-shadow:0 24px 60px rgba(0,0,0,.7);animation:loginIn .35s cubic-bezier(.34,1.56,.64,1)}
+@keyframes loginIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
+.login-inp{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:12px 14px;color:#e2e8f0;font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s;font-family:'JetBrains Mono',monospace;margin-bottom:14px}
+.login-inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+.login-btn{width:100%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:800;font-size:14px;padding:13px;border-radius:10px;border:none;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,.3);transition:opacity .18s,transform .12s;margin-top:4px}
+.login-btn:hover{opacity:.88;transform:translateY(-1px)}
 .shake{animation:shake .4s ease}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 </style>
@@ -59,56 +54,50 @@ body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-
 <body>
 <div id="app">
 
-  <!-- ===== 登录弹窗（先登录再进入）===== -->
+  <!-- 登录弹窗 -->
   <div class="login-overlay" v-if="!authed">
     <div class="login-box" :class="loginShake?'shake':''">
-      <!-- Logo -->
-      <div class="flex items-center gap-3 mb-6">
-        <div style="background:rgba(99,102,241,0.15);border-radius:10px;padding:8px">
-          <svg width="22" height="22" fill="none" stroke="#818cf8" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <div class="flex items-center gap-3 mb-7">
+        <div style="background:rgba(99,102,241,.15);border-radius:10px;padding:9px">
+          <svg width="22" height="22" fill="none" stroke="#818cf8" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
         <div>
-          <div class="text-[16px] font-black" style="color:#e2e8f0">探针中枢管理台</div>
-          <div class="text-[11px]" style="color:#475569">请先登录以继续</div>
+          <div style="font-size:17px;font-weight:900;color:#e2e8f0">探针中枢管理台</div>
+          <div style="font-size:11px;color:#475569">请输入管理员凭据</div>
         </div>
       </div>
-
-      <div class="space-y-4">
-        <div>
-          <label class="lbl" style="margin-bottom:6px">管理员账号</label>
-          <input class="login-inp" v-model="loginUser" placeholder="admin" @keyup.enter="doLogin"/>
-        </div>
-        <div>
-          <label class="lbl" style="margin-bottom:6px">管理员密码</label>
-          <input class="login-inp" type="password" v-model="loginPass" placeholder="请输入密码" @keyup.enter="doLogin"/>
-        </div>
-        <div v-if="loginErr" class="text-[12px] font-bold text-red-400 flex items-center gap-1.5">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-          {{ loginErr }}
-        </div>
-        <button class="login-btn" @click="doLogin" :disabled="loginLoading">
-          <span v-if="!loginLoading">🔓 登录管理台</span>
-          <span v-else>验证中...</span>
-        </button>
+      <div>
+        <label class="lbl" style="margin-bottom:6px">管理员账号</label>
+        <input class="login-inp" v-model="loginUser" placeholder="admin" @keyup.enter="doLogin" autocomplete="username"/>
       </div>
+      <div>
+        <label class="lbl" style="margin-bottom:6px">管理员密码</label>
+        <input class="login-inp" type="password" v-model="loginPass" placeholder="请输入密码" @keyup.enter="doLogin" autocomplete="current-password"/>
+      </div>
+      <div v-if="loginErr" style="color:#f87171;font-size:12px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        {{ loginErr }}
+      </div>
+      <button class="login-btn" @click="doLogin" :disabled="loginLoading">
+        {{ loginLoading ? '验证中...' : '🔓 登录管理台' }}
+      </button>
     </div>
   </div>
 
-  <!-- ===== 管理台主体 ===== -->
+  <!-- 主体 -->
   <div v-if="authed" class="w-full max-w-[1300px] mx-auto">
-    <!-- 顶部栏 -->
     <div class="glass flex items-center justify-between px-6 py-4 mb-5">
       <div class="flex items-center gap-3">
-        <svg width="22" height="22" fill="none" stroke="#6366f1" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span class="text-[17px] font-black tracking-widest" style="color:#e2e8f0">探针中枢管理台</span>
-        <span class="text-[11px] px-2 py-0.5 rounded-full mono font-black" style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.2)">● 已登录: {{ loginUser }}</span>
+        <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span style="font-size:17px;font-weight:900;color:#e2e8f0;letter-spacing:.1em">探针中枢管理台</span>
+        <span style="font-size:10px;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.2);font-family:'JetBrains Mono',monospace;font-weight:700">● {{ loginUser }}</span>
       </div>
-      <div class="flex items-center gap-3">
-        <a href="/" class="btn-add btn-blue text-[12px]">
+      <div class="flex gap-3">
+        <a href="/" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;background:rgba(99,102,241,.1);color:#818cf8;border:1px solid rgba(99,102,241,.25);text-decoration:none">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          返回前端首页
+          返回前端
         </a>
-        <button @click="saveConfig" class="btn-save">
+        <button class="btn-save" @click="saveConfig">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           保存并动态下发配置
         </button>
@@ -117,105 +106,71 @@ body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-
 
     <!-- 基础配置 -->
     <div class="glass p-5 mb-5">
-      <div class="text-[11px] font-black uppercase tracking-widest mb-4" style="color:#6366f1">⚙️ 基础配置</div>
+      <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#6366f1;margin-bottom:14px">⚙️ 基础配置</div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div><label class="lbl">网站标题名称</label><input class="inp" v-model="cfg.site_name" placeholder="T小K的VPS"/></div>
-        <div><label class="lbl">修改后台账号</label><input class="inp" v-model="cfg.admin_user" placeholder="admin"/></div>
-        <div><label class="lbl">修改后台密码 (留空不变)</label><input class="inp" type="password" v-model="cfg.admin_pass" placeholder="留空则不修改密码"/></div>
+        <div><label class="lbl">网站标题</label><input class="inp" v-model="cfg.site_name" placeholder="T小K的VPS"/></div>
+        <div><label class="lbl">修改账号</label><input class="inp" v-model="cfg.admin_user" placeholder="admin"/></div>
+        <div><label class="lbl">修改密码（留空不变）</label><input class="inp" type="password" v-model="cfg.admin_pass" placeholder="留空则不修改"/></div>
       </div>
     </div>
 
-    <!-- 主内容 -->
+    <!-- 节点 + Ping -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-      <!-- 左：节点管理 -->
-      <div class="lg:col-span-2">
-        <div class="glass p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-[11px] font-black uppercase tracking-widest" style="color:#818cf8">🖥 被控节点 (小鸡) 管理</span>
-              <span class="px-2 py-0.5 rounded-full text-[9px] font-black mono" style="background:rgba(99,102,241,0.15);color:#818cf8">{{ cfg.nodes.length }} 台</span>
+      <div class="lg:col-span-2 glass p-5">
+        <div class="flex items-center justify-between mb-4">
+          <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#818cf8">🖥 被控节点管理 ({{ cfg.nodes.length }}台)</span>
+          <button @click="addNode" class="btn-add btn-blue">+ 新增节点</button>
+        </div>
+        <div id="node-sortable" class="node-grid">
+          <div v-for="(node,idx) in cfg.nodes" :key="node.id" class="node-card">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <div class="drag-handle" title="拖拽排序">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="7" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="17" r="1.5"/><circle cx="15" cy="7" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="17" r="1.5"/></svg>
+                </div>
+                <span style="font-size:9px;font-family:'JetBrains Mono';padding:2px 7px;border-radius:99px;background:rgba(99,102,241,.12);color:#818cf8;font-weight:900">#{{ idx+1 }}</span>
+                <span style="font-size:13px;font-weight:900;color:#e2e8f0">{{ node.name||'未命名' }}</span>
+              </div>
+              <div class="flex gap-1.5">
+                <button @click="copyDeploy(node)" class="btn-copy">📋 部署</button>
+                <button @click="removeNode(idx)" class="btn-del">✕</button>
+              </div>
             </div>
-            <button @click="addNode" class="btn-add btn-blue">
-              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg>
-              新增节点
-            </button>
-          </div>
-          <div class="text-[10px] mb-3 flex items-center gap-1.5" style="color:rgba(148,163,184,0.45)">
-            <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="7" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="9" cy="17" r="1.2"/><circle cx="15" cy="7" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="15" cy="17" r="1.2"/></svg>
-            拖拽左侧把手可自由调整节点顺序
-          </div>
-
-          <!-- 节点网格 -->
-          <div id="node-sortable" class="node-grid">
-            <div v-for="(node,idx) in cfg.nodes" :key="node.id" class="node-card" :data-idx="idx">
-              <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                  <div class="drag-handle" title="拖拽排序">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="7" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="17" r="1.5"/><circle cx="15" cy="7" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="17" r="1.5"/></svg>
-                  </div>
-                  <span class="text-[9px] mono px-1.5 py-0.5 rounded-full font-black" style="background:rgba(99,102,241,0.12);color:#818cf8">#{{ idx+1 }}</span>
-                  <span class="text-[12px] font-black" style="color:#e2e8f0">{{ node.name||'未命名' }}</span>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <button @click="copyDeploy(node)" class="btn-copy" title="复制一键部署命令">
-                    <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    部署
-                  </button>
-                  <button @click="removeNode(idx)" class="btn-del">✕</button>
-                </div>
+            <div class="space-y-2">
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="lbl">节点 ID</label><input class="inp mono" :value="node.id" readonly style="opacity:.5;cursor:not-allowed;font-size:10px"/></div>
+                <div><label class="lbl">显示名称</label><input class="inp" v-model="node.name"/></div>
               </div>
-              <div class="space-y-2.5">
-                <div class="grid grid-cols-2 gap-2">
-                  <div><label class="lbl">节点 ID</label><input class="inp mono" :value="node.id" readonly style="opacity:0.55;cursor:not-allowed;font-size:11px"/></div>
-                  <div><label class="lbl">显示名称</label><input class="inp" v-model="node.name" placeholder="如: zouter JP"/></div>
-                </div>
-                <div><label class="lbl">通信 Token</label><input class="inp mono" v-model="node.token" placeholder="secret_xxxx"/></div>
-                <div class="grid grid-cols-2 gap-2">
-                  <div><label class="lbl">到期时间</label><input class="inp mono" v-model="node._ed" placeholder="2027/01/01"/></div>
-                  <div><label class="lbl">月流量上限 GB (0=不限)</label><input class="inp mono" type="number" v-model.number="node._tl" min="0" placeholder="0"/></div>
-                </div>
+              <div><label class="lbl">通信 Token</label><input class="inp mono" v-model="node.token"/></div>
+              <div class="grid grid-cols-2 gap-2">
+                <div><label class="lbl">到期时间</label><input class="inp mono" v-model="node._ed" placeholder="2027/01/01"/></div>
+                <div><label class="lbl">月流量上限 GB（0=不限）</label><input class="inp mono" type="number" v-model.number="node._tl" min="0"/></div>
               </div>
-              <div class="mt-3">
-                <label class="lbl" style="margin-bottom:5px">一键部署命令</label>
+              <div>
+                <label class="lbl">一键部署命令</label>
                 <div class="deploy-code" :title="deployCmd(node)">{{ deployCmd(node) }}</div>
               </div>
             </div>
           </div>
-          <div v-if="cfg.nodes.length===0" class="text-center py-10" style="color:rgba(148,163,184,0.35)">
-            <svg class="mx-auto mb-3 opacity-40" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-            <div class="text-[13px] font-bold">暂无节点，点击「新增节点」添加</div>
-          </div>
         </div>
+        <div v-if="cfg.nodes.length===0" style="text-align:center;padding:40px;color:rgba(148,163,184,.3);font-size:13px">暂无节点，点击「新增节点」</div>
       </div>
 
-      <!-- 右：Ping 目标 -->
-      <div class="lg:col-span-1">
-        <div class="glass p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-[11px] font-black uppercase tracking-widest" style="color:#34d399">🌐 全局 Ping 监测目标</span>
-              <span class="px-2 py-0.5 rounded-full text-[9px] font-black mono" style="background:rgba(16,185,129,0.12);color:#34d399">{{ cfg.ping_tasks.length }} 个</span>
+      <div class="lg:col-span-1 glass p-5">
+        <div class="flex items-center justify-between mb-4">
+          <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#34d399">🌐 Ping 监测目标 ({{ cfg.ping_tasks.length }}个)</span>
+          <button @click="addPing" class="btn-add btn-green">+ 新增</button>
+        </div>
+        <div style="font-size:10px;color:rgba(148,163,184,.4);margin-bottom:10px">TCP 连接探测（端口默认 :80）</div>
+        <div class="space-y-3">
+          <div v-for="(t,i) in cfg.ping_tasks" :key="i" class="ping-card">
+            <div class="flex justify-between items-center mb-2">
+              <span style="font-size:11px;font-weight:900;color:#34d399">目标 #{{ i+1 }}</span>
+              <button @click="removePing(i)" class="btn-del" style="padding:3px 8px;font-size:10px">✕</button>
             </div>
-            <button @click="addPing" class="btn-add btn-green">
-              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg>
-              新增
-            </button>
-          </div>
-          <div class="text-[10px] mb-3" style="color:rgba(148,163,184,0.4)">TCP 连接探测，端口默认 :80</div>
-          <div class="space-y-2.5">
-            <div v-for="(t,i) in cfg.ping_tasks" :key="i" class="ping-card">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[11px] font-black" style="color:#34d399">目标 #{{ i+1 }}</span>
-                <button @click="removePing(i)" class="btn-del" style="padding:3px 8px;font-size:10px">✕</button>
-              </div>
-              <div class="space-y-2">
-                <div><label class="lbl">名称</label><input class="inp" v-model="t.name" placeholder="广东电信"/></div>
-                <div><label class="lbl">IP 或域名</label><input class="inp mono" v-model="t.host" placeholder="gd-ct-v4.ip.zstaticcdn.com"/></div>
-              </div>
-            </div>
-            <div v-if="cfg.ping_tasks.length===0" class="text-center py-6" style="color:rgba(148,163,184,0.3)">
-              <div class="text-[12px]">暂无监测目标</div>
+            <div class="space-y-2">
+              <div><label class="lbl">名称</label><input class="inp" v-model="t.name" placeholder="广东电信"/></div>
+              <div><label class="lbl">IP 或域名</label><input class="inp mono" v-model="t.host" placeholder="gd-ct-v4.ip.zstaticcdn.com"/></div>
             </div>
           </div>
         </div>
@@ -223,121 +178,142 @@ body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-
     </div>
   </div>
 
-  <!-- Toast -->
-  <div v-if="toast.show" :class="['toast',toast.ok?'tok':'terr']">{{ toast.msg }}</div>
+  <div v-if="toast.show" :class="['toast', toast.ok?'tok':'terr']">{{ toast.msg }}</div>
 </div>
-
 <script>
-const{createApp,ref,reactive,onMounted,nextTick}=Vue;
+const {createApp,ref,reactive,onMounted,nextTick} = Vue;
 createApp({
   setup(){
-    /* 登录状态 */
-    const authed=ref(false);
-    const loginUser=ref('admin');
-    const loginPass=ref('');
-    const loginErr=ref('');
-    const loginLoading=ref(false);
-    const loginShake=ref(false);
-    /* 存储凭据供后续请求使用 */
-    let authHeader='';
+    // ─── 登录态（用内存变量，不用 localStorage/sessionStorage）
+    const authed = ref(false);
+    const loginUser = ref('');
+    const loginPass = ref('');
+    const loginErr = ref('');
+    const loginLoading = ref(false);
+    const loginShake = ref(false);
+    let authHeader = '';
 
-    const cfg=reactive({site_name:'',admin_user:'',admin_pass:'',nodes:[],ping_tasks:[]});
-    const toast=reactive({show:false,ok:true,msg:''});
-    let sortable=null;
+    const cfg = reactive({site_name:'',admin_user:'admin',admin_pass:'',nodes:[],ping_tasks:[]});
+    const toast = reactive({show:false,ok:true,msg:''});
+    let sortable = null;
 
-    const showToast=(msg,ok=true)=>{toast.msg=msg;toast.ok=ok;toast.show=true;setTimeout(()=>toast.show=false,3200)};
+    const showToast = (msg, ok=true) => {
+      toast.msg=msg; toast.ok=ok; toast.show=true;
+      setTimeout(()=>toast.show=false, 3000);
+    };
 
-    /* ===== 登录逻辑 ===== */
-    const doLogin=async()=>{
+    // ─── 尝试用已存凭据自动登录（页面刷新时复用）
+    const tryAutoLogin = async () => {
+      // 从 sessionStorage 读取（仅当前标签页有效，关闭即清除）
+      try {
+        const saved = sessionStorage.getItem('probe_auth');
+        if (saved) {
+          const r = await fetch('/api/admin/config', {headers:{Authorization: saved}});
+          if (r.ok) {
+            authHeader = saved;
+            const d = await r.json();
+            fillCfg(d);
+            authed.value = true;
+            await nextTick();
+            initSortable();
+            return;
+          } else {
+            sessionStorage.removeItem('probe_auth');
+          }
+        }
+      } catch(e){}
+    };
+
+    const fillCfg = (d) => {
+      cfg.site_name = d.site_name||'';
+      cfg.admin_user = d.admin_user||'admin';
+      cfg.ping_tasks = (d.ping_tasks||[]).map(t=>({name:t.name,host:t.host}));
+      cfg.nodes = (d.nodes||[]).map(n=>{
+        let ed='2027/01/01', tl=0;
+        const raw = String(n.expire_date||'');
+        if(raw.includes('|')){const p=raw.split('|');ed=p[0]||'2027/01/01';tl=parseInt(p[1])||0;}
+        else ed=raw||'2027/01/01';
+        return {id:n.id||genId(), name:n.name||'', token:n.token||'', _ed:ed, _tl:tl};
+      });
+    };
+
+    const doLogin = async () => {
       if(!loginUser.value||!loginPass.value){loginErr.value='账号和密码不能为空';return;}
-      loginLoading.value=true;loginErr.value='';
-      try{
-        const h='Basic '+btoa(loginUser.value+':'+loginPass.value);
-        const r=await fetch('/api/admin/config',{headers:{Authorization:h}});
+      loginLoading.value = true; loginErr.value = '';
+      try {
+        const h = 'Basic ' + btoa(loginUser.value + ':' + loginPass.value);
+        const r = await fetch('/api/admin/config', {headers:{Authorization:h}});
         if(r.status===401){
-          loginErr.value='账号或密码错误，请重试';
-          loginShake.value=true;
-          setTimeout(()=>loginShake.value=false,500);
-        }else if(r.ok){
-          authHeader=h;
-          const d=await r.json();
-          /* 填充配置 */
-          cfg.site_name=d.site_name||'';
-          cfg.admin_user=d.admin_user||'admin';
-          cfg.ping_tasks=(d.ping_tasks||[]).map(t=>({name:t.name,host:t.host}));
-          cfg.nodes=(d.nodes||[]).map(n=>{
-            let ed='2027/01/01',tl=0;
-            const raw=String(n.expire_date||'');
-            if(raw.includes('|')){const p=raw.split('|');ed=p[0]||'2027/01/01';tl=parseInt(p[1])||0;}
-            else ed=raw||'2027/01/01';
-            return{id:n.id||genId(),name:n.name||'',token:n.token||'',_ed:ed,_tl:tl};
-          });
-          authed.value=true;
+          loginErr.value = '账号或密码错误，请重试';
+          loginShake.value = true;
+          setTimeout(()=>loginShake.value=false, 500);
+        } else if(r.ok){
+          authHeader = h;
+          // 保存到 sessionStorage，刷新页面可自动恢复
+          sessionStorage.setItem('probe_auth', h);
+          const d = await r.json();
+          fillCfg(d);
+          authed.value = true;
           await nextTick();
           initSortable();
-        }else{
-          loginErr.value='服务器错误: '+r.status;
+        } else {
+          loginErr.value = '服务器错误: '+r.status;
         }
-      }catch(e){loginErr.value='连接失败: '+e.message;}
-      loginLoading.value=false;
+      } catch(e){loginErr.value='连接失败: '+e.message;}
+      loginLoading.value = false;
     };
 
-    const genId=()=>'node-'+Date.now()+Math.floor(Math.random()*10000);
+    const genId = () => 'node-'+Date.now()+Math.floor(Math.random()*10000);
 
-    const saveConfig=async()=>{
-      try{
-        const nodes=cfg.nodes.map(n=>({
-          id:n.id,name:n.name,token:n.token,
-          expire_date:n._tl>0?`${n._ed}|${n._tl}`:n._ed
+    const saveConfig = async () => {
+      try {
+        const nodes = cfg.nodes.map(n=>({
+          id:n.id, name:n.name, token:n.token,
+          expire_date: n._tl>0 ? `${n._ed}|${n._tl}` : n._ed
         }));
-        const payload={site_name:cfg.site_name,admin_user:cfg.admin_user,admin_pass:cfg.admin_pass||'',nodes,ping_tasks:cfg.ping_tasks};
-        const r=await fetch('/api/admin/config',{
+        const r = await fetch('/api/admin/config',{
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':authHeader},
-          body:JSON.stringify(payload)
+          body:JSON.stringify({site_name:cfg.site_name,admin_user:cfg.admin_user,admin_pass:cfg.admin_pass||'',nodes,ping_tasks:cfg.ping_tasks})
         });
-        if(r.ok)showToast('✅ 配置已保存并下发！');
-        else if(r.status===401)showToast('❌ 认证已失效，请刷新重新登录',false);
+        if(r.ok) showToast('✅ 配置已保存并下发！');
+        else if(r.status===401){showToast('❌ 会话已过期，请刷新重新登录',false);sessionStorage.removeItem('probe_auth');}
         else showToast('❌ 保存失败: '+r.status,false);
-      }catch(e){showToast('❌ 请求失败: '+e.message,false);}
+      } catch(e){showToast('❌ 请求失败: '+e.message,false);}
     };
 
-    const addNode=()=>{
+    const addNode = () => {
       cfg.nodes.push({id:genId(),name:'',token:'secret_'+Math.random().toString(36).slice(2,8),_ed:'2027/01/01',_tl:0});
       nextTick(()=>initSortable());
     };
-    const removeNode=i=>cfg.nodes.splice(i,1);
-    const addPing=()=>cfg.ping_tasks.push({name:'',host:''});
-    const removePing=i=>cfg.ping_tasks.splice(i,1);
+    const removeNode = i => cfg.nodes.splice(i,1);
+    const addPing = () => cfg.ping_tasks.push({name:'',host:''});
+    const removePing = i => cfg.ping_tasks.splice(i,1);
 
-    const deployCmd=n=>`curl -sL https://tz.shell.kdns.fr/install.sh?t=${n.id.replace('node-','')} | bash -s -- -s https://tz.shell.kdns.fr -t ${n.token}`;
-    const copyDeploy=n=>{
+    const deployCmd = n => `curl -sL https://tz.shell.kdns.fr/install.sh?t=${n.id.replace('node-','')} | bash -s -- -s https://tz.shell.kdns.fr -t ${n.token}`;
+    const copyDeploy = n => {
       navigator.clipboard.writeText(deployCmd(n))
-        .then(()=>showToast('✅ 部署命令已复制到剪贴板！'))
-        .catch(()=>showToast('❌ 复制失败，请手动复制',false));
+        .then(()=>showToast('✅ 部署命令已复制！'))
+        .catch(()=>showToast('❌ 复制失败',false));
     };
 
-    const initSortable=()=>{
-      const el=document.getElementById('node-sortable');
-      if(!el)return;
-      if(sortable)sortable.destroy();
-      sortable=Sortable.create(el,{
-        handle:'.drag-handle',
-        animation:200,
+    const initSortable = () => {
+      const el = document.getElementById('node-sortable');
+      if(!el) return;
+      if(sortable) sortable.destroy();
+      sortable = Sortable.create(el,{
+        handle:'.drag-handle', animation:200,
         ghostClass:'sortable-ghost',
-        chosenClass:'sortable-chosen',
-        onEnd:e=>{
-          const moved=cfg.nodes.splice(e.oldIndex,1)[0];
+        onEnd: e => {
+          const moved = cfg.nodes.splice(e.oldIndex,1)[0];
           cfg.nodes.splice(e.newIndex,0,moved);
         }
       });
     };
 
-    onMounted(()=>{
-      /* 不自动请求，等用户手动登录 */
-    });
+    onMounted(()=>tryAutoLogin());
 
-    return{authed,loginUser,loginPass,loginErr,loginLoading,loginShake,doLogin,
+    return {authed,loginUser,loginPass,loginErr,loginLoading,loginShake,doLogin,
       cfg,toast,saveConfig,addNode,removeNode,addPing,removePing,deployCmd,copyDeploy};
   }
 }).mount('#app');
