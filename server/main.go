@@ -70,7 +70,7 @@ json.NewEncoder(w).Encode(map[string]interface{}{ "site_name": appConfig.SiteNam
 http.HandleFunc("/api/ping_history", func(w http.ResponseWriter, r *http.Request) {
 w.Header().Set("Content-Type", "application/json"); serverID := r.URL.Query().Get("server_id"); hours := r.URL.Query().Get("hours"); if hours == "" { hours = "24" }
 query := fmt.Sprintf(`SELECT datetime(timestamp, 'localtime'), target_name, delay, loss_rate FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', '-%s hours') ORDER BY timestamp ASC`, hours)
-rows, _ := db.Query(query, serverID); defer rows.Close(); type DataPoint struct { Time string `json:"time"`; Target string `json:"target"`; Delay float64 `json:"delay"`; Loss float64 `json:"loss"` }; var points []DataPoint
+rows, _ := db.Query(query, serverID); defer rows.Close(); type DataPoint struct { Time string `json:"time"`; Target string `json:"target"`; Delay float64 `json:"delay"`; Loss float64 `json:"loss"` }; points := make([]DataPoint, 0)
 for rows.Next() { var p DataPoint; rows.Scan(&p.Time, &p.Target, &p.Delay, &p.Loss); points = append(points, p) }; json.NewEncoder(w).Encode(points)
 })
 fmt.Println("🚀 服务端热刷新机制已激活！"); log.Fatal(http.ListenAndServe(":8080", nil))

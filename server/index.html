@@ -282,7 +282,7 @@ createApp({
       const out={};
       await Promise.all(ids.map(async sid=>{
         try{
-          const data=await fetch("/api/ping_history?server_id="+sid+"&hours=1").then(r=>r.json())||[];
+          const data=await fetch("/api/ping_history?server_id="+encodeURIComponent(sid)+"&hours=1").then(r=>r.json()).then(x=>x||[])||[];
           const bucket={};
           data.forEach(item=>{
             const tgt=item.target||item.target_name||"未知";
@@ -360,7 +360,7 @@ createApp({
       const li=theme.value==="km";
       if(showL&&ec)ec.showLoading({text:"加载中...",color:"#6366f1",textColor:li?"#0f172a":"#f8fafc",maskColor:li?"rgba(255,255,255,.5)":"rgba(15,23,42,.5)"});
       try{
-        const data=await fetch("/api/ping_history?server_id="+chartId.value+"&hours="+h).then(r=>r.json())||[];
+        const data=await fetch("/api/ping_history?server_id="+encodeURIComponent(chartId.value)+"&hours="+h).then(r=>r.json()).then(x=>x||[])||[];
         const tm={};const tgts=new Set();
         data.forEach(item=>{
           const ts=(item.time||"").substring(0,16).replace("T"," ");
