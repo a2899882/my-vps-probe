@@ -44,12 +44,12 @@ body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-i
 .pw{padding-top:8px;border-top:1px solid rgba(128,128,128,.13);margin-top:8px}
 .ph{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .pr{display:flex;align-items:center;margin-bottom:3px;gap:3px}
-.pn{width:46px;font-size:10px;font-weight:700;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pn{width:54px;font-size:10px;font-weight:700;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pbars{flex:1;display:flex;align-items:flex-end;gap:1px;height:18px;min-width:0}
 .pb{flex:1;min-width:0;border-radius:1.5px}
 .pb-g{background:#10b981;height:100%}
 .pb-y{background:#f59e0b;height:100%}
-.pb-r{background:#c0392b;height:30%}
+.pb-r{background:#ef4444;height:100%}
 .pb-n{background:rgba(148,163,184,.15);height:50%}
 .pms{width:46px;text-align:right;flex-shrink:0;font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;white-space:nowrap}
 .pm-g{color:#10b981}
@@ -67,7 +67,7 @@ body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-i
 .plg{display:flex;align-items:center;gap:3px;font-size:8.5px;color:rgba(148,163,184,.5)}
 .pld-g{width:14px;height:8px;border-radius:1.5px;background:#10b981;flex-shrink:0}
 .pld-y{width:14px;height:8px;border-radius:1.5px;background:#f59e0b;flex-shrink:0}
-.pld-r{width:14px;height:4px;border-radius:1.5px;background:#c0392b;flex-shrink:0}
+.pld-r{width:14px;height:8px;border-radius:1.5px;background:#ef4444;flex-shrink:0}
 </style>
 </head>
 <body class="km">
@@ -267,17 +267,16 @@ createApp({
     const trafClr=p=>+p>=90?"bg-[#ef4444]":+p>=75?"bg-[#f59e0b]":"bg-[#8b5cf6]";
     // Ping: history[]存ms浮点(>0连通)或0(断流)
     const getPmStr=ps=>{
-      const h=(ps.history||[]);
-      if(!h.length)return"-- ms";
-      const last=h[h.length-1];
-      return last===0?"LOSS":last.toFixed(0)+" ms";
+      const cd=ps.current_delay;
+      if(cd===undefined||cd===null)return"-- ms";
+      if(cd===0)return"LOSS";
+      return cd.toFixed(0)+" ms";
     };
     const getPmClass=ps=>{
-      const h=(ps.history||[]);
-      if(!h.length)return"pms pm-n";
-      const last=h[h.length-1];
-      if(last===0)return"pms pm-r";
-      if(last<100)return"pms pm-g";
+      const cd=ps.current_delay;
+      if(cd===undefined||cd===null)return"pms pm-n";
+      if(cd===0)return"pms pm-r";
+      if(cd<100)return"pms pm-g";
       return"pms pm-y";
     };
     const getLoss=ps=>{
@@ -294,7 +293,7 @@ createApp({
       if(rate<10)return"ploss-item pl-w";
       return"ploss-item pl-b";
     };
-    const shortName=n=>n.replace("广东","").replace("电信","电").replace("联通","联").replace("移动","动");
+    const shortName=n=>n.replace("广东","");
     const openChart=async(id,name)=>{
       chartId.value=id;chartName.value=name;showChart.value=true;
       await nextTick();
