@@ -154,8 +154,8 @@ body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-i
                 v-for="(val,bi) in (ps.history||[]).slice(-60)"
                 :key="'b'+bi"
                 class="pb"
-                :class="val===0?'pb-r':(val<100?'pb-g':'pb-y')"
-                :title="val===0?'&#x65AD;&#x6D41;':val.toFixed(1)+' ms'"
+                :class="val<0?'pb-r':(val<100?'pb-g':'pb-y')"
+                :title="val<0?'&#x65AD;&#x6D41;':val.toFixed(1)+' ms'"
               ></div>
             </div>
             <span class="pms" :class="getPmClass(ps)">{{ getPmStr(ps) }}</span>
@@ -269,26 +269,26 @@ createApp({
     const getPmStr=ps=>{
       const cd=ps.current_delay;
       if(cd===undefined||cd===null)return"-- ms";
-      if(cd===0)return"LOSS";
+      if(cd<0)return"LOSS";
       return cd.toFixed(0)+" ms";
     };
     const getPmClass=ps=>{
       const cd=ps.current_delay;
       if(cd===undefined||cd===null)return"pms pm-n";
-      if(cd===0)return"pms pm-r";
+      if(cd<0)return"pms pm-r";
       if(cd<100)return"pms pm-g";
       return"pms pm-y";
     };
     const getLoss=ps=>{
       const h=(ps.history||[]).slice(-60);
       if(!h.length)return"--";
-      const lost=h.filter(v=>v===0).length;
+      const lost=h.filter(v=>v<0).length;
       return(lost/h.length*100).toFixed(1)+"%";
     };
     const getLossClass=ps=>{
       const h=(ps.history||[]).slice(-60);
       if(!h.length)return"ploss-item pl-n";
-      const rate=h.filter(v=>v===0).length/h.length*100;
+      const rate=h.filter(v=>v<0).length/h.length*100;
       if(rate===0)return"ploss-item pl-ok";
       if(rate<10)return"ploss-item pl-w";
       return"ploss-item pl-b";
