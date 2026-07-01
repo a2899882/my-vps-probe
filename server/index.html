@@ -336,10 +336,10 @@ createApp({
             if(p.c>0){sd+=p.s;sc+=p.c;}
           });
           stats[tgt]={c,on:true,avg:sc>0?sd/sc:0,loss:sn>0?sf/sn*100:0};
-          series.push({name:tgt,type:"line",smooth:true,connectNulls:false,symbol:"none",
-            itemStyle:{color:c},lineStyle:{width:2.5},
-            areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:c+"30"},{offset:1,color:c+"00"}])},
-            data:pts});
+          series.push({name:tgt,type:"line",smooth:true,connectNulls:false,symbol:"none",sampling:"lttb",z:3,
+            itemStyle:{color:c},lineStyle:{width:2.2,opacity:.96},
+            areaStyle:{opacity:.42,color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:c+"12"},{offset:.62,color:c+"06"},{offset:1,color:c+"00"}])},
+            emphasis:{focus:"series"},data:pts});
         });
         chartSt.value=stats;
         ec.setOption({
@@ -348,7 +348,7 @@ createApp({
             backgroundColor:li?"rgba(255,255,255,.95)":"rgba(15,23,42,.95)",
             textStyle:{color:li?"#0f172a":"#f8fafc",fontWeight:"bold"},
             borderColor:li?"#e2e8f0":"#334155",borderWidth:1,padding:12,
-            valueFormatter:v=>v?v.toFixed(1)+" ms":"断流"},
+            valueFormatter:v => (v !== null && v !== undefined) ? (v.toFixed(1)+" ms") : "断流"},
           legend:{show:false},
           grid:{left:"1%",right:"3%",bottom:"2%",top:"5%",containLabel:true},
           xAxis:{type:"category",data:labels,boundaryGap:false,
