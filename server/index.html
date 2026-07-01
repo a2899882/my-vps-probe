@@ -146,7 +146,7 @@ body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-i
           <span style="font-size:8px;color:rgba(148,163,184,.4)">60&#x683C;=60&#x5206;&#x949F;</span>
         </div>
         <template v-if="nd.status&&nd.status.ping_statuses&&nd.status.ping_statuses.length>0">
-          <div v-for="ps in nd.status.ping_statuses" :key="ps.target_name" class="pr">
+          <div v-for="ps in getCardPingStatuses(nd)" :key="ps.target_name" class="pr">
             <span class="pn t3">{{ ps.target_name }}</span>
             <div class="pbars">
               <div v-for="i in Math.max(0,60-(ps.history?ps.history.length:0))" :key="'e'+i" class="pb pb-n"></div>
@@ -154,8 +154,8 @@ body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-i
                 v-for="(val,bi) in (ps.history||[]).slice(-60)"
                 :key="'b'+bi"
                 class="pb"
-                :class="val<0?'pb-r':(val<100?'pb-g':'pb-y')"
-                :title="val<0?'&#x65AD;&#x6D41;':val.toFixed(1)+' ms'"
+                :class="val==null?'pb-n':(val<0?'pb-r':(val<100?'pb-g':'pb-y'))"
+                :title="val==null?'&#x65E0;&#x6570;&#x636E;':(val<0?'&#x65AD;&#x6D41;':val.toFixed(1)+' ms')"
               ></div>
             </div>
             <span class="pms" :class="getPmClass(ps)">{{ getPmStr(ps) }}</span>
@@ -163,7 +163,7 @@ body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-i
           <div class="ploss-row">
             <span class="ploss-label t4">&#x4E22;&#x5305;&#x7387;</span>
             <span
-              v-for="ps in nd.status.ping_statuses"
+              v-for="ps in getCardPingStatuses(nd)"
               :key="'lp'+ps.target_name"
               class="ploss-item"
               :class="getLossClass(ps)"
@@ -266,29 +266,82 @@ createApp({
     const trafPct=n=>{if(!n._tlim)return 0;const u=((n.status&&n.status.net_out_transfer)||0)+((n.status&&n.status.net_in_transfer)||0);return Math.min(+(u/(n._tlim*1073741824)*100).toFixed(1),100);};
     const trafClr=p=>+p>=90?"bg-[#ef4444]":+p>=75?"bg-[#f59e0b]":"bg-[#8b5cf6]";
     // Ping: history[]存ms浮点(>0连通)或0(断流)
+    const cardHistory=ref({});
+    const buildMinuteKeys=()=>{
+      const out=[];const d=new Date();d.setSeconds(0,0);
+      for(let i=59;i>=0;i--){
+        const x=new Date(d.getTime()-i*60000);
+        out.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")} ${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`);
+      }
+      return out;
+    };
+    const normMinuteKey=s=>((s||"").substring(0,16).replace("T"," "));
+    const loadCardHistory=async()=>{
+      const ids=servers.value.map(n=>n.id).filter(Boolean);
+      const minuteKeys=buildMinuteKeys();
+      const out={};
+      await Promise.all(ids.map(async sid=>{
+        try{
+          const data=await fetch("/api/ping_history?server_id="+sid+"&hours=1").then(r=>r.json())||[];
+          const bucket={};
+          data.forEach(item=>{
+            const tgt=item.target||item.target_name||"未知";
+            const key=normMinuteKey(item.time);
+            const raw=(item.delay ?? item.avg_delay ?? item.avg);
+            const dv=(raw===undefined||raw===null)?null:Number(raw);
+            if(!bucket[tgt])bucket[tgt]={};
+            bucket[tgt][key]=Number.isNaN(dv)?null:dv;
+          });
+          const order=(pingTasks.value||[]).map(t=>t.name);
+          const targets=[...new Set([...order,...Object.keys(bucket)])];
+          out[sid]=targets.map(tgt=>{
+            const hist=minuteKeys.map(k=>(bucket[tgt]&&Object.prototype.hasOwnProperty.call(bucket[tgt],k))?bucket[tgt][k]:null);
+            const valid=hist.filter(v=>typeof v==="number"&&v>0);
+            const fail=hist.filter(v=>typeof v==="number"&&v<=0);
+            return{
+              target_name:tgt,
+              history:hist,
+              card_avg_delay:valid.length?valid.reduce((a,b)=>a+b,0)/valid.length:-1,
+              card_loss_rate:(valid.length+fail.length)?(fail.length/(valid.length+fail.length)*100):0
+            };
+          });
+        }catch(e){
+          out[sid]=null;
+        }
+      }));
+      cardHistory.value=out;
+    };
+    const getCardPingStatuses=nd=>{
+      const rows=cardHistory.value[nd.id];
+      if(rows&&rows.length)return rows;
+      return (nd.status&&nd.status.ping_statuses)||[];
+    };
     const getPmStr=ps=>{
-      const cd=ps.current_delay;
+      const cd=(ps.card_avg_delay ?? ps.current_delay);
       if(cd===undefined||cd===null)return"-- ms";
       if(cd<0)return"LOSS";
       return cd.toFixed(0)+" ms";
     };
     const getPmClass=ps=>{
-      const cd=ps.current_delay;
+      const cd=(ps.card_avg_delay ?? ps.current_delay);
       if(cd===undefined||cd===null)return"pms pm-n";
       if(cd<0)return"pms pm-r";
       if(cd<100)return"pms pm-g";
       return"pms pm-y";
     };
     const getLoss=ps=>{
+      if(ps.card_loss_rate!==undefined)return ps.card_loss_rate.toFixed(1)+"%";
       const h=(ps.history||[]).slice(-60);
       if(!h.length)return"--";
-      const lost=h.filter(v=>v<0).length;
-      return(lost/h.length*100).toFixed(1)+"%";
+      const seen=h.filter(v=>v!==null&&v!==undefined);
+      if(!seen.length)return"--";
+      const lost=seen.filter(v=>v<=0).length;
+      return(lost/seen.length*100).toFixed(1)+"%";
     };
     const getLossClass=ps=>{
-      const h=(ps.history||[]).slice(-60);
-      if(!h.length)return"ploss-item pl-n";
-      const rate=h.filter(v=>v<0).length/h.length*100;
+      const rate=(ps.card_loss_rate!==undefined)
+        ? ps.card_loss_rate
+        : (()=>{const h=(ps.history||[]).slice(-60).filter(v=>v!==null&&v!==undefined);return !h.length?0:(h.filter(v=>v<=0).length/h.length*100);})();
       if(rate===0)return"ploss-item pl-ok";
       if(rate<10)return"ploss-item pl-w";
       return"ploss-item pl-b";
@@ -362,15 +415,19 @@ createApp({
     };
     onMounted(()=>{
       document.body.className=theme.value;
-      fetchData();
-      ft=setInterval(fetchData,2000);
+      const refreshAll=async()=>{
+        await fetchData();
+        await loadCardHistory();
+      };
+      refreshAll();
+      ft=setInterval(refreshAll,15000);
       ct=setInterval(()=>{if(showChart.value&&chartId.value)loadH(chartHr.value,false);},10000);
     });
     onUnmounted(()=>{clearInterval(ft);clearInterval(ct);});
     return{servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
       showChart,chartName,chartHr,chartSt,
       fb,pct,daysLeft,expClr,fmtUp,trafUsed,trafPct,trafClr,
-      getPmStr,getPmClass,getLoss,getLossClass,shortName,
+      getCardPingStatuses,getPmStr,getPmClass,getLoss,getLossClass,shortName,
       openChart,closeChart,loadH,toggleLn};
   }
 }).mount("#app");
