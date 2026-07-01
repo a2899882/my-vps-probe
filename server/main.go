@@ -145,11 +145,11 @@ return out
 
 func main() {
 loadConfig(); initDB(); defer db.Close()
-http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/index.html") })
-http.HandleFunc("/admin", basicAuth(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/admin.html") }))
-http.HandleFunc("/probe-agent-amd64", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/probe-agent-amd64") })
-	http.HandleFunc("/probe-agent-arm64", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/probe-agent-arm64") })
-	http.HandleFunc("/install.sh", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "install.sh") })
+http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"); w.Header().Set("Pragma", "no-cache"); w.Header().Set("Expires", "0"); http.ServeFile(w, r, "server/index.html") })
+http.HandleFunc("/admin", basicAuth(func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"); w.Header().Set("Pragma", "no-cache"); w.Header().Set("Expires", "0"); http.ServeFile(w, r, "server/admin.html") }))
+http.HandleFunc("/probe-agent-amd64", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"); w.Header().Set("Pragma", "no-cache"); w.Header().Set("Expires", "0"); http.ServeFile(w, r, "server/probe-agent-amd64") })
+	http.HandleFunc("/probe-agent-arm64", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"); w.Header().Set("Pragma", "no-cache"); w.Header().Set("Expires", "0"); http.ServeFile(w, r, "server/probe-agent-arm64") })
+	http.HandleFunc("/install.sh", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"); w.Header().Set("Pragma", "no-cache"); w.Header().Set("Expires", "0"); http.ServeFile(w, r, "install.sh") })
 http.HandleFunc("/download/agent.go", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "agent/main.go") })
 http.HandleFunc("/api/admin/config", basicAuth(func(w http.ResponseWriter, r *http.Request) {
 w.Header().Set("Content-Type", "application/json")
@@ -173,12 +173,12 @@ mapMutex.Lock(); st := serverStatusMap[cNode.ID]; st.IsOnline = true; serverStat
 for { if err := conn.ReadJSON(&st); err != nil { mapMutex.Lock(); st = serverStatusMap[cNode.ID]; st.IsOnline = false; serverStatusMap[cNode.ID] = st; mapMutex.Unlock(); break }; st.ServerID = cNode.ID; st.IsOnline = true; mapMutex.Lock(); serverStatusMap[cNode.ID] = st; mapMutex.Unlock() }
 })
 http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
-w.Header().Set("Content-Type", "application/json"); configMutex.RLock(); mapMutex.RLock(); var nodes []FrontendNode
+w.Header().Set("Content-Type", "application/json"); w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"); w.Header().Set("Pragma", "no-cache"); w.Header().Set("Expires", "0"); configMutex.RLock(); mapMutex.RLock(); var nodes []FrontendNode
 for _, n := range appConfig.Nodes { st := serverStatusMap[n.ID]; st.CardPingStatuses = buildCardPingStatuses(n.ID); nodes = append(nodes, FrontendNode{ NodeConfig: n, Status: st }) }
 json.NewEncoder(w).Encode(map[string]interface{}{ "site_name": appConfig.SiteName, "nodes": nodes, "ping_tasks": appConfig.PingTasks}); mapMutex.RUnlock(); configMutex.RUnlock()
 })
 http.HandleFunc("/api/ping_history", func(w http.ResponseWriter, r *http.Request) {
-w.Header().Set("Content-Type", "application/json"); serverID := r.URL.Query().Get("server_id"); hours := r.URL.Query().Get("hours"); if hours == "" { hours = "24" }
+w.Header().Set("Content-Type", "application/json"); w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"); w.Header().Set("Pragma", "no-cache"); w.Header().Set("Expires", "0"); serverID := r.URL.Query().Get("server_id"); hours := r.URL.Query().Get("hours"); if hours == "" { hours = "24" }
 query := fmt.Sprintf(`SELECT datetime(timestamp, 'localtime'), target_name, delay, loss_rate FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', '-%s hours') ORDER BY timestamp ASC`, hours)
 rows, _ := db.Query(query, serverID); defer rows.Close(); type DataPoint struct { Time string `json:"time"`; Target string `json:"target"`; Delay float64 `json:"delay"`; Loss float64 `json:"loss"` }; points := make([]DataPoint, 0)
 for rows.Next() { var p DataPoint; rows.Scan(&p.Time, &p.Target, &p.Delay, &p.Loss); points = append(points, p) }; json.NewEncoder(w).Encode(points)

@@ -20,9 +20,9 @@ BASE_URL="https://${CLEAN_SERVER}"
 
 ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then
-    DL_URL="${BASE_URL}/probe-agent-amd64?v=4"
+    DL_URL="${BASE_URL}/probe-agent-amd64?v=5"
 elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    DL_URL="${BASE_URL}/probe-agent-arm64?v=4"
+    DL_URL="${BASE_URL}/probe-agent-arm64?v=5"
 else
     echo "❌ 暂不支持的架构: $ARCH"
     exit 1

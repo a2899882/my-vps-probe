@@ -29,6 +29,7 @@ trackers                           = make(map[string]*PingTracker)
 serverAddr, token                  string
 globalCountryCode                  = "OT"
 lastNetBytesRecv, lastNetBytesSent uint64
+lastNetAt time.Time
 )
 
 func init() {
@@ -86,12 +87,17 @@ if d, err := disk.Usage("/"); err == nil && d != nil { status.DiskTotal = d.Tota
 if n, err := psnet.IOCounters(false); err == nil && len(n) > 0 {
 status.NetInTransfer = n[0].BytesRecv
 status.NetOutTransfer = n[0].BytesSent
-if lastNetBytesRecv > 0 {
-status.NetInSpeed = (n[0].BytesRecv - lastNetBytesRecv) / 60
-status.NetOutSpeed = (n[0].BytesSent - lastNetBytesSent) / 60
+now := time.Now()
+if lastNetBytesRecv > 0 && !lastNetAt.IsZero() {
+secs := now.Sub(lastNetAt).Seconds()
+if secs > 0 {
+status.NetInSpeed = uint64(float64(n[0].BytesRecv-lastNetBytesRecv) / secs)
+status.NetOutSpeed = uint64(float64(n[0].BytesSent-lastNetBytesSent) / secs)
+}
 }
 lastNetBytesRecv = n[0].BytesRecv
 lastNetBytesSent = n[0].BytesSent
+lastNetAt = now
 }
 
 newTrackers := make(map[string]*PingTracker)
@@ -153,7 +159,7 @@ status.PingStatuses = pingResults
 if err := conn.WriteJSON(status); err != nil {
 return
 }
-time.Sleep(60 * time.Second)
+time.Sleep(2 * time.Second)
 }
 }
 
