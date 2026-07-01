@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>探针看板</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x26A1;</text></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{font-family:"Noto Sans SC",sans-serif;-webkit-font-smoothing:antialiased;background-size:cover;background-attachment:fixed;background-position:center;min-height:100vh;margin:0;padding:16px;transition:background .8s}
+.jm{font-family:"JetBrains Mono",monospace}
+.bt{transition:width .8s cubic-bezier(.4,0,.2,1);border-radius:99px}
+.ptr{border-radius:99px;overflow:hidden;height:6px}
+.gc{transition:all .3s cubic-bezier(.4,0,.2,1);border-radius:12px}
+.gc:hover{transform:translateY(-2px)}
+body.dk{background-image:url("https://i.yon.li/w/682f73d97eade.png");color:#f8fafc}
+body.dk::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:-1;pointer-events:none}
+.dk .gc{background:rgba(17,25,40,.62);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.11);box-shadow:0 8px 30px rgba(0,0,0,.3)}
+.dk .ptr{background:rgba(255,255,255,.1)}
+.dk .t1{color:#fff!important;font-weight:800}
+.dk .t2{color:#f1f5f9!important;font-weight:700}
+.dk .t3{color:#cbd5e1!important;font-weight:600}
+.dk .t4{color:#94a3b8!important;font-weight:600}
+.dk .dv{border-color:rgba(255,255,255,.08)!important}
+.dk .cmod{background:rgba(20,26,42,.97);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.08);box-shadow:0 25px 60px rgba(0,0,0,.55)}
+.dk .bpill{background:rgba(255,255,255,.06)}
+body.km{background-image:url("https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&w=1920&auto=format&fit=crop");color:#0f172a}
+body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-index:-1;pointer-events:none}
+.km .gc{background:rgba(250,252,255,.76);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.82);box-shadow:0 8px 25px rgba(0,0,0,.06)}
+.km .ptr{background:rgba(0,0,0,.08)}
+.km .t1{color:#000!important;font-weight:900}
+.km .t2{color:#0f172a!important;font-weight:800}
+.km .t3{color:#1e293b!important;font-weight:800}
+.km .t4{color:#334155!important;font-weight:800}
+.km .dv{border-color:rgba(0,0,0,.08)!important}
+.km .cmod{background:rgba(255,255,255,.97);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,1);box-shadow:0 25px 60px rgba(0,0,0,.12)}
+.km .bpill{background:rgba(0,0,0,.04)}
+.bact{background:#6366f1!important;color:#fff!important;box-shadow:0 2px 10px rgba(99,102,241,.4)!important}
+.pw{padding-top:8px;border-top:1px solid rgba(128,128,128,.13);margin-top:8px}
+.ph{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.pr{display:flex;align-items:center;margin-bottom:3px;gap:3px}
+.pn{width:54px;font-size:10px;font-weight:700;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbars{flex:1;display:flex;align-items:flex-end;gap:1px;height:18px;min-width:0}
+.pb{flex:1;min-width:0;border-radius:1.5px}
+.pb-g{background:#10b981;height:100%}
+.pb-y{background:#f59e0b;height:100%}
+.pb-r{background:#ef4444;height:100%}
+.pb-n{background:rgba(148,163,184,.15);height:50%}
+.pms{width:46px;text-align:right;flex-shrink:0;font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;white-space:nowrap}
+.pm-g{color:#10b981}
+.pm-y{color:#f59e0b}
+.pm-r{color:#ef4444}
+.pm-n{color:rgba(148,163,184,.35)}
+.ploss-row{display:flex;align-items:center;margin-top:4px;padding-top:4px;border-top:1px dashed rgba(128,128,128,.12);gap:6px;flex-wrap:wrap}
+.ploss-label{font-size:9px;width:46px;flex-shrink:0;font-weight:600;color:rgba(148,163,184,.5)}
+.ploss-item{font-size:9.5px;font-family:"JetBrains Mono",monospace;font-weight:700}
+.pl-ok{color:#10b981}
+.pl-w{color:#f59e0b}
+.pl-b{color:#ef4444}
+.pl-n{color:rgba(148,163,184,.3)}
+.pleg{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.plg{display:flex;align-items:center;gap:3px;font-size:8.5px;color:rgba(148,163,184,.5)}
+.pld-g{width:14px;height:8px;border-radius:1.5px;background:#10b981;flex-shrink:0}
+.pld-y{width:14px;height:8px;border-radius:1.5px;background:#f59e0b;flex-shrink:0}
+.pld-r{width:14px;height:8px;border-radius:1.5px;background:#ef4444;flex-shrink:0}
+</style>
+</head>
+<body class="km">
+<div id="app" class="w-full max-w-[1400px] mx-auto">
+
+  <header class="gc flex items-center justify-between px-6 py-3 mb-4">
+    <div class="text-[18px] font-black tracking-widest t1">{{ siteName }}</div>
+    <div class="flex items-center gap-4">
+      <button @click="toggleTheme" class="hover:opacity-60 transition t3">
+        <svg v-if="theme==='km'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a href="/admin" target="_blank" class="hover:opacity-60 transition t3">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <div class="gc mb-4 px-6 py-4 flex flex-wrap md:flex-nowrap justify-between items-center text-center">
+    <div class="flex-1 flex flex-col px-3 py-1"><span class="text-[11px] t4 mb-1 font-bold">当前时间</span><span class="text-[13px] t1 jm font-bold">{{ now }}</span></div>
+    <div class="flex-1 flex flex-col px-3 py-1 border-l dv"><span class="text-[11px] t4 mb-1 font-bold">当前在线</span><span class="text-[13px] t1 jm font-bold"><span class="text-[#10b981]">{{ onlineCnt }}</span><span class="opacity-40"> / {{ servers.length }}</span></span></div>
+    <div class="flex-1 flex flex-col px-3 py-1 border-l dv"><span class="text-[11px] t4 mb-1 font-bold">点亮地区</span><span class="text-[13px] t1 jm font-bold">{{ servers.length }}</span></div>
+    <div class="flex-1 flex flex-col px-3 py-1 border-l dv"><span class="text-[11px] t4 mb-1 font-bold">流量概览</span><span class="text-[11px] t1 jm font-bold"><span class="text-[#3b82f6]">&#x2191; {{ fb(totOut) }}</span><br><span class="text-[#10b981]">&#x2193; {{ fb(totIn) }}</span></span></div>
+    <div class="flex-1 flex flex-col px-3 py-1 border-l dv"><span class="text-[11px] t4 mb-1 font-bold">网络速率</span><span class="text-[11px] t1 jm font-bold"><span class="text-[#3b82f6]">&#x2191; {{ fb(spOut) }}/s</span><br><span class="text-[#10b981]">&#x2193; {{ fb(spIn) }}/s</span></span></div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8">
+    <div v-for="nd in servers" :key="nd.id" class="gc p-4 flex flex-col relative overflow-hidden">
+      <div v-if="!nd.status||!nd.status.is_online" class="absolute inset-0 pointer-events-none z-0" style="background:repeating-linear-gradient(-45deg,transparent,transparent 10px,rgba(239,68,68,.07) 10px,rgba(239,68,68,.07) 20px)"></div>
+      <div v-if="!nd.status||!nd.status.is_online" class="absolute inset-0 border-2 border-red-500/25 rounded-xl pointer-events-none z-10"></div>
+      <div class="flex justify-between items-center mb-2 relative z-20">
+        <div class="flex items-center gap-2 text-[14px] font-black t1">
+          <span v-if="nd.status&&nd.status.country_code&&nd.status.country_code!=='OT'" :class="['fi','fi-'+nd.status.country_code.toLowerCase(),'rounded-sm']"></span>
+          <span v-else>&#x1F310;</span>
+          {{ nd.name }}
+        </div>
+        <div class="flex items-center gap-3">
+          <svg class="w-4 h-4 opacity-30 cursor-pointer hover:opacity-80 transition t3" @click="openChart(nd.id,nd.name)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <span :class="nd.status&&nd.status.is_online?'bg-[#10b981] shadow-[0_0_8px_#10b981]':'bg-[#ef4444] shadow-[0_0_8px_#ef4444]'" class="w-2.5 h-2.5 rounded-full flex-shrink-0"></span>
+        </div>
+      </div>
+      <div class="mb-2 relative z-20">
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="expClr(daysLeft(nd._exp))">&#x4F59; {{ daysLeft(nd._exp) }} &#x5929;</span>
+      </div>
+      <div class="flex gap-3 mb-3 text-[11px] font-bold relative z-20 flex-wrap">
+        <span class="text-[#3b82f6]">&#x2B21; {{ (nd.status&&nd.status.cpu_cores)||0 }} Cores</span>
+        <span class="text-[#10b981]">&#x25A3; {{ fb((nd.status&&nd.status.mem_total)||0) }}</span>
+        <span class="text-[#8b5cf6]">&#x25EB; {{ fb((nd.status&&nd.status.disk_total)||0) }}</span>
+      </div>
+      <div class="space-y-2 mb-3 text-[11px] font-bold relative z-20">
+        <div class="flex items-center"><span class="w-8 t4">CPU</span><div class="flex-1 mx-2 ptr"><div class="h-full bg-[#3b82f6] bt" :style="'width:'+pct(nd.status&&nd.status.cpu_usage,100)+'%'"></div></div><span class="w-8 text-right jm t2">{{ ((nd.status&&nd.status.cpu_usage)||0).toFixed(0) }}%</span></div>
+        <div class="flex items-center"><span class="w-8 t4">&#x5185;&#x5B58;</span><div class="flex-1 mx-2 ptr"><div class="h-full bg-[#10b981] bt" :style="'width:'+pct(nd.status&&nd.status.mem_used,nd.status&&nd.status.mem_total)+'%'"></div></div><span class="w-8 text-right jm t2">{{ pct(nd.status&&nd.status.mem_used,nd.status&&nd.status.mem_total) }}%</span></div>
+        <div class="flex items-center"><span class="w-8 t4">SWAP</span><div class="flex-1 mx-2 ptr"><div class="h-full bg-[#f59e0b] bt" :style="'width:'+pct(nd.status&&nd.status.swap_used,nd.status&&nd.status.swap_total)+'%'"></div></div>
+          <span class="w-8 text-right jm t2" v-if="nd.status&&nd.status.swap_total">{{ pct(nd.status.swap_used,nd.status.swap_total) }}%</span>
+          <span class="w-8 text-right jm t4 opacity-50" v-else>OFF</span>
+        </div>
+        <div class="flex items-center"><span class="w-8 t4">&#x786C;&#x76D8;</span><div class="flex-1 mx-2 ptr"><div class="h-full bg-[#10b981] bt" :style="'width:'+pct(nd.status&&nd.status.disk_used,nd.status&&nd.status.disk_total)+'%'"></div></div><span class="w-8 text-right jm t2">{{ pct(nd.status&&nd.status.disk_used,nd.status&&nd.status.disk_total) }}%</span></div>
+      </div>
+      <div class="border-t dv pt-2 pb-1 space-y-1 text-[11px] font-bold relative z-20">
+        <div class="flex justify-between"><span class="t4">&#x7F51;&#x7EDC;</span><span class="jm t2">&#x2191; {{ fb((nd.status&&nd.status.net_out_speed)||0) }}/s | &#x2193; {{ fb((nd.status&&nd.status.net_in_speed)||0) }}/s</span></div>
+        <div class="flex justify-between"><span class="t4">&#x6D41;&#x91CF;</span><span class="jm t2">&#x2191; {{ fb((nd.status&&nd.status.net_out_transfer)||0) }} | &#x2193; {{ fb((nd.status&&nd.status.net_in_transfer)||0) }}</span></div>
+        <div class="flex justify-between"><span class="t4">&#x8D1F;&#x8F7D;</span><span class="jm t2">{{ ((nd.status&&nd.status.load_1)||0).toFixed(2) }} | 0.00 | 0.00</span></div>
+      </div>
+      <div v-if="nd._tlim>0" class="pt-2 mt-1 border-t dv relative z-20">
+        <div class="flex justify-between mb-1 text-[10px] font-bold">
+          <span class="t4">&#x5F53;&#x6708;&#x6D41;&#x91CF; <span class="opacity-50 text-[9px]">({{ nd._tlim }}GB)</span></span>
+          <span class="jm" :class="trafPct(nd)>=90?'text-red-400':'t2'">{{ trafUsed(nd) }} | {{ trafPct(nd) }}%</span>
+        </div>
+        <div class="ptr bg-black/10"><div class="h-full bt" :class="trafClr(trafPct(nd))" :style="'width:'+trafPct(nd)+'%'"></div></div>
+      </div>
+
+      <div class="pw relative z-20">
+        <div class="ph">
+          <span class="text-[10px] t4 font-bold">&#x8FDE;&#x901A;&#x7387;&#x76D1;&#x6D4B;</span>
+          <span style="font-size:8px;padding:1px 5px;border-radius:99px;background:rgba(99,102,241,.18);color:#818cf8;font-weight:700;font-family:'JetBrains Mono',monospace">TCP</span>
+          <span style="font-size:8px;color:rgba(148,163,184,.4)">60&#x683C;=60&#x5206;&#x949F;</span>
+        </div>
+        <template v-if="nd.status&&nd.status.ping_statuses&&nd.status.ping_statuses.length>0">
+          <div v-for="ps in nd.status.ping_statuses" :key="ps.target_name" class="pr">
+            <span class="pn t3">{{ ps.target_name }}</span>
+            <div class="pbars">
+              <div v-for="i in Math.max(0,60-(ps.history?ps.history.length:0))" :key="'e'+i" class="pb pb-n"></div>
+              <div
+                v-for="(val,bi) in (ps.history||[]).slice(-60)"
+                :key="'b'+bi"
+                class="pb"
+                :class="val<0?'pb-r':(val<100?'pb-g':'pb-y')"
+                :title="val<0?'&#x65AD;&#x6D41;':val.toFixed(1)+' ms'"
+              ></div>
+            </div>
+            <span class="pms" :class="getPmClass(ps)">{{ getPmStr(ps) }}</span>
+          </div>
+          <div class="ploss-row">
+            <span class="ploss-label t4">&#x4E22;&#x5305;&#x7387;</span>
+            <span
+              v-for="ps in nd.status.ping_statuses"
+              :key="'lp'+ps.target_name"
+              class="ploss-item"
+              :class="getLossClass(ps)"
+            >{{ shortName(ps.target_name) }}: {{ getLoss(ps) }}</span>
+          </div>
+        </template>
+        <template v-else>
+          <div v-for="n in 3" :key="'np'+n" class="pr">
+            <span class="pn t4">&#x7B49;&#x5F85;...</span>
+            <div class="pbars"><div v-for="i in 60" :key="i" class="pb pb-n"></div></div>
+            <span class="pms pm-n">-- ms</span>
+          </div>
+        </template>
+        <div class="pleg">
+          <span class="plg"><span class="pld-g"></span>&lt;100ms</span>
+          <span class="plg"><span class="pld-y"></span>&#x2265;100ms</span>
+          <span class="plg"><span class="pld-r"></span>&#x65AD;&#x6D41;</span>
+        </div>
+      </div>
+
+      <div class="pt-2 mt-2 border-t dv flex justify-between text-[11px] font-bold t4 relative z-20">
+        <span>&#x5230;&#x671F;: <span class="t3">{{ nd._exp }}</span></span>
+        <span>&#x5728;&#x7EBF;: <span style="color:#6366f1">{{ fmtUp((nd.status&&nd.status.uptime)||0) }}</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showChart" class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,.55);backdrop-filter:blur(6px)" @click.self="closeChart">
+    <div class="cmod rounded-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col">
+      <div class="flex justify-between items-center p-5">
+        <h3 class="text-[16px] font-bold flex items-center gap-2 t1">
+          <span style="color:#6366f1;font-size:18px">{{ chartName }}</span> &#x591A;&#x94FE;&#x8DEF;&#x5EF6;&#x8FDF;&#x6CE2;&#x52A8;
+          <span style="font-size:9px;padding:1px 6px;border-radius:99px;background:rgba(99,102,241,.18);color:#818cf8;font-weight:700;font-family:'JetBrains Mono',monospace">TCP PING</span>
+        </h3>
+        <div class="flex items-center gap-4">
+          <div class="flex bpill rounded-full p-1">
+            <button @click="loadH(1)"  :class="chartHr===1?'bact':'t4'" class="px-4 py-1.5 rounded-full text-[12px] font-bold transition-all">1&#x5C0F;&#x65F6;</button>
+            <button @click="loadH(4)"  :class="chartHr===4?'bact':'t4'" class="px-4 py-1.5 rounded-full text-[12px] font-bold transition-all">4&#x5C0F;&#x65F6;</button>
+            <button @click="loadH(24)" :class="chartHr===24?'bact':'t4'" class="px-4 py-1.5 rounded-full text-[12px] font-bold transition-all">24&#x5C0F;&#x65F6;</button>
+          </div>
+          <button @click="closeChart" class="t4 hover:text-red-400 transition p-1">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="px-6 pb-2 flex flex-wrap justify-center gap-3">
+        <div v-for="(st,tgt) in chartSt" :key="tgt"
+             class="px-4 py-2 rounded-xl border-2 cursor-pointer transition-all min-w-[120px] text-center select-none"
+             :style="{borderColor:st.on?st.c:'rgba(148,163,184,.2)',background:st.on?st.c+'18':'transparent',opacity:st.on?1:.38}"
+             @click="toggleLn(tgt)">
+          <div class="text-[13px] font-bold mb-1" :style="{color:st.on?st.c:'#94a3b8'}">{{ tgt }}</div>
+          <div class="text-[11px] jm t3">{{ st.avg>0?st.avg.toFixed(1)+' ms':'-- ms' }} <span class="opacity-40">|</span> <span :class="st.loss>0?'text-red-400 font-bold':''">{{ st.loss.toFixed(1) }}%</span></div>
+        </div>
+      </div>
+      <div class="px-5 pb-5"><div id="ec" class="w-full h-[360px]"></div></div>
+    </div>
+  </div>
+
+</div>
+<script>
+const {createApp,ref,computed,watch,onMounted,onUnmounted,nextTick}=Vue;
+createApp({
+  setup(){
+    const servers=ref([]),siteName=ref("txiaoK"),theme=ref(localStorage.getItem("pt")||"km");
+    const showChart=ref(false),chartId=ref(""),chartName=ref(""),chartHr=ref(4),chartSt=ref({});
+    const now=ref("");
+    let ec=null,ft=null,ct=null;
+    setInterval(()=>now.value=new Date().toLocaleTimeString("zh-CN",{hour12:false}),1000);
+    const toggleTheme=()=>theme.value=theme.value==="km"?"dk":"km";
+    watch(theme,v=>{
+      localStorage.setItem("pt",v);
+      document.body.className=v;
+      if(ec&&showChart.value){ec.dispose();ec=null;nextTick(()=>{ec=echarts.init(document.getElementById("ec"),null,{renderer:"canvas"});loadH(chartHr.value,false);});}
+    });
+    const fetchData=async()=>{
+      try{
+        const d=await fetch("/api/status").then(r=>r.json());
+        siteName.value=d.site_name||"探针看板";
+        document.title=siteName.value;
+        (d.nodes||[]).forEach(n=>{
+          n._exp="2027/01/01";n._tlim=0;
+          const raw=String(n.expire_date||"");
+          if(raw.includes("|")){const p=raw.split("|");n._exp=p[0]||"2027/01/01";n._tlim=parseInt(p[1])||0;}
+          else if(raw&&!raw.includes("NaN"))n._exp=raw;
+        });
+        servers.value=d.nodes||[];
+      }catch(e){}
+    };
+    const onlineCnt=computed(()=>servers.value.filter(n=>n.status&&n.status.is_online).length);
+    const totIn=computed(()=>servers.value.reduce((a,c)=>a+((c.status&&c.status.net_in_transfer)||0),0));
+    const totOut=computed(()=>servers.value.reduce((a,c)=>a+((c.status&&c.status.net_out_transfer)||0),0));
+    const spIn=computed(()=>servers.value.reduce((a,c)=>a+((c.status&&c.status.net_in_speed)||0),0));
+    const spOut=computed(()=>servers.value.reduce((a,c)=>a+((c.status&&c.status.net_out_speed)||0),0));
+    const fb=b=>{if(!b||b===0)return"0 B";const k=1024,s=["B","KB","MB","GB","TB"],i=Math.floor(Math.log(b)/Math.log(k));return parseFloat((b/k**i).toFixed(2))+" "+s[i];};
+    const pct=(u,t)=>!t?0:Math.min(+((u/t)*100).toFixed(0),100);
+    const daysLeft=ds=>{if(!ds||ds==="未知")return"∞";const d=new Date(ds)-Date.now();if(isNaN(d))return"∞";return d<=0?0:Math.ceil(d/86400000);};
+    const expClr=d=>{if(d==="∞"||isNaN(+d))return"text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30";if(+d<=7)return"text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30";if(+d<=30)return"text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30";return"text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30";};
+    const fmtUp=s=>{if(!s)return"离线";const d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d>0?d+"天"+h+"小时":h+"小时";};
+    const trafUsed=n=>fb(((n.status&&n.status.net_out_transfer)||0)+((n.status&&n.status.net_in_transfer)||0));
+    const trafPct=n=>{if(!n._tlim)return 0;const u=((n.status&&n.status.net_out_transfer)||0)+((n.status&&n.status.net_in_transfer)||0);return Math.min(+(u/(n._tlim*1073741824)*100).toFixed(1),100);};
+    const trafClr=p=>+p>=90?"bg-[#ef4444]":+p>=75?"bg-[#f59e0b]":"bg-[#8b5cf6]";
+    // Ping: history[]存ms浮点(>0连通)或0(断流)
+    const getPmStr=ps=>{
+      const cd=ps.current_delay;
+      if(cd===undefined||cd===null)return"-- ms";
+      if(cd<0)return"LOSS";
+      return cd.toFixed(0)+" ms";
+    };
+    const getPmClass=ps=>{
+      const cd=ps.current_delay;
+      if(cd===undefined||cd===null)return"pms pm-n";
+      if(cd<0)return"pms pm-r";
+      if(cd<100)return"pms pm-g";
+      return"pms pm-y";
+    };
+    const getLoss=ps=>{
+      const h=(ps.history||[]).slice(-60);
+      if(!h.length)return"--";
+      const lost=h.filter(v=>v<0).length;
+      return(lost/h.length*100).toFixed(1)+"%";
+    };
+    const getLossClass=ps=>{
+      const h=(ps.history||[]).slice(-60);
+      if(!h.length)return"ploss-item pl-n";
+      const rate=h.filter(v=>v<0).length/h.length*100;
+      if(rate===0)return"ploss-item pl-ok";
+      if(rate<10)return"ploss-item pl-w";
+      return"ploss-item pl-b";
+    };
+    const shortName=n=>n.replace("广东","");
+    const openChart=async(id,name)=>{
+      chartId.value=id;chartName.value=name;showChart.value=true;
+      await nextTick();
+      if(!ec)ec=echarts.init(document.getElementById("ec"),null,{renderer:"canvas"});
+      loadH(4);
+    };
+    const closeChart=()=>{showChart.value=false;if(ec){ec.dispose();ec=null;}};
+    const toggleLn=t=>{chartSt.value[t].on=!chartSt.value[t].on;ec.dispatchAction({type:"legendToggleSelect",name:t});};
+    const loadH=async(h,showL=true)=>{
+      chartHr.value=h;
+      const li=theme.value==="km";
+      if(showL&&ec)ec.showLoading({text:"加载中...",color:"#6366f1",textColor:li?"#0f172a":"#f8fafc",maskColor:li?"rgba(255,255,255,.5)":"rgba(15,23,42,.5)"});
+      try{
+        const data=await fetch("/api/ping_history?server_id="+chartId.value+"&hours="+h).then(r=>r.json())||[];
+        const tm={};const tgts=new Set();
+        data.forEach(item=>{
+          const ts=(item.time||"").substring(0,16).replace("T"," ");
+          if(!tm[ts])tm[ts]={};
+          const tgt=item.target||item.target_name||"未知";
+          if(!tm[ts][tgt])tm[ts][tgt]={s:0,c:0,f:0};
+          const dv=item.delay||item.avg_delay||item.avg||0;
+          if(dv>0){tm[ts][tgt].s+=dv;tm[ts][tgt].c++;}else tm[ts][tgt].f++;
+          tgts.add(tgt);
+        });
+        const times=Object.keys(tm).sort();
+        const labels=times.map(t=>t.slice(11,16));
+        const colors=["#6366f1","#10b981","#f43f5e","#f59e0b","#0ea5e9","#8b5cf6"];
+        const stats={};const series=[];
+        Array.from(tgts).forEach((tgt,i)=>{
+          const c=colors[i%colors.length];
+          const pts=[];let sd=0,sc=0,sf=0,sn=0;
+          times.forEach(t=>{
+            const p=tm[t][tgt];
+            if(!p){pts.push(null);return;}
+            sn+=(p.c+p.f);sf+=p.f;
+            pts.push((p.f>0||p.c===0)?null:p.s/p.c);
+            if(p.c>0){sd+=p.s;sc+=p.c;}
+          });
+          stats[tgt]={c,on:true,avg:sc>0?sd/sc:0,loss:sn>0?sf/sn*100:0};
+          series.push({name:tgt,type:"line",smooth:true,connectNulls:false,symbol:"none",
+            itemStyle:{color:c},lineStyle:{width:2.5},
+            areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:c+"30"},{offset:1,color:c+"00"}])},
+            data:pts});
+        });
+        chartSt.value=stats;
+        ec.setOption({
+          backgroundColor:"transparent",
+          tooltip:{trigger:"axis",axisPointer:{type:"cross"},
+            backgroundColor:li?"rgba(255,255,255,.95)":"rgba(15,23,42,.95)",
+            textStyle:{color:li?"#0f172a":"#f8fafc",fontWeight:"bold"},
+            borderColor:li?"#e2e8f0":"#334155",borderWidth:1,padding:12,
+            valueFormatter:v=>v?v.toFixed(1)+" ms":"断流"},
+          legend:{show:false},
+          grid:{left:"1%",right:"3%",bottom:"2%",top:"5%",containLabel:true},
+          xAxis:{type:"category",data:labels,boundaryGap:false,
+            axisLine:{lineStyle:{color:li?"#94a3b8":"#475569"}},
+            axisLabel:{color:li?"#64748b":"#94a3b8",margin:10}},
+          yAxis:{type:"value",name:"ms",
+            nameTextStyle:{color:li?"#64748b":"#94a3b8"},
+            splitLine:{lineStyle:{color:li?"#e2e8f0":"#1e293b",type:"dashed"}},
+            axisLabel:{color:li?"#64748b":"#94a3b8"}},
+          series
+        },true);
+      }catch(e){}
+      if(showL&&ec)ec.hideLoading();
+    };
+    onMounted(()=>{
+      document.body.className=theme.value;
+      fetchData();
+      ft=setInterval(fetchData,2000);
+      ct=setInterval(()=>{if(showChart.value&&chartId.value)loadH(chartHr.value,false);},10000);
+    });
+    onUnmounted(()=>{clearInterval(ft);clearInterval(ct);});
+    return{servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
+      showChart,chartName,chartHr,chartSt,
+      fb,pct,daysLeft,expClr,fmtUp,trafUsed,trafPct,trafClr,
+      getPmStr,getPmClass,getLoss,getLossClass,shortName,
+      openChart,closeChart,loadH,toggleLn};
+  }
+}).mount("#app");
+</script>
+</body>
+</html>

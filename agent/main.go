@@ -20,16 +20,12 @@ psnet "github.com/shirou/gopsutil/v3/net"
 )
 
 type PingTracker struct {
-History   []float64
-TickSum   float64
-TickCount int
-TickFails int
-LastDelay float64
+History []float64
+Last    float64
 }
 
 var (
 trackers                           = make(map[string]*PingTracker)
-tickCount                          = 0
 serverAddr, token                  string
 globalCountryCode                  = "OT"
 lastNetBytesRecv, lastNetBytesSent uint64
@@ -91,8 +87,8 @@ if n, err := psnet.IOCounters(false); err == nil && len(n) > 0 {
 status.NetInTransfer = n[0].BytesRecv
 status.NetOutTransfer = n[0].BytesSent
 if lastNetBytesRecv > 0 {
-status.NetInSpeed = (n[0].BytesRecv - lastNetBytesRecv) / 2
-status.NetOutSpeed = (n[0].BytesSent - lastNetBytesSent) / 2
+status.NetInSpeed = (n[0].BytesRecv - lastNetBytesRecv) / 60
+status.NetOutSpeed = (n[0].BytesSent - lastNetBytesSent) / 60
 }
 lastNetBytesRecv = n[0].BytesRecv
 lastNetBytesSent = n[0].BytesSent
@@ -103,13 +99,10 @@ for _, task := range instr.PingTasks {
 if val, ok := trackers[task.Name]; ok {
 newTrackers[task.Name] = val
 } else {
-newTrackers[task.Name] = &PingTracker{History: make([]float64, 0)}
+newTrackers[task.Name] = &PingTracker{History: make([]float64, 0), Last: -1}
 }
 }
 trackers = newTrackers
-
-tickCount++
-isMinuteTick := (tickCount % 30 == 0)
 
 var pingResults []common.PingResult
 for _, task := range instr.PingTasks {
@@ -117,65 +110,63 @@ delay, success := tcpPing(task.Host)
 t := trackers[task.Name]
 
 if success {
-t.LastDelay = delay
-t.TickSum += delay
-t.TickCount++
+t.Last = delay
+t.History = append(t.History, delay)
 } else {
-t.LastDelay = -1
-t.TickFails++
-}
-
-if isMinuteTick {
-if t.TickCount > 0 {
-t.History = append(t.History, t.TickSum/float64(t.TickCount))
-} else {
+t.Last = -1
 t.History = append(t.History, -1)
 }
 if len(t.History) > 60 {
-t.History = t.History[1:]
-}
-t.TickSum = 0
-t.TickCount = 0
-t.TickFails = 0
+t.History = t.History[len(t.History)-60:]
 }
 
-fails := 0
+var sum float64
+valid := 0
+fail := 0
 for _, v := range t.History {
-if v < 0 { fails++ }
+if v > 0 {
+sum += v
+valid++
+} else {
+fail++
+}
+}
+avg := 0.0
+if valid > 0 {
+avg = sum / float64(valid)
 }
 loss := 0.0
 if len(t.History) > 0 {
-loss = float64(fails) / float64(len(t.History)) * 100.0
+loss = float64(fail) / float64(len(t.History)) * 100.0
 }
-
-var avgDelay float64
-validCount := 0
-for _, v := range t.History {
-if v > 0 { avgDelay += v; validCount++ }
-}
-if validCount > 0 { avgDelay /= float64(validCount) }
 
 pingResults = append(pingResults, common.PingResult{
 TargetName:   task.Name,
-CurrentDelay: t.LastDelay,
-AvgDelay:     avgDelay,
+CurrentDelay: t.Last,
+AvgDelay:     avg,
 LossRate:     loss,
-History:      t.History,
+History:      append([]float64(nil), t.History...),
 })
 }
 
 status.PingStatuses = pingResults
-if err := conn.WriteJSON(status); err != nil { return }
-time.Sleep(2 * time.Second)
+if err := conn.WriteJSON(status); err != nil {
+return
+}
+time.Sleep(60 * time.Second)
 }
 }
 
 func tcpPing(host string) (float64, bool) {
 addr := host
-if !strings.Contains(addr, ":") { addr = addr + ":80" }
+if !strings.Contains(addr, ":") {
+addr += ":80"
+}
 start := time.Now()
 conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
-if err != nil { return 0, false }
+if err != nil {
+return 0, false
+}
 conn.Close()
 return float64(time.Since(start).Milliseconds()), true
 }

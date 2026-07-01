@@ -32,7 +32,117 @@ func initDB() { db, _ = sql.Open("sqlite", "data.db"); db.Exec(`CREATE TABLE IF 
 func saveHistoryToDB() { mapMutex.RLock(); defer mapMutex.RUnlock(); tx, _ := db.Begin(); defer tx.Commit(); stmt, _ := tx.Prepare("INSERT INTO ping_history (server_id, target_name, delay, loss_rate) VALUES (?, ?, ?, ?)"); defer stmt.Close(); for serverID, status := range serverStatusMap { if !status.IsOnline { continue }; for _, ping := range status.PingStatuses { stmt.Exec(serverID, ping.TargetName, ping.CurrentDelay, ping.LossRate) } } }
 func loadConfig() { data, err := os.ReadFile("config.json"); if err == nil { json.Unmarshal(data, &appConfig) } else { appConfig = AppConfig{ SiteName: "探针看板", AdminUser: "admin", AdminPass: "123456", Nodes: []common.NodeConfig{ {ID: "node-1", Name: "主控测试机", Token: "my_secret_token_123", ExpireDate: "2027/05/13", Region: "CN"} }, PingTasks: []common.PingTask{ {Name: "Cloudflare", Host: "1.1.1.1"}, {Name: "Google", Host: "8.8.8.8"} } }; data, _ := json.MarshalIndent(appConfig, "", "  "); os.WriteFile("config.json", data, 0644) }; if appConfig.AdminUser == "" { appConfig.AdminUser = "admin" }; if appConfig.AdminPass == "" { appConfig.AdminPass = "123456" }; if appConfig.SiteName == "" { appConfig.SiteName = "探针看板" } }
 var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+
 type FrontendNode struct { common.NodeConfig; Status common.ServerStatus `json:"status"` }
+
+func buildCardPingStatuses(serverID string) []common.CardPingStatus {
+rows, err := db.Query(`SELECT datetime(timestamp, 'localtime'), target_name, delay FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', '-1 hours') ORDER BY timestamp ASC`, serverID)
+if err != nil {
+return []common.CardPingStatus{}
+}
+defer rows.Close()
+
+type item struct {
+t string
+target string
+delay float64
+}
+var items []item
+targetSet := map[string]bool{}
+for rows.Next() {
+var it item
+rows.Scan(&it.t, &it.target, &it.delay)
+if len(it.t) >= 16 {
+it.t = it.t[:16]
+}
+items = append(items, it)
+targetSet[it.target] = true
+}
+
+minutes := make([]string, 0, 60)
+now := time.Now().Truncate(time.Minute)
+for i := 59; i >= 0; i-- {
+minutes = append(minutes, now.Add(-time.Duration(i)*time.Minute).Format("2006-01-02 15:04"))
+}
+
+bucket := map[string]map[string]float64{}
+for _, it := range items {
+if _, ok := bucket[it.target]; !ok {
+bucket[it.target] = map[string]float64{}
+}
+bucket[it.target][it.t] = it.delay
+}
+
+configMutex.RLock()
+taskOrder := make([]string, 0, len(appConfig.PingTasks))
+for _, t := range appConfig.PingTasks {
+taskOrder = append(taskOrder, t.Name)
+targetSet[t.Name] = true
+}
+configMutex.RUnlock()
+
+ordered := make([]string, 0, len(targetSet))
+used := map[string]bool{}
+for _, name := range taskOrder {
+if targetSet[name] {
+ordered = append(ordered, name)
+used[name] = true
+}
+}
+for name := range targetSet {
+if !used[name] {
+ordered = append(ordered, name)
+}
+}
+
+out := make([]common.CardPingStatus, 0, len(ordered))
+for _, tgt := range ordered {
+hist := make([]float64, 0, 60)
+valid := 0
+fail := 0
+sum := 0.0
+seen := 0
+for _, mk := range minutes {
+v, ok := bucket[tgt][mk]
+if !ok {
+hist = append(hist, 0)
+continue
+}
+hist = append(hist, v)
+seen++
+if v > 0 {
+valid++
+sum += v
+} else {
+fail++
+}
+}
+avg := 0.0
+if valid > 0 {
+avg = sum / float64(valid)
+}
+loss := 0.0
+if seen > 0 {
+loss = float64(fail) / float64(seen) * 100.0
+}
+current := 0.0
+for i := len(hist)-1; i >= 0; i-- {
+if hist[i] != 0 {
+current = hist[i]
+break
+}
+}
+out = append(out, common.CardPingStatus{
+TargetName: tgt,
+History60: hist,
+AvgDelay1H: avg,
+LossRate1H: loss,
+CurrentDelay: current,
+})
+}
+return out
+}
+
 func main() {
 loadConfig(); initDB(); defer db.Close()
 http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "server/index.html") })
@@ -64,7 +174,7 @@ for { if err := conn.ReadJSON(&st); err != nil { mapMutex.Lock(); st = serverSta
 })
 http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 w.Header().Set("Content-Type", "application/json"); configMutex.RLock(); mapMutex.RLock(); var nodes []FrontendNode
-for _, n := range appConfig.Nodes { nodes = append(nodes, FrontendNode{ NodeConfig: n, Status: serverStatusMap[n.ID] }) }
+for _, n := range appConfig.Nodes { st := serverStatusMap[n.ID]; st.CardPingStatuses = buildCardPingStatuses(n.ID); nodes = append(nodes, FrontendNode{ NodeConfig: n, Status: st }) }
 json.NewEncoder(w).Encode(map[string]interface{}{ "site_name": appConfig.SiteName, "nodes": nodes, "ping_tasks": appConfig.PingTasks}); mapMutex.RUnlock(); configMutex.RUnlock()
 })
 http.HandleFunc("/api/ping_history", func(w http.ResponseWriter, r *http.Request) {
