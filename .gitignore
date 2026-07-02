@@ -7,3 +7,8 @@ server.log
 data.db
 config.json
 server.log
+
+# runtime state
+usage_state.json
+usage_state.json.bak.*
+server/*.bak
