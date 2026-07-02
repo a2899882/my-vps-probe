@@ -83,7 +83,7 @@
     .node-list{display:flex;flex-direction:column;gap:10px}
     .node-row{
       display:grid;
-      grid-template-columns:28px minmax(220px,1.4fr) minmax(140px,.9fr) minmax(110px,.7fr) auto auto;
+      grid-template-columns:28px minmax(220px,1.1fr) minmax(180px,1fr) minmax(140px,.75fr) minmax(170px,.95fr) auto auto;
       gap:10px;
       align-items:center;
       padding:12px;
@@ -252,11 +252,18 @@
               <div class="sub mono">{{ node.id }}</div>
             </div>
 
-            <div style="display:flex;gap:8px;align-items:center">
-              <input class="inp" v-model.trim="node._ed" placeholder="2027/01/01">
-              <span :class="['expire-badge', expireBadgeClass(node)]">{{ expireBadgeText(node) }}</span>
+            <div style="display:flex;align-items:center;gap:6px;min-width:0">
+              <span class="sub" style="min-width:48px;flex:0 0 48px">到期日</span>
+              <input class="inp" style="flex:1;min-width:0;width:100%" v-model.trim="node._ed" placeholder="2027/01/01" title="到期日期">
             </div>
-            <input class="inp" type="number" min="0" v-model.number="node._tl" placeholder="0">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0">
+              <span class="sub" style="min-width:48px;flex:0 0 48px">重置日</span>
+              <input class="inp" style="flex:1;min-width:0;width:100%" type="number" min="1" max="28" v-model.number="node._rd" placeholder="1" title="流量重置日">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;min-width:0">
+              <span class="sub" style="min-width:56px;flex:0 0 56px">月流量</span>
+              <input class="inp" style="flex:1;min-width:0;width:100%" type="number" min="0" v-model.number="node._tl" placeholder="0" title="月流量 GB">
+            </div>
             <button class="btn btn-green" @click="copyDeploy(node)">部署</button>
             <button class="btn btn-red" @click="removeNodeById(node.id)">删除</button>
           </div>
@@ -345,21 +352,25 @@ createApp({
         host: t.host || ''
       }));
       cfg.nodes = (d.nodes || []).map(n => {
-        let ed = '2027/01/01', tl = 0;
+        let ed = '2027/01/01', tl = 0, rd = 1;
         const raw = String(n.expire_date || '');
         if (raw.includes('|')) {
           const p = raw.split('|');
           ed = p[0] || '2027/01/01';
           tl = parseInt(p[1], 10) || 0;
+          rd = parseInt(p[2], 10) || 1;
         } else {
           ed = raw || '2027/01/01';
         }
+        if (!rd || rd < 1) rd = 1;
+        if (rd > 28) rd = 28;
         return {
           id: n.id || genId(),
           name: n.name || '',
           token: n.token || '',
           _ed: ed,
-          _tl: tl
+          _tl: tl,
+          _rd: rd
         };
       });
     };
@@ -476,7 +487,7 @@ createApp({
           id: n.id,
           name: n.name,
           token: n.token,
-          expire_date: n._tl > 0 ? `${n._ed}|${n._tl}` : n._ed
+          expire_date: `${n._ed}|${parseInt(n._tl || 0, 10) || 0}|${Math.max(1, Math.min(28, parseInt(n._rd || 1, 10) || 1))}`
         }));
 
         const r = await fetch('/api/admin/config', {
@@ -520,7 +531,8 @@ createApp({
         name: '',
         token: 'secret_' + Math.random().toString(36).slice(2,8),
         _ed: '2027/01/01',
-        _tl: 0
+        _tl: 0,
+        _rd: 1
       });
       nodeKeyword.value = '';
       nodeSort.value = 'manual';

@@ -133,8 +133,8 @@ body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-i
       </div>
       <div v-if="nd._tlim>0" class="pt-2 mt-1 border-t dv relative z-20">
         <div class="flex justify-between mb-1 text-[10px] font-bold">
-          <span class="t4">&#x5F53;&#x6708;&#x6D41;&#x91CF; <span class="opacity-50 text-[9px]">({{ nd._tlim }}GB)</span></span>
-          <span class="jm" :class="trafPct(nd)>=90?'text-red-400':'t2'">{{ trafUsed(nd) }} | {{ trafPct(nd) }}%</span>
+          <span class="t4">本月流量 <span class="opacity-50 text-[9px]">(每月{{ nd._rd }}日 / {{ trafficLimit(nd) }})</span></span>
+          <span class="jm" :class="trafPct(nd)>=90?'text-red-400':'t2'">已用 {{ monthUsed(nd) }} · 剩余 {{ monthRemain(nd) }}</span>
         </div>
         <div class="ptr bg-black/10"><div class="h-full bt" :class="trafClr(trafPct(nd))" :style="'width:'+trafPct(nd)+'%'"></div></div>
       </div>
@@ -244,10 +244,14 @@ createApp({
         siteName.value=d.site_name||"探针看板";
         document.title=siteName.value;
         (d.nodes||[]).forEach(n=>{
-          n._exp="2027/01/01";n._tlim=0;
+          n._exp="2027/01/01";
+          n._tlim=parseInt(n.traffic_limit_gb)||0;
+          n._rd=parseInt(n.reset_day)||1;
           const raw=String(n.expire_date||"");
-          if(raw.includes("|")){const p=raw.split("|");n._exp=p[0]||"2027/01/01";n._tlim=parseInt(p[1])||0;}
+          if(raw.includes("|")){const p=raw.split("|");n._exp=p[0]||"2027/01/01";if(!n._tlim)n._tlim=parseInt(p[1])||0;if(p[2])n._rd=parseInt(p[2])||1;}
           else if(raw&&!raw.includes("NaN"))n._exp=raw;
+          if(!n._rd||n._rd<1)n._rd=1;
+          if(n._rd>28)n._rd=28;
         });
         servers.value=d.nodes||[];
       }catch(e){}
@@ -263,8 +267,11 @@ createApp({
     const expTxt=d=>{if(d==="∞"||isNaN(+d))return"∞";if(+d<=0)return"已到期";return "余 " + d + " 天";};
     const expClr=d=>{if(d==="∞"||isNaN(+d))return"text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30";if(+d<=0)return"text-[#ef4444] bg-[#ef4444]/14 border border-[#ef4444]/35";if(+d<=3)return"text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30";if(+d<=7)return"text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30";return"text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30";};
     const fmtUp=s=>{if(!s)return"离线";const d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d>0?d+"天"+h+"小时":h+"小时";};
-    const trafUsed=n=>fb(((n.status&&n.status.net_out_transfer)||0)+((n.status&&n.status.net_in_transfer)||0));
-    const trafPct=n=>{if(!n._tlim)return 0;const u=((n.status&&n.status.net_out_transfer)||0)+((n.status&&n.status.net_in_transfer)||0);return Math.min(+(u/(n._tlim*1073741824)*100).toFixed(1),100);};
+    const trafficLimit=n=>{const lim=parseInt(n.traffic_limit_gb ?? n._tlim ?? 0,10)||0;return lim>0?(lim+"GB"):"不限";};
+    const monthBytes=n=>Number(n.month_used||0);
+    const monthUsed=n=>fb(monthBytes(n));
+    const monthRemain=n=>{const lim=parseInt(n.traffic_limit_gb ?? n._tlim ?? 0,10)||0;if(!lim)return"不限";return fb(Math.max(lim*1073741824-monthBytes(n),0));};
+    const trafPct=n=>{const lim=parseInt(n.traffic_limit_gb ?? n._tlim ?? 0,10)||0;if(!lim)return 0;return Math.min(+((monthBytes(n)/(lim*1073741824)*100).toFixed(1)),100);};
     const trafClr=p=>+p>=90?"bg-[#ef4444]":+p>=75?"bg-[#f59e0b]":"bg-[#8b5cf6]";
     // Ping: history[]存ms浮点(>0连通)或0(断流)
     const getPmStr=ps=>{
@@ -373,7 +380,7 @@ createApp({
     onUnmounted(()=>{clearInterval(ft);clearInterval(ct);});
     return{servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
       showChart,chartName,chartHr,chartSt,
-      fb,pct,daysLeft,expTxt,expClr,fmtUp,trafUsed,trafPct,trafClr,
+      fb,pct,daysLeft,expTxt,expClr,fmtUp,trafficLimit,monthUsed,monthRemain,trafPct,trafClr,
       getPmStr,getPmClass,getLoss,getLossClass,shortName,
       openChart,closeChart,loadH,toggleLn};
   }
