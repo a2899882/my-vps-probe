@@ -54,6 +54,9 @@ User=root
 WantedBy=multi-user.target
 EOF
 
+echo "==> 5.5 install tz menu"
+install -m 755 "${INSTALL_DIR}/scripts/tz.sh" /usr/local/bin/tz
+
 echo "==> 6. enable service"
 systemctl daemon-reload
 systemctl enable ${SERVICE_NAME}
