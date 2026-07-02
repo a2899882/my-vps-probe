@@ -33,7 +33,7 @@ body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-
 .node-row:hover{border-color:rgba(99,102,241,.28);box-shadow:0 8px 28px rgba(15,23,42,.18)}
 .node-row-main{display:grid;grid-template-columns:minmax(240px,1.5fr) minmax(300px,1fr) auto;gap:12px;align-items:center;padding:12px 14px}
 .node-left{display:flex;align-items:center;gap:10px;min-width:0}
-.node-mid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;min-width:0}
+.node-mid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
 .node-actions{display:flex;align-items:center;gap:8px}
 .node-order{font-size:10px;font-family:'JetBrains Mono',monospace;padding:2px 8px;border-radius:999px;background:rgba(99,102,241,.12);color:#818cf8;font-weight:900;white-space:nowrap}
 .node-name-compact{width:100%;min-width:0;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-weight:800;outline:none}
@@ -49,7 +49,7 @@ body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-
 .drag-handle{cursor:grab;color:rgba(148,163,184,.35);transition:color .18s;display:flex;align-items:center;padding:2px}
 .drag-handle:hover{color:rgba(148,163,184,.8)}
 .sortable-ghost{opacity:.3;border:2px dashed rgba(99,102,241,.5)!important}
-.ping-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px}
+.ping-card{background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px}
 .deploy-code{background:rgba(0,0,0,.4);border:1px solid rgba(99,102,241,.15);border-radius:7px;padding:8px 12px;font-size:11px;color:#a5b4fc;font-family:'JetBrains Mono',monospace;word-break:break-all;line-height:1.6;max-height:64px;overflow:hidden}
 .toast{position:fixed;bottom:28px;right:28px;padding:12px 20px;border-radius:10px;font-weight:700;font-size:13px;z-index:9999;pointer-events:none;animation:tIn .3s ease}
 .tok{background:rgba(16,185,129,.92);color:#fff}
@@ -130,14 +130,42 @@ body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-
     </div>
 
     <!-- 节点 + Ping -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      <div class="lg:col-span-2 glass p-5">
+    <div class="glass p-3 mb-5" style="display:flex;align-items:center;gap:10px">
+      <button
+        @click="adminTab='nodes'"
+        :class="adminTab==='nodes' ? 'btn-add btn-blue' : 'btn-copy'"
+        style="padding:8px 14px;font-size:12px"
+      >节点管理</button>
+      <button
+        @click="adminTab='ping'"
+        :class="adminTab==='ping' ? 'btn-add btn-green' : 'btn-copy'"
+        style="padding:8px 14px;font-size:12px"
+      >Ping监测</button>
+    </div>
+    <div class="space-y-5">
+      <div v-show="adminTab==='nodes'" class="glass p-5">
         <div class="flex items-center justify-between mb-4">
           <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#818cf8">🖥 被控节点管理 ({{ cfg.nodes.length }}台)</span>
           <button @click="addNode" class="btn-add btn-blue">+ 新增节点</button>
         </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <div class="md:col-span-2">
+            <label class="lbl">搜索节点</label>
+            <input class="inp" v-model="nodeKeyword" placeholder="名称 / ID / 到期日期"/>
+          </div>
+          <div>
+            <label class="lbl">排序方式</label>
+            <select class="inp" v-model="nodeSort" style="font-family:'Noto Sans SC',sans-serif">
+              <option value="manual">手动排序</option>
+              <option value="name_asc">名称 A → Z</option>
+              <option value="name_desc">名称 Z → A</option>
+              <option value="expire_asc">到期从近到远</option>
+              <option value="expire_desc">到期从远到近</option>
+            </select>
+          </div>
+        </div>
         <div id="node-sortable" class="node-list">
-          <div v-for="(node,idx) in cfg.nodes" :key="node.id" class="node-row">
+          <div v-for="(node,idx) in filteredNodes" :key="node.id" class="node-row">
             <div class="node-row-main">
               <div class="node-left">
                 <div class="drag-handle" title="拖拽排序">
@@ -155,45 +183,26 @@ body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-
                   <span class="mini-label">流量GB</span>
                   <input class="mini-inp" type="number" v-model.number="node._tl" min="0" placeholder="0"/>
                 </div>
-                <div class="mini-field token-preview">
-                  <span class="mini-label">Token</span>
-                  <span class="mono">{{ (node.token||'').slice(0,12) }}{{ (node.token||'').length>12 ? '...' : '' }}</span>
-                </div>
-              </div>
+</div>
               <div class="node-actions">
-                <button @click="node._open=!node._open" class="btn-copy">{{ node._open ? '收起' : '编辑' }}</button>
                 <button @click="copyDeploy(node)" class="btn-copy">📋 部署</button>
-                <button @click="removeNode(idx)" class="btn-del">✕</button>
+                <button @click="removeNodeById ? removeNodeById(node.id) : removeNode(idx)" class="btn-del">✕</button>
               </div>
             </div>
-            <div v-if="node._open" class="node-row-detail">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>
-                  <label class="lbl">节点 ID</label>
-                  <input class="inp mono" :value="node.id" readonly style="opacity:.55;cursor:not-allowed;font-size:10px"/>
-                </div>
-                <div>
-                  <label class="lbl">通信 Token</label>
-                  <input class="inp mono" v-model="node.token"/>
-                </div>
-              </div>
-              <div style="margin-top:10px">
-                <label class="lbl">一键部署命令</label>
-                <div class="deploy-code" :title="deployCmd(node)">{{ deployCmd(node) }}</div>
-              </div>
-            </div>
+</div>
           </div>
         </div>
         <div v-if="cfg.nodes.length===0" style="text-align:center;padding:40px;color:rgba(148,163,184,.3);font-size:13px">暂无节点，点击「新增节点」</div>
+        <div v-else-if="filteredNodes.length===0" style="text-align:center;padding:28px;color:rgba(148,163,184,.45);font-size:13px">没有匹配的节点</div>
       </div>
 
-      <div class="lg:col-span-1 glass p-5">
+      <div v-show="adminTab==='ping'" class="glass p-5">
         <div class="flex items-center justify-between mb-4">
           <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#34d399">🌐 Ping 监测目标 ({{ cfg.ping_tasks.length }}个)</span>
           <button @click="addPing" class="btn-add btn-green">+ 新增</button>
         </div>
         <div style="font-size:10px;color:rgba(148,163,184,.4);margin-bottom:10px">TCP 连接探测（端口默认 :80）</div>
-        <div class="space-y-3">
+        <div class="space-y-2">
           <div v-for="(t,i) in cfg.ping_tasks" :key="i" class="ping-card">
             <div class="flex justify-between items-center mb-2">
               <span style="font-size:11px;font-weight:900;color:#34d399">目标 #{{ i+1 }}</span>
@@ -212,7 +221,7 @@ body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-
   <div v-if="toast.show" :class="['toast', toast.ok?'tok':'terr']">{{ toast.msg }}</div>
 </div>
 <script>
-const {createApp,ref,reactive,onMounted,nextTick} = Vue;
+const {createApp,ref,reactive,onMounted,nextTick,computed} = Vue;
 createApp({
   setup(){
     // ─── 登录态（内存变量 + sessionStorage 仅当前标签页复用）
@@ -226,7 +235,41 @@ createApp({
 
     const cfg = reactive({site_name:'',admin_user:'admin',admin_pass:'',nodes:[],ping_tasks:[]});
     const toast = reactive({show:false,ok:true,msg:''});
+    const adminTab = ref('nodes');
+    const nodeKeyword = ref('');
+    const nodeSort = ref('manual');
     let sortable = null;
+
+    const parseDateScore = (s) => {
+      const m = String(s||'').trim().match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+      if(!m) return 0;
+      return Number(m[1])*10000 + Number(m[2])*100 + Number(m[3]);
+    };
+
+    const filteredNodes = computed(() => {
+      const kw = nodeKeyword.value.trim().toLowerCase();
+      let arr = cfg.nodes.map((n, idx) => ({...n, _idx: idx}));
+      if(kw){
+        arr = arr.filter(n =>
+          String(n.name||'').toLowerCase().includes(kw) ||
+          String(n.id||'').toLowerCase().includes(kw) ||
+          String(n.token||'').toLowerCase().includes(kw) ||
+          String(n._ed||'').toLowerCase().includes(kw)
+        );
+      }
+      if(nodeSort.value === 'name_asc'){
+        arr.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hans-CN'));
+      }else if(nodeSort.value === 'name_desc'){
+        arr.sort((a,b)=>String(b.name||'').localeCompare(String(a.name||''),'zh-Hans-CN'));
+      }else if(nodeSort.value === 'expire_asc'){
+        arr.sort((a,b)=>parseDateScore(a._ed)-parseDateScore(b._ed));
+      }else if(nodeSort.value === 'expire_desc'){
+        arr.sort((a,b)=>parseDateScore(b._ed)-parseDateScore(a._ed));
+      }else{
+        arr.sort((a,b)=>a._idx-b._idx);
+      }
+      return arr;
+    });
 
     const showToast = (msg, ok=true) => {
       toast.msg=msg; toast.ok=ok; toast.show=true;
@@ -264,7 +307,7 @@ createApp({
         const raw = String(n.expire_date||'');
         if(raw.includes('|')){const p=raw.split('|');ed=p[0]||'2027/01/01';tl=parseInt(p[1])||0;}
         else ed=raw||'2027/01/01';
-        return {id:n.id||genId(), name:n.name||'', token:n.token||'', _ed:ed, _tl:tl, _open:false};
+        return {id:n.id||genId(), name:n.name||'', token:n.token||'', _ed:ed, _tl:tl};
       });
     };
 
@@ -314,10 +357,14 @@ createApp({
     };
 
     const addNode = () => {
-      cfg.nodes.push({id:genId(),name:'',token:'secret_'+Math.random().toString(36).slice(2,8),_ed:'2027/01/01',_tl:0,_open:true});
+      cfg.nodes.push({id:genId(),name:'',token:'secret_'+Math.random().toString(36).slice(2,8),_ed:'2027/01/01',_tl:0});
       nextTick(()=>initSortable());
     };
     const removeNode = i => cfg.nodes.splice(i,1);
+    const removeNodeById = id => {
+      const i = cfg.nodes.findIndex(n => n.id === id);
+      if(i >= 0) cfg.nodes.splice(i,1);
+    };
     const addPing = () => cfg.ping_tasks.push({name:'',host:''});
     const removePing = i => cfg.ping_tasks.splice(i,1);
 
@@ -327,8 +374,7 @@ createApp({
         .then(()=>showToast('✅ 部署命令已复制！'))
         .catch(()=>showToast('❌ 复制失败',false));
     };
-
-    const initSortable = () => {
+const initSortable = () => {
       const el = document.getElementById('node-sortable');
       if(!el) return;
       if(sortable) sortable.destroy();
@@ -345,7 +391,7 @@ createApp({
     onMounted(()=>tryAutoLogin());
 
     return {authed,loginUser,loginPass,loginErr,loginLoading,loginShake,doLogin,
-      cfg,toast,saveConfig,addNode,removeNode,addPing,removePing,deployCmd,copyDeploy};
+      cfg,toast,adminTab,nodeKeyword,nodeSort,filteredNodes,saveConfig,addNode,removeNode,removeNodeById,addPing,removePing,deployCmd,copyDeploy};
   }
 }).mount('#app');
 </script>
