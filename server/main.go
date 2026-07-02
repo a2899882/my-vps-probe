@@ -156,8 +156,37 @@ w.Header().Set("Content-Type", "application/json")
 if r.Method == "GET" { configMutex.RLock(); safeConfig := appConfig; safeConfig.AdminPass = ""; json.NewEncoder(w).Encode(safeConfig); configMutex.RUnlock() } else if r.Method == "POST" {
 var newConfig AppConfig; if err := json.NewDecoder(r.Body).Decode(&newConfig); err == nil { 
 configMutex.Lock(); if newConfig.AdminPass == "" { newConfig.AdminPass = appConfig.AdminPass }; appConfig = newConfig; data, _ := json.MarshalIndent(appConfig, "", "  "); os.WriteFile("config.json", data, 0644); configMutex.Unlock()
-// 【关键】强制切断所有 Agent 连接，让它们重连获取新配置
-connMutex.Lock(); for _, conn := range activeConns { conn.Close() }; connMutex.Unlock()
+// 热下发新配置：不强制断开在线 Agent，直接推送最新指令
+configMutex.RLock()
+pTasks := appConfig.PingTasks
+nodeNameMap := map[string]string{}
+for _, n := range appConfig.Nodes { nodeNameMap[n.ID] = n.Name }
+configMutex.RUnlock()
+
+connMutex.Lock()
+for id, conn := range activeConns {
+    name, ok := nodeNameMap[id]
+    if !ok {
+        conn.Close()
+        delete(activeConns, id)
+        mapMutex.Lock()
+        st := serverStatusMap[id]
+        st.IsOnline = false
+        serverStatusMap[id] = st
+        mapMutex.Unlock()
+        continue
+    }
+    if err := conn.WriteJSON(common.AgentInstruction{ServerName: name, PingTasks: pTasks}); err != nil {
+        conn.Close()
+        delete(activeConns, id)
+        mapMutex.Lock()
+        st := serverStatusMap[id]
+        st.IsOnline = false
+        serverStatusMap[id] = st
+        mapMutex.Unlock()
+    }
+}
+connMutex.Unlock()
 w.Write([]byte(`{"status":"ok"}`)) 
 }
 }

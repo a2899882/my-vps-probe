@@ -1,329 +1,401 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>探针中枢管理台</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans SC',sans-serif;background:#080c14;color:#e2e8f0;min-height:100vh;padding:20px}
-.mono{font-family:'JetBrains Mono',monospace}
-.glass{background:rgba(255,255,255,0.038);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,0.075);border-radius:14px}
-.inp{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s,box-shadow .2s}
-.inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
-.inp::placeholder{color:rgba(148,163,184,.3)}
-.lbl{font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:block}
-.btn-save{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:800;font-size:13px;padding:10px 24px;border-radius:10px;border:none;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,.3);display:inline-flex;align-items:center;gap:7px;transition:opacity .18s,transform .12s}
-.btn-save:hover{opacity:.88;transform:translateY(-1px)}
-.btn-add{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;transition:all .18s;border:1px solid transparent}
-.btn-blue{background:rgba(99,102,241,.1);color:#818cf8;border-color:rgba(99,102,241,.25)}
-.btn-blue:hover{background:rgba(99,102,241,.2);border-color:rgba(99,102,241,.45)}
-.btn-green{background:rgba(16,185,129,.09);color:#34d399;border-color:rgba(16,185,129,.25)}
-.btn-green:hover{background:rgba(16,185,129,.18);border-color:rgba(16,185,129,.45)}
-.btn-del{background:transparent;border:1px solid rgba(239,68,68,.18);color:#f87171;padding:4px 10px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;transition:all .18s}
-.btn-del:hover{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.4)}
-.btn-copy{background:transparent;border:1px solid rgba(99,102,241,.2);color:#818cf8;padding:4px 10px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;transition:all .18s}
-.btn-copy:hover{background:rgba(99,102,241,.12)}
-.node-list{display:flex;flex-direction:column;gap:10px}
-.node-row{background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;transition:border-color .18s,box-shadow .18s,transform .12s}
-.node-row:hover{border-color:rgba(99,102,241,.28);box-shadow:0 8px 28px rgba(15,23,42,.18)}
-.node-row-main{display:grid;grid-template-columns:minmax(240px,1.5fr) minmax(300px,1fr) auto;gap:12px;align-items:center;padding:12px 14px}
-.node-left{display:flex;align-items:center;gap:10px;min-width:0}
-.node-mid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
-.node-actions{display:flex;align-items:center;gap:8px}
-.node-order{font-size:10px;font-family:'JetBrains Mono',monospace;padding:2px 8px;border-radius:999px;background:rgba(99,102,241,.12);color:#818cf8;font-weight:900;white-space:nowrap}
-.node-name-compact{width:100%;min-width:0;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:10px 12px;color:#e2e8f0;font-size:13px;font-weight:800;outline:none}
-.node-name-compact:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
-.mini-field{display:flex;align-items:center;gap:8px;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}
-.mini-label{font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
-.mini-inp{width:100%;min-width:0;background:transparent;border:none;outline:none;color:#e2e8f0;font-size:12px;font-family:'JetBrains Mono',monospace}
-.token-preview{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden}
-.token-preview .mono{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#a5b4fc;font-size:12px}
-.node-row-detail{padding:0 14px 14px 14px;border-top:1px dashed rgba(148,163,184,.12);background:rgba(2,6,23,.16)}
-@media (max-width: 1024px){.node-row-main{grid-template-columns:1fr}.node-mid{grid-template-columns:1fr 1fr}.node-actions{justify-content:flex-end}}
-@media (max-width: 640px){.node-mid{grid-template-columns:1fr}.node-actions{justify-content:space-between}}
-.drag-handle{cursor:grab;color:rgba(148,163,184,.35);transition:color .18s;display:flex;align-items:center;padding:2px}
-.drag-handle:hover{color:rgba(148,163,184,.8)}
-.sortable-ghost{opacity:.3;border:2px dashed rgba(99,102,241,.5)!important}
-.ping-card{background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px}
-.deploy-code{background:rgba(0,0,0,.4);border:1px solid rgba(99,102,241,.15);border-radius:7px;padding:8px 12px;font-size:11px;color:#a5b4fc;font-family:'JetBrains Mono',monospace;word-break:break-all;line-height:1.6;max-height:64px;overflow:hidden}
-.toast{position:fixed;bottom:28px;right:28px;padding:12px 20px;border-radius:10px;font-weight:700;font-size:13px;z-index:9999;pointer-events:none;animation:tIn .3s ease}
-.tok{background:rgba(16,185,129,.92);color:#fff}
-.terr{background:rgba(239,68,68,.92);color:#fff}
-@keyframes tIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(10px);z-index:999;display:flex;align-items:center;justify-content:center}
-.login-box{background:#0f1623;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:40px;width:400px;box-shadow:0 24px 60px rgba(0,0,0,.7);animation:loginIn .35s cubic-bezier(.34,1.56,.64,1)}
-@keyframes loginIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
-.login-inp{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:12px 14px;color:#e2e8f0;font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s;font-family:'JetBrains Mono',monospace;margin-bottom:14px}
-.login-inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.18)}
-.login-btn{width:100%;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:800;font-size:14px;padding:13px;border-radius:10px;border:none;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,.3);transition:opacity .18s,transform .12s;margin-top:4px}
-.login-btn:hover{opacity:.88;transform:translateY(-1px)}
-.shake{animation:shake .4s ease}
-@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Probe Admin</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <style>
+    [v-cloak]{display:none}
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:#0f172a;
+      color:#e2e8f0;
+      font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    .wrap{max-width:1180px;margin:0 auto;padding:24px}
+    .card{
+      background:rgba(15,23,42,.92);
+      border:1px solid rgba(148,163,184,.16);
+      border-radius:16px;
+      padding:18px;
+      box-shadow:0 10px 30px rgba(2,6,23,.28);
+      backdrop-filter:blur(10px);
+    }
+    .mb16{margin-bottom:16px}
+    .mb20{margin-bottom:20px}
+    .title{
+      font-size:13px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:#a5b4fc;
+      margin-bottom:12px;
+    }
+    .grid{display:grid;gap:12px}
+    .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .lbl{display:block;margin-bottom:6px;color:#94a3b8;font-size:12px}
+    .inp,.sel{
+      width:100%;
+      height:40px;
+      border-radius:10px;
+      border:1px solid rgba(148,163,184,.18);
+      background:#111827;
+      color:#e5e7eb;
+      padding:0 12px;
+      outline:none;
+    }
+    .inp:focus,.sel:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    .row{display:flex;gap:10px;align-items:center}
+    .between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .btn{
+      height:38px;
+      border:none;
+      border-radius:10px;
+      padding:0 14px;
+      cursor:pointer;
+      color:#fff;
+      font-weight:700;
+      background:#334155;
+    }
+    .btn:hover{filter:brightness(1.06)}
+    .btn-blue{background:#4f46e5}
+    .btn-green{background:#059669}
+    .btn-red{background:#dc2626}
+    .btn-ghost{
+      background:rgba(99,102,241,.10);
+      color:#c7d2fe;
+      border:1px solid rgba(99,102,241,.18);
+    }
+    .tabs{display:flex;gap:10px;margin:0 0 16px 0}
+    .tabs .btn{height:36px}
+    .toolbar{
+      display:grid;
+      grid-template-columns:minmax(220px,1fr) 170px auto;
+      gap:10px;
+      align-items:center;
+      margin-bottom:14px;
+    }
+    .node-list{display:flex;flex-direction:column;gap:10px}
+    .node-row{
+      display:grid;
+      grid-template-columns:28px minmax(220px,1.4fr) minmax(140px,.9fr) minmax(110px,.7fr) auto auto;
+      gap:10px;
+      align-items:center;
+      padding:12px;
+      border-radius:12px;
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(148,163,184,.10);
+    }
+    .drag-handle{
+      cursor:grab;
+      color:#94a3b8;
+      text-align:center;
+      user-select:none;
+      font-size:18px;
+      line-height:1;
+    }
+    .node-meta{min-width:0}
+    
+    .expire-badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:78px;
+      height:34px;
+      padding:0 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      white-space:nowrap;
+      border:1px solid transparent;
+    }
+    .expire-ok{
+      background:rgba(148,163,184,.10);
+      border-color:rgba(148,163,184,.20);
+      color:#cbd5e1;
+    }
+    .expire-warn{
+      background:rgba(234,179,8,.16);
+      border-color:rgba(234,179,8,.32);
+      color:#facc15;
+    }
+    .expire-danger{
+      background:rgba(239,68,68,.16);
+      border-color:rgba(239,68,68,.32);
+      color:#f87171;
+    }
+    .expire-expired{
+      background:rgba(220,38,38,.88);
+      border-color:rgba(248,113,113,.50);
+      color:#fff;
+    }
+
+    .node-meta .sub{
+      margin-top:4px;
+      color:#64748b;
+      font-size:11px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .sortable-ghost{opacity:.35}
+    .ping-list{display:flex;flex-direction:column;gap:10px}
+    .ping-card{
+      padding:12px;
+      border-radius:12px;
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(148,163,184,.10);
+    }
+    .hint{color:#94a3b8;font-size:12px}
+    .empty{
+      text-align:center;
+      color:#64748b;
+      padding:28px 12px;
+      font-size:13px;
+    }
+    .errtxt{color:#f87171;font-size:13px;margin-top:10px}
+    .toast{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      z-index:9999;
+      padding:12px 14px;
+      border-radius:12px;
+      font-weight:700;
+      color:#fff;
+      box-shadow:0 12px 30px rgba(0,0,0,.3);
+    }
+    .toast.ok{background:#059669}
+    .toast.err{background:#dc2626}
+    @media (max-width: 980px){
+      .g3{grid-template-columns:1fr}
+      .g2{grid-template-columns:1fr}
+      .toolbar{grid-template-columns:1fr}
+      .node-row{grid-template-columns:24px 1fr}
+      .node-row > *:nth-child(n+3){grid-column:2}
+    }
+  </style>
 </head>
 <body>
-<div id="app">
-
-  <!-- 登录弹窗 -->
-  <div class="login-overlay" v-if="!authed">
-    <div class="login-box" :class="loginShake?'shake':''">
-      <div class="flex items-center gap-3 mb-7">
-        <div style="background:rgba(99,102,241,.15);border-radius:10px;padding:9px">
-          <svg width="22" height="22" fill="none" stroke="#818cf8" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        </div>
-        <div>
-          <div style="font-size:17px;font-weight:900;color:#e2e8f0">探针中枢管理台</div>
-          <div style="font-size:11px;color:#475569">请输入管理员凭据</div>
-        </div>
+<div id="app" v-cloak>
+  <div class="wrap">
+    <div v-if="!authed" class="card" style="max-width:420px;margin:80px auto 0">
+      <div class="title">登录管理台</div>
+      <div class="mb16">
+        <label class="lbl">账号</label>
+        <input class="inp" v-model.trim="loginUser" autocomplete="username" placeholder="请输入账号">
       </div>
-      <div>
-        <label class="lbl" style="margin-bottom:6px">管理员账号</label>
-        <input class="login-inp" v-model="loginUser" placeholder="admin" @keyup.enter="doLogin" autocomplete="username"/>
+      <div class="mb16">
+        <label class="lbl">密码</label>
+        <input class="inp" type="password" v-model="loginPass" autocomplete="current-password" @keyup.enter="doLogin" placeholder="请输入密码">
       </div>
-      <div>
-        <label class="lbl" style="margin-bottom:6px">管理员密码</label>
-        <input class="login-inp" type="password" v-model="loginPass" placeholder="请输入密码" @keyup.enter="doLogin" autocomplete="current-password"/>
-      </div>
-      <div v-if="loginErr" style="color:#f87171;font-size:12px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-        {{ loginErr }}
-      </div>
-      <button class="login-btn" @click="doLogin" :disabled="loginLoading">
-        {{ loginLoading ? '验证中...' : '🔓 登录管理台' }}
-      </button>
-    </div>
-  </div>
-
-  <!-- 主体 -->
-  <div v-if="authed" class="w-full max-w-[1300px] mx-auto">
-    <div class="glass flex items-center justify-between px-6 py-4 mb-5">
-      <div class="flex items-center gap-3">
-        <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span style="font-size:17px;font-weight:900;color:#e2e8f0;letter-spacing:.1em">探针中枢管理台</span>
-        <span style="font-size:10px;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.2);font-family:'JetBrains Mono',monospace;font-weight:700">● {{ loginUser }}</span>
-      </div>
-      <div class="flex gap-3">
-        <a href="/" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;background:rgba(99,102,241,.1);color:#818cf8;border:1px solid rgba(99,102,241,.25);text-decoration:none">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          返回前端
-        </a>
-        <button class="btn-save" @click="saveConfig">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          保存并动态下发配置
-        </button>
-      </div>
+      <button class="btn btn-blue" style="width:100%" @click="doLogin">{{ loginLoading ? '验证中...' : '登录管理台' }}</button>
+      <div v-if="loginErr" class="errtxt">{{ loginErr }}</div>
     </div>
 
-    <!-- 基础配置 -->
-    <div class="glass p-5 mb-5">
-      <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#6366f1;margin-bottom:14px">⚙️ 基础配置</div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div><label class="lbl">网站标题</label><input class="inp" v-model="cfg.site_name" placeholder="T小K的VPS"/></div>
-        <div><label class="lbl">修改账号</label><input class="inp" v-model="cfg.admin_user" placeholder="admin"/></div>
-        <div><label class="lbl">修改密码（留空不变）</label><input class="inp" type="password" v-model="cfg.admin_pass" placeholder="留空则不修改"/></div>
-      </div>
-    </div>
-
-    <!-- 节点 + Ping -->
-    <div class="glass p-3 mb-5" style="display:flex;align-items:center;gap:10px">
-      <button
-        @click="adminTab='nodes'"
-        :class="adminTab==='nodes' ? 'btn-add btn-blue' : 'btn-copy'"
-        style="padding:8px 14px;font-size:12px"
-      >节点管理</button>
-      <button
-        @click="adminTab='ping'"
-        :class="adminTab==='ping' ? 'btn-add btn-green' : 'btn-copy'"
-        style="padding:8px 14px;font-size:12px"
-      >Ping监测</button>
-    </div>
-    <div class="space-y-5">
-      <div v-show="adminTab==='nodes'" class="glass p-5">
-        <div class="flex items-center justify-between mb-4">
-          <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#818cf8">🖥 被控节点管理 ({{ cfg.nodes.length }}台)</span>
-          <button @click="addNode" class="btn-add btn-blue">+ 新增节点</button>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-          <div class="md:col-span-2">
-            <label class="lbl">搜索节点</label>
-            <input class="inp" v-model="nodeKeyword" placeholder="名称 / ID / 到期日期"/>
+    <template v-else>
+      <div class="card mb20">
+        <div class="title">基础配置</div>
+        <div class="grid g3">
+          <div>
+            <label class="lbl">站点名称</label>
+            <input class="inp" v-model.trim="cfg.site_name" placeholder="我的探针">
           </div>
           <div>
-            <label class="lbl">排序方式</label>
-            <select class="inp" v-model="nodeSort" style="font-family:'Noto Sans SC',sans-serif">
-              <option value="manual">手动排序</option>
-              <option value="name_asc">名称 A → Z</option>
-              <option value="name_desc">名称 Z → A</option>
-              <option value="expire_asc">到期从近到远</option>
-              <option value="expire_desc">到期从远到近</option>
-            </select>
+            <label class="lbl">管理账号</label>
+            <input class="inp" v-model.trim="cfg.admin_user" placeholder="admin">
+          </div>
+          <div>
+            <label class="lbl">修改密码（留空不变）</label>
+            <input class="inp" type="password" v-model="cfg.admin_pass" placeholder="留空则不修改">
           </div>
         </div>
-        <div id="node-sortable" class="node-list">
-          <div v-for="(node,idx) in filteredNodes" :key="node.id" class="node-row">
-            <div class="node-row-main">
-              <div class="node-left">
-                <div class="drag-handle" title="拖拽排序">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="7" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="17" r="1.5"/><circle cx="15" cy="7" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="17" r="1.5"/></svg>
-                </div>
-                <span class="node-order">#{{ idx+1 }}</span>
-                <input class="node-name-compact" v-model="node.name" placeholder="节点名称"/>
-              </div>
-              <div class="node-mid">
-                <div class="mini-field">
-                  <span class="mini-label">到期</span>
-                  <input class="mini-inp" v-model="node._ed" placeholder="2027/01/01"/>
-                </div>
-                <div class="mini-field">
-                  <span class="mini-label">流量GB</span>
-                  <input class="mini-inp" type="number" v-model.number="node._tl" min="0" placeholder="0"/>
-                </div>
-</div>
-              <div class="node-actions">
-                <button @click="copyDeploy(node)" class="btn-copy">📋 部署</button>
-                <button @click="removeNodeById ? removeNodeById(node.id) : removeNode(idx)" class="btn-del">✕</button>
-              </div>
-            </div>
-</div>
-          </div>
+        <div style="margin-top:14px">
+          <button class="btn btn-blue" @click="saveConfig">保存并动态下发配置</button>
         </div>
-        <div v-if="cfg.nodes.length===0" style="text-align:center;padding:40px;color:rgba(148,163,184,.3);font-size:13px">暂无节点，点击「新增节点」</div>
-        <div v-else-if="filteredNodes.length===0" style="text-align:center;padding:28px;color:rgba(148,163,184,.45);font-size:13px">没有匹配的节点</div>
       </div>
 
-      <div v-show="adminTab==='ping'" class="glass p-5">
-        <div class="flex items-center justify-between mb-4">
-          <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#34d399">🌐 Ping 监测目标 ({{ cfg.ping_tasks.length }}个)</span>
-          <button @click="addPing" class="btn-add btn-green">+ 新增</button>
+      <div class="tabs">
+        <button class="btn" :class="adminTab==='nodes' ? 'btn-blue' : 'btn-ghost'" @click="switchTab('nodes')">节点管理</button>
+        <button class="btn" :class="adminTab==='ping' ? 'btn-green' : 'btn-ghost'" @click="switchTab('ping')">Ping监测</button>
+      </div>
+
+      <div v-show="adminTab==='nodes'" class="card mb20">
+        <div class="between mb16">
+          <div class="title" style="margin:0">被控节点管理 ({{ cfg.nodes.length }}台)</div>
+          <button class="btn btn-blue" @click="addNode">+ 新增节点</button>
         </div>
-        <div style="font-size:10px;color:rgba(148,163,184,.4);margin-bottom:10px">TCP 连接探测（端口默认 :80）</div>
-        <div class="space-y-2">
-          <div v-for="(t,i) in cfg.ping_tasks" :key="i" class="ping-card">
-            <div class="flex justify-between items-center mb-2">
-              <span style="font-size:11px;font-weight:900;color:#34d399">目标 #{{ i+1 }}</span>
-              <button @click="removePing(i)" class="btn-del" style="padding:3px 8px;font-size:10px">✕</button>
+
+        <div class="toolbar">
+          <input class="inp" v-model.trim="nodeKeyword" placeholder="名称 / ID / 到期日期">
+          <select class="sel" v-model="nodeSort">
+            <option value="manual">手动顺序</option>
+            <option value="name_asc">名称 A-Z</option>
+            <option value="name_desc">名称 Z-A</option>
+            <option value="expire_asc">到期日期升序</option>
+            <option value="expire_desc">到期日期降序</option>
+          </select>
+          <div class="hint">搜索/排序时仅查看，拖拽排序请切回手动顺序。</div>
+        </div>
+
+        <div id="node-sortable" class="node-list" v-if="filteredNodes.length > 0">
+          <div v-for="(node,idx) in filteredNodes" :key="node.id" class="node-row">
+            <div class="drag-handle" title="拖拽排序">⋮⋮</div>
+
+            <div class="node-meta">
+              <input class="inp" v-model.trim="node.name" placeholder="节点名称">
+              <div class="sub mono">{{ node.id }}</div>
             </div>
-            <div class="space-y-2">
-              <div><label class="lbl">名称</label><input class="inp" v-model="t.name" placeholder="广东电信"/></div>
-              <div><label class="lbl">IP 或域名</label><input class="inp mono" v-model="t.host" placeholder="gd-ct-v4.ip.zstaticcdn.com"/></div>
+
+            <div style="display:flex;gap:8px;align-items:center">
+              <input class="inp" v-model.trim="node._ed" placeholder="2027/01/01">
+              <span :class="['expire-badge', expireBadgeClass(node)]">{{ expireBadgeText(node) }}</span>
+            </div>
+            <input class="inp" type="number" min="0" v-model.number="node._tl" placeholder="0">
+            <button class="btn btn-green" @click="copyDeploy(node)">部署</button>
+            <button class="btn btn-red" @click="removeNodeById(node.id)">删除</button>
+          </div>
+        </div>
+
+        <div v-if="cfg.nodes.length===0" class="empty">暂无节点，点击“新增节点”</div>
+        <div v-else-if="filteredNodes.length===0" class="empty">没有匹配的节点</div>
+      </div>
+
+      <div v-show="adminTab==='ping'" class="card">
+        <div class="between mb16">
+          <div class="title" style="margin:0;color:#6ee7b7">Ping 监测目标 ({{ cfg.ping_tasks.length }}个)</div>
+          <button class="btn btn-green" @click="addPing">+ 新增</button>
+        </div>
+        <div class="hint mb16">TCP 连接探测（端口默认 :80）</div>
+
+        <div class="ping-list" v-if="cfg.ping_tasks.length > 0">
+          <div v-for="(t,i) in cfg.ping_tasks" :key="i" class="ping-card">
+            <div class="between mb16">
+              <strong>目标 #{{ i+1 }}</strong>
+              <button class="btn btn-red" style="height:32px" @click="removePing(i)">删除</button>
+            </div>
+            <div class="grid g2">
+              <div>
+                <label class="lbl">名称</label>
+                <input class="inp" v-model.trim="t.name" placeholder="广东电信">
+              </div>
+              <div>
+                <label class="lbl">IP 或域名</label>
+                <input class="inp mono" v-model.trim="t.host" placeholder="gd-ct-v4.ip.zstaticcdn.com">
+              </div>
             </div>
           </div>
         </div>
+
+        <div v-else class="empty">暂无 Ping 目标，点击“新增”</div>
       </div>
-    </div>
+    </template>
   </div>
 
-  <div v-if="toast.show" :class="['toast', toast.ok?'tok':'terr']">{{ toast.msg }}</div>
+  <div v-if="toast.show" :class="['toast', toast.ok ? 'ok' : 'err']">{{ toast.msg }}</div>
 </div>
+
 <script>
-const {createApp,ref,reactive,onMounted,nextTick,computed} = Vue;
+const {createApp,ref,reactive,computed,onMounted,nextTick} = Vue;
+
 createApp({
   setup(){
-    // ─── 登录态（内存变量 + sessionStorage 仅当前标签页复用）
     const authed = ref(false);
     const loginUser = ref('');
     const loginPass = ref('');
     const loginErr = ref('');
     const loginLoading = ref(false);
-    const loginShake = ref(false);
-    let authHeader = '';
 
-    const cfg = reactive({site_name:'',admin_user:'admin',admin_pass:'',nodes:[],ping_tasks:[]});
-    const toast = reactive({show:false,ok:true,msg:''});
     const adminTab = ref('nodes');
     const nodeKeyword = ref('');
     const nodeSort = ref('manual');
-    let sortable = null;
 
-    const parseDateScore = (s) => {
-      const m = String(s||'').trim().match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
-      if(!m) return 0;
-      return Number(m[1])*10000 + Number(m[2])*100 + Number(m[3]);
-    };
-
-    const filteredNodes = computed(() => {
-      const kw = nodeKeyword.value.trim().toLowerCase();
-      let arr = cfg.nodes.map((n, idx) => ({...n, _idx: idx}));
-      if(kw){
-        arr = arr.filter(n =>
-          String(n.name||'').toLowerCase().includes(kw) ||
-          String(n.id||'').toLowerCase().includes(kw) ||
-          String(n.token||'').toLowerCase().includes(kw) ||
-          String(n._ed||'').toLowerCase().includes(kw)
-        );
-      }
-      if(nodeSort.value === 'name_asc'){
-        arr.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hans-CN'));
-      }else if(nodeSort.value === 'name_desc'){
-        arr.sort((a,b)=>String(b.name||'').localeCompare(String(a.name||''),'zh-Hans-CN'));
-      }else if(nodeSort.value === 'expire_asc'){
-        arr.sort((a,b)=>parseDateScore(a._ed)-parseDateScore(b._ed));
-      }else if(nodeSort.value === 'expire_desc'){
-        arr.sort((a,b)=>parseDateScore(b._ed)-parseDateScore(a._ed));
-      }else{
-        arr.sort((a,b)=>a._idx-b._idx);
-      }
-      return arr;
+    const toast = reactive({show:false, ok:true, msg:''});
+    const cfg = reactive({
+      site_name:'',
+      admin_user:'admin',
+      admin_pass:'',
+      nodes:[],
+      ping_tasks:[]
     });
 
+    let authHeader = '';
+    let sortable = null;
+
     const showToast = (msg, ok=true) => {
-      toast.msg=msg; toast.ok=ok; toast.show=true;
-      setTimeout(()=>toast.show=false, 3000);
+      toast.msg = msg;
+      toast.ok = ok;
+      toast.show = true;
+      setTimeout(() => { toast.show = false; }, 2600);
     };
 
-    // ─── 尝试用已存凭据自动登录（页面刷新时复用）
-    const tryAutoLogin = async () => {
-      // 从 sessionStorage 读取（仅当前标签页有效，关闭即清除）
-      try {
-        const saved = sessionStorage.getItem('probe_auth');
-        if (saved) {
-          const r = await fetch('/api/admin/config', {headers:{Authorization: saved}});
-          if (r.ok) {
-            authHeader = saved;
-            const d = await r.json();
-            fillCfg(d);
-            authed.value = true;
-            await nextTick();
-            initSortable();
-            return;
-          } else {
-            sessionStorage.removeItem('probe_auth');
-          }
-        }
-      } catch(e){}
-    };
+    const genId = () => 'node-' + Date.now() + Math.floor(Math.random() * 10000);
 
     const fillCfg = (d) => {
-      cfg.site_name = d.site_name||'';
-      cfg.admin_user = d.admin_user||'admin';
-      cfg.ping_tasks = (d.ping_tasks||[]).map(t=>({name:t.name,host:t.host}));
-      cfg.nodes = (d.nodes||[]).map(n=>{
-        let ed='2027/01/01', tl=0;
-        const raw = String(n.expire_date||'');
-        if(raw.includes('|')){const p=raw.split('|');ed=p[0]||'2027/01/01';tl=parseInt(p[1])||0;}
-        else ed=raw||'2027/01/01';
-        return {id:n.id||genId(), name:n.name||'', token:n.token||'', _ed:ed, _tl:tl};
+      cfg.site_name = d.site_name || '';
+      cfg.admin_user = d.admin_user || 'admin';
+      cfg.admin_pass = '';
+      cfg.ping_tasks = (d.ping_tasks || []).map(t => ({
+        name: t.name || '',
+        host: t.host || ''
+      }));
+      cfg.nodes = (d.nodes || []).map(n => {
+        let ed = '2027/01/01', tl = 0;
+        const raw = String(n.expire_date || '');
+        if (raw.includes('|')) {
+          const p = raw.split('|');
+          ed = p[0] || '2027/01/01';
+          tl = parseInt(p[1], 10) || 0;
+        } else {
+          ed = raw || '2027/01/01';
+        }
+        return {
+          id: n.id || genId(),
+          name: n.name || '',
+          token: n.token || '',
+          _ed: ed,
+          _tl: tl
+        };
       });
     };
 
+    const tryAutoLogin = async () => {
+      try {
+        const saved = sessionStorage.getItem('probe_auth');
+        if (!saved) return;
+        const r = await fetch('/api/admin/config', {headers:{Authorization:saved}});
+        if (!r.ok) {
+          sessionStorage.removeItem('probe_auth');
+          return;
+        }
+        authHeader = saved;
+        const d = await r.json();
+        fillCfg(d);
+        authed.value = true;
+        await nextTick();
+        initSortable();
+      } catch (_) {}
+    };
+
     const doLogin = async () => {
-      if(!loginUser.value||!loginPass.value){loginErr.value='账号和密码不能为空';return;}
-      loginLoading.value = true; loginErr.value = '';
+      if (!loginUser.value || !loginPass.value) {
+        loginErr.value = '账号和密码不能为空';
+        return;
+      }
+      loginLoading.value = true;
+      loginErr.value = '';
       try {
         const h = 'Basic ' + btoa(loginUser.value + ':' + loginPass.value);
         const r = await fetch('/api/admin/config', {headers:{Authorization:h}});
-        if(r.status===401){
+        if (r.status === 401) {
           loginErr.value = '账号或密码错误，请重试';
-          loginShake.value = true;
-          setTimeout(()=>loginShake.value=false, 500);
-        } else if(r.ok){
+        } else if (r.ok) {
           authHeader = h;
-          // 保存到 sessionStorage，刷新页面可自动恢复
           sessionStorage.setItem('probe_auth', h);
           const d = await r.json();
           fillCfg(d);
@@ -331,67 +403,187 @@ createApp({
           await nextTick();
           initSortable();
         } else {
-          loginErr.value = '服务器错误: '+r.status;
+          loginErr.value = '服务器错误: ' + r.status;
         }
-      } catch(e){loginErr.value='连接失败: '+e.message;}
+      } catch (e) {
+        loginErr.value = '连接失败: ' + e.message;
+      }
       loginLoading.value = false;
     };
 
-    const genId = () => 'node-'+Date.now()+Math.floor(Math.random()*10000);
+    const parseDateNum = s => {
+      const m = String(s || '').trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+      if (!m) return 99999999;
+      return parseInt(m[1], 10) * 10000 + parseInt(m[2], 10) * 100 + parseInt(m[3], 10);
+    };
+
+    const parseExpireDays = raw => {
+      const s = String(raw || '').trim();
+      const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      const target = new Date(y, mo, d);
+      if (Number.isNaN(target.getTime())) return null;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+      return Math.floor((end - today) / 86400000);
+    };
+
+    const expireBadgeText = n => {
+      const days = parseExpireDays(n._ed);
+      if (days === null) return '未设';
+      if (days <= 0) return '已到期';
+      return `余 ${days} 天`;
+    };
+
+    const expireBadgeClass = n => {
+      const days = parseExpireDays(n._ed);
+      if (days === null) return 'expire-ok';
+      if (days <= 0) return 'expire-expired';
+      if (days <= 3) return 'expire-danger';
+      if (days <= 7) return 'expire-warn';
+      return 'expire-ok';
+    };
+
+    const filteredNodes = computed(() => {
+      const kw = nodeKeyword.value.trim().toLowerCase();
+      let arr = cfg.nodes.filter(n => {
+        if (!kw) return true;
+        return String(n.name || '').toLowerCase().includes(kw)
+          || String(n.id || '').toLowerCase().includes(kw)
+          || String(n._ed || '').toLowerCase().includes(kw);
+      });
+
+      if (nodeSort.value === 'name_asc') {
+        arr = [...arr].sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN'));
+      } else if (nodeSort.value === 'name_desc') {
+        arr = [...arr].sort((a,b) => String(b.name || '').localeCompare(String(a.name || ''), 'zh-Hans-CN'));
+      } else if (nodeSort.value === 'expire_asc') {
+        arr = [...arr].sort((a,b) => parseDateNum(a._ed) - parseDateNum(b._ed));
+      } else if (nodeSort.value === 'expire_desc') {
+        arr = [...arr].sort((a,b) => parseDateNum(b._ed) - parseDateNum(a._ed));
+      }
+
+      return arr;
+    });
 
     const saveConfig = async () => {
       try {
-        const nodes = cfg.nodes.map(n=>({
-          id:n.id, name:n.name, token:n.token,
-          expire_date: n._tl>0 ? `${n._ed}|${n._tl}` : n._ed
+        const nodes = cfg.nodes.map(n => ({
+          id: n.id,
+          name: n.name,
+          token: n.token,
+          expire_date: n._tl > 0 ? `${n._ed}|${n._tl}` : n._ed
         }));
-        const r = await fetch('/api/admin/config',{
+
+        const r = await fetch('/api/admin/config', {
           method:'POST',
-          headers:{'Content-Type':'application/json','Authorization':authHeader},
-          body:JSON.stringify({site_name:cfg.site_name,admin_user:cfg.admin_user,admin_pass:cfg.admin_pass||'',nodes,ping_tasks:cfg.ping_tasks})
+          headers:{
+            'Content-Type':'application/json',
+            'Authorization': authHeader
+          },
+          body: JSON.stringify({
+            site_name: cfg.site_name,
+            admin_user: cfg.admin_user,
+            admin_pass: cfg.admin_pass || '',
+            nodes,
+            ping_tasks: cfg.ping_tasks
+          })
         });
-        if(r.ok) showToast('✅ 配置已保存并下发！');
-        else if(r.status===401){showToast('❌ 会话已过期，请刷新重新登录',false);sessionStorage.removeItem('probe_auth');}
-        else showToast('❌ 保存失败: '+r.status,false);
-      } catch(e){showToast('❌ 请求失败: '+e.message,false);}
+
+        if (r.ok) {
+          const latest = await fetch('/api/admin/config', {headers:{Authorization:authHeader}});
+          if (latest.ok) {
+            const d = await latest.json();
+            fillCfg(d);
+            await nextTick();
+            initSortable();
+          }
+          showToast('✅ 配置已保存并下发！', true);
+        } else if (r.status === 401) {
+          sessionStorage.removeItem('probe_auth');
+          showToast('❌ 会话已过期，请刷新重新登录', false);
+        } else {
+          showToast('❌ 保存失败: ' + r.status, false);
+        }
+      } catch (e) {
+        showToast('❌ 请求失败: ' + e.message, false);
+      }
     };
 
-    const addNode = () => {
-      cfg.nodes.push({id:genId(),name:'',token:'secret_'+Math.random().toString(36).slice(2,8),_ed:'2027/01/01',_tl:0});
-      nextTick(()=>initSortable());
+    const addNode = async () => {
+      cfg.nodes.push({
+        id: genId(),
+        name: '',
+        token: 'secret_' + Math.random().toString(36).slice(2,8),
+        _ed: '2027/01/01',
+        _tl: 0
+      });
+      nodeKeyword.value = '';
+      nodeSort.value = 'manual';
+      adminTab.value = 'nodes';
+      await nextTick();
+      initSortable();
     };
-    const removeNode = i => cfg.nodes.splice(i,1);
+
+    const removeNode = i => cfg.nodes.splice(i, 1);
+
     const removeNodeById = id => {
       const i = cfg.nodes.findIndex(n => n.id === id);
-      if(i >= 0) cfg.nodes.splice(i,1);
+      if (i >= 0) cfg.nodes.splice(i, 1);
     };
-    const addPing = () => cfg.ping_tasks.push({name:'',host:''});
-    const removePing = i => cfg.ping_tasks.splice(i,1);
 
-    const deployCmd = n => `curl -sL https://tz.shell.kdns.fr/install.sh?t=${n.id.replace('node-','')} | bash -s -- -s https://tz.shell.kdns.fr -t ${n.token}`;
+    const addPing = () => cfg.ping_tasks.push({name:'', host:''});
+    const removePing = i => cfg.ping_tasks.splice(i, 1);
+
+    const deployCmd = n => {
+      const sid = String(n.id || '').replace('node-','');
+      return `curl -sL ${location.origin}/install.sh?t=${sid} | bash -s -- -s ${location.origin} -t ${n.token}`;
+    };
+
     const copyDeploy = n => {
       navigator.clipboard.writeText(deployCmd(n))
-        .then(()=>showToast('✅ 部署命令已复制！'))
-        .catch(()=>showToast('❌ 复制失败',false));
+        .then(() => showToast('✅ 部署命令已复制！', true))
+        .catch(() => showToast('❌ 复制失败', false));
     };
-const initSortable = () => {
+
+    const switchTab = async (tab) => {
+      adminTab.value = tab;
+      await nextTick();
+      if (tab === 'nodes') initSortable();
+    };
+
+    const initSortable = () => {
       const el = document.getElementById('node-sortable');
-      if(!el) return;
-      if(sortable) sortable.destroy();
-      sortable = Sortable.create(el,{
-        handle:'.drag-handle', animation:200,
-        ghostClass:'sortable-ghost',
+      if (!el) return;
+      if (sortable) sortable.destroy();
+      if (nodeKeyword.value || nodeSort.value !== 'manual') return;
+      sortable = Sortable.create(el, {
+        handle: '.drag-handle',
+        animation: 180,
+        ghostClass: 'sortable-ghost',
         onEnd: e => {
-          const moved = cfg.nodes.splice(e.oldIndex,1)[0];
-          cfg.nodes.splice(e.newIndex,0,moved);
+          const moved = cfg.nodes.splice(e.oldIndex, 1)[0];
+          cfg.nodes.splice(e.newIndex, 0, moved);
         }
       });
     };
 
-    onMounted(()=>tryAutoLogin());
+    onMounted(() => {
+      tryAutoLogin();
+    });
 
-    return {authed,loginUser,loginPass,loginErr,loginLoading,loginShake,doLogin,
-      cfg,toast,adminTab,nodeKeyword,nodeSort,filteredNodes,saveConfig,addNode,removeNode,removeNodeById,addPing,removePing,deployCmd,copyDeploy};
+    return {
+      authed, loginUser, loginPass, loginErr, loginLoading,
+      adminTab, nodeKeyword, nodeSort, filteredNodes,
+      cfg, toast,
+      doLogin, saveConfig, addNode, removeNode, removeNodeById,
+      addPing, removePing, copyDeploy, switchTab,
+      expireBadgeText, expireBadgeClass
+    };
   }
 }).mount('#app');
 </script>

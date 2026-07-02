@@ -110,7 +110,7 @@ body.km::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.22);z-i
         </div>
       </div>
       <div class="mb-2 relative z-20">
-        <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="expClr(daysLeft(nd._exp))">&#x4F59; {{ daysLeft(nd._exp) }} &#x5929;</span>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="expClr(daysLeft(nd._exp))">{{ expTxt(daysLeft(nd._exp)) }}</span>
       </div>
       <div class="flex gap-3 mb-3 text-[11px] font-bold relative z-20 flex-wrap">
         <span class="text-[#3b82f6]">&#x2B21; {{ (nd.status&&nd.status.cpu_cores)||0 }} Cores</span>
@@ -260,7 +260,8 @@ createApp({
     const fb=b=>{if(!b||b===0)return"0 B";const k=1024,s=["B","KB","MB","GB","TB"],i=Math.floor(Math.log(b)/Math.log(k));return parseFloat((b/k**i).toFixed(2))+" "+s[i];};
     const pct=(u,t)=>!t?0:Math.min(+((u/t)*100).toFixed(0),100);
     const daysLeft=ds=>{if(!ds||ds==="未知")return"∞";const d=new Date(ds)-Date.now();if(isNaN(d))return"∞";return d<=0?0:Math.ceil(d/86400000);};
-    const expClr=d=>{if(d==="∞"||isNaN(+d))return"text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30";if(+d<=7)return"text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30";if(+d<=30)return"text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30";return"text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30";};
+    const expTxt=d=>{if(d==="∞"||isNaN(+d))return"∞";if(+d<=0)return"已到期";return "余 " + d + " 天";};
+    const expClr=d=>{if(d==="∞"||isNaN(+d))return"text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30";if(+d<=0)return"text-[#ef4444] bg-[#ef4444]/14 border border-[#ef4444]/35";if(+d<=3)return"text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30";if(+d<=7)return"text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30";return"text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30";};
     const fmtUp=s=>{if(!s)return"离线";const d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d>0?d+"天"+h+"小时":h+"小时";};
     const trafUsed=n=>fb(((n.status&&n.status.net_out_transfer)||0)+((n.status&&n.status.net_in_transfer)||0));
     const trafPct=n=>{if(!n._tlim)return 0;const u=((n.status&&n.status.net_out_transfer)||0)+((n.status&&n.status.net_in_transfer)||0);return Math.min(+(u/(n._tlim*1073741824)*100).toFixed(1),100);};
@@ -372,7 +373,7 @@ createApp({
     onUnmounted(()=>{clearInterval(ft);clearInterval(ct);});
     return{servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
       showChart,chartName,chartHr,chartSt,
-      fb,pct,daysLeft,expClr,fmtUp,trafUsed,trafPct,trafClr,
+      fb,pct,daysLeft,expTxt,expClr,fmtUp,trafUsed,trafPct,trafClr,
       getPmStr,getPmClass,getLoss,getLossClass,shortName,
       openChart,closeChart,loadH,toggleLn};
   }
