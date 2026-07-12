@@ -260,7 +260,9 @@ body::before{
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2 text-[16px] font-black t1 leading-none">
             <span :class="nd.status&&nd.status.is_online?'mini-dot glow-online':'mini-dot glow-offline'"></span>
-            <span class="truncate">{{ nd.name }}</span>
+            <button type="button" @click="openDetail(nd)"
+                    class="truncate text-left hover:text-violet-300 transition"
+                    title="查看节点详情">{{ nd.name }}</button>
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -364,6 +366,46 @@ body::before{
     </div>
   </div>
 
+  <div v-if="showDetail && detailNode"
+       class="fixed inset-0 z-[60] flex items-center justify-center"
+       style="background:rgba(0,0,0,.58);backdrop-filter:blur(8px)"
+       @click.self="closeDetail">
+    <div class="cmod rounded-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div class="flex items-center justify-between p-5 border-b dv">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 text-[16px] font-black t1">
+            <span :class="detailNode.status&&detailNode.status.is_online?'mini-dot glow-online':'mini-dot glow-offline'"></span>
+            <span class="truncate">{{ detailNode.name }}</span>
+          </div>
+          <div class="text-[10px] t4 mt-1">节点状态详情</div>
+        </div>
+        <button type="button" @click="closeDetail"
+                class="t4 hover:text-red-400 transition p-1 text-xl leading-none"
+                title="关闭">×</button>
+      </div>
+
+      <div class="p-5 space-y-3 text-[12px] font-bold">
+        <div class="flex items-center justify-between rounded-xl px-4 py-3"
+             style="background:rgba(255,255,255,.035)">
+          <span class="t4">当前状态</span>
+          <span :class="detailNode.status&&detailNode.status.is_online?'text-emerald-300':'text-red-300'">
+            {{ detailNode.status&&detailNode.status.is_online?'在线':'离线' }}
+          </span>
+        </div>
+
+        <div class="flex items-center justify-between rounded-xl px-4 py-3"
+             style="background:rgba(255,255,255,.035)">
+          <span class="t4">最后上报</span>
+          <span class="jm t2">{{ lastReportText(detailNode.status&&detailNode.status.last_report) }}</span>
+        </div>
+
+        <div class="text-[10px] t4 text-center pt-1">
+          此详情不显示 IP、Token、主机名或地址信息
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div v-if="showChart" class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,.58);backdrop-filter:blur(8px)" @click.self="closeChart">
     <div class="cmod rounded-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col">
       <div class="flex justify-between items-center p-5">
@@ -402,6 +444,7 @@ createApp({
   setup(){
     const servers=ref([]),siteName=ref("探针看板"),theme=ref("km");
     const showChart=ref(false),chartId=ref(""),chartName=ref(""),chartHr=ref(4),chartSt=ref({});
+    const showDetail=ref(false),detailNode=ref(null);
     const now=ref("");
     let ec=null,ft=null,ct=null,nt=null;
 
@@ -564,6 +607,31 @@ createApp({
       return "🐧";
     };
 
+    const openDetail=node=>{
+      detailNode.value=node;
+      showDetail.value=true;
+    };
+
+    const closeDetail=()=>{
+      showDetail.value=false;
+      detailNode.value=null;
+    };
+
+    const lastReportText=ts=>{
+      const unix=Number(ts||0);
+      if(!unix)return "等待上报";
+      const date=new Date(unix*1000);
+      const exact=date.toLocaleTimeString("zh-CN",{hour12:false});
+      const sec=Math.max(0,Math.floor(Date.now()/1000-unix));
+      if(sec<10)return "刚刚 · "+exact;
+      if(sec<60)return sec+" 秒前 · "+exact;
+      const min=Math.floor(sec/60);
+      if(min<60)return min+" 分钟前 · "+exact;
+      const hr=Math.floor(min/60);
+      if(hr<24)return hr+" 小时前 · "+exact;
+      return Math.floor(hr/24)+" 天前 · "+date.toLocaleDateString("zh-CN");
+    };
+
     const openChart=async(id,name)=>{
       chartId.value=id;
       chartName.value=name;
@@ -667,10 +735,10 @@ createApp({
 
     return{
       servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
-      showChart,chartName,chartHr,chartSt,
+      showChart,chartName,chartHr,chartSt,showDetail,detailNode,
       fb,pct,daysLeft,expTxt,expClr,fmtUp,trafficLimit,monthUsed,monthRemain,trafPct,trafClr,trafTextClr,resTextClr,resBarClr,
       getPmStr,getPmClass,getLoss,getLossClass,shortName,osIcon,
-      openChart,closeChart,loadH,toggleLn
+      openDetail,closeDetail,lastReportText,openChart,closeChart,loadH,toggleLn
     };
   }
 }).mount("#app");
