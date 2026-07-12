@@ -81,7 +81,7 @@ func loadConfig() {
 	} else {
 		appConfig = AppConfig{SiteName: "探针看板", AdminUser: "admin", AdminPass: "123456", Nodes: []common.NodeConfig{{ID: "node-1", Name: "主控测试机", Token: "my_secret_token_123", ExpireDate: "2027/05/13", Region: "CN"}}, PingTasks: []common.PingTask{{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80"}, {Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80"}, {Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80"}}}
 		data, _ := json.MarshalIndent(appConfig, "", "  ")
-		os.WriteFile("config.json", data, 0644)
+		os.WriteFile("config.json", data, 0600)
 	}
 	if appConfig.AdminUser == "" {
 		appConfig.AdminUser = "admin"
@@ -259,7 +259,7 @@ func main() {
 				}
 				appConfig = newConfig
 				data, _ := json.MarshalIndent(appConfig, "", "  ")
-				os.WriteFile("config.json", data, 0644)
+				os.WriteFile("config.json", data, 0600)
 				configMutex.Unlock()
 				// 热下发新配置：不强制断开在线 Agent，直接推送最新指令
 				configMutex.RLock()
