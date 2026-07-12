@@ -336,6 +336,7 @@ func main() {
 			}
 			st.ServerID = cNode.ID
 			st.IsOnline = true
+                        st.LastReport = time.Now().Unix()
 			mapMutex.Lock()
 			serverStatusMap[cNode.ID] = st
 			mapMutex.Unlock()

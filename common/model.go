@@ -33,6 +33,7 @@ type CardPingStatus struct {
 
 type ServerStatus struct {
 	ServerID         string           `json:"server_id"`
+        LastReport       int64            `json:"last_report"`
 	IsOnline         bool             `json:"is_online"`
 	Uptime           uint64           `json:"uptime"`
 	Load1            float64          `json:"load_1"`
