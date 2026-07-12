@@ -286,20 +286,20 @@ body::before{
 
       <div class="grid grid-cols-2 gap-x-3 gap-y-2.5 mb-3 text-[11px] font-bold relative z-20">
         <div>
-          <div class="flex justify-between mb-0.5"><span class="t4">CPU</span><span class="jm t2">{{ ((nd.status&&nd.status.cpu_usage)||0).toFixed(1) }}%</span></div>
-          <div class="ptr"><div class="bt bg-sky-400" :style="'width:'+pct(nd.status&&nd.status.cpu_usage,100)+'%'"></div></div>
+          <div class="flex justify-between mb-0.5"><span class="t4">CPU</span><span class="jm" :class="resTextClr(pct(nd.status&&nd.status.cpu_usage,100))">{{ ((nd.status&&nd.status.cpu_usage)||0).toFixed(1) }}%</span></div>
+          <div class="ptr"><div class="bt" :style="'width:'+pct(nd.status&&nd.status.cpu_usage,100)+'%;background:'+resBarClr(pct(nd.status&&nd.status.cpu_usage,100),'#38bdf8')"></div></div>
         </div>
         <div>
-          <div class="flex justify-between mb-0.5"><span class="t4">内存</span><span class="jm t2">{{ pct(nd.status&&nd.status.mem_used,nd.status&&nd.status.mem_total) }}%</span></div>
-          <div class="ptr"><div class="bt bg-emerald-400" :style="'width:'+pct(nd.status&&nd.status.mem_used,nd.status&&nd.status.mem_total)+'%'"></div></div>
+          <div class="flex justify-between mb-0.5"><span class="t4">内存</span><span class="jm" :class="resTextClr(pct(nd.status&&nd.status.mem_used,nd.status&&nd.status.mem_total))">{{ pct(nd.status&&nd.status.mem_used,nd.status&&nd.status.mem_total) }}%</span></div>
+          <div class="ptr"><div class="bt" :style="'width:'+pct(nd.status&&nd.status.mem_used,nd.status&&nd.status.mem_total)+'%;background:'+resBarClr(pct(nd.status&&nd.status.mem_used,nd.status&&nd.status.mem_total),'#34d399')"></div></div>
         </div>
         <div>
           <div class="flex justify-between mb-0.5"><span class="t4">SWAP</span><span class="jm t2" v-if="nd.status&&nd.status.swap_total">{{ pct(nd.status.swap_used,nd.status.swap_total) }}%</span><span class="jm t4 opacity-50" v-else>OFF</span></div>
           <div class="ptr"><div class="bt bg-amber-400" :style="'width:'+pct(nd.status&&nd.status.swap_used,nd.status&&nd.status.swap_total)+'%'"></div></div>
         </div>
         <div>
-          <div class="flex justify-between mb-0.5"><span class="t4">硬盘</span><span class="jm t2">{{ pct(nd.status&&nd.status.disk_used,nd.status&&nd.status.disk_total) }}%</span></div>
-          <div class="ptr"><div class="bt bg-green-400" :style="'width:'+pct(nd.status&&nd.status.disk_used,nd.status&&nd.status.disk_total)+'%'"></div></div>
+          <div class="flex justify-between mb-0.5"><span class="t4">硬盘</span><span class="jm" :class="resTextClr(pct(nd.status&&nd.status.disk_used,nd.status&&nd.status.disk_total))">{{ pct(nd.status&&nd.status.disk_used,nd.status&&nd.status.disk_total) }}%</span></div>
+          <div class="ptr"><div class="bt" :style="'width:'+pct(nd.status&&nd.status.disk_used,nd.status&&nd.status.disk_total)+'%;background:'+resBarClr(pct(nd.status&&nd.status.disk_used,nd.status&&nd.status.disk_total),'#4ade80')"></div></div>
         </div>
       </div>
 
@@ -312,7 +312,7 @@ body::before{
       <div v-if="nd._tlim>0" class="monthly-usage pt-2 mt-1 border-t dv relative z-20">
         <div class="flex justify-between mb-1 text-[10px] font-bold">
           <span class="t4">本月流量 <span class="opacity-50 text-[9px]">(每月{{ nd._rd }}日 / {{ trafficLimit(nd) }})</span></span>
-          <span class="jm" :class="trafPct(nd)>=90?'text-red-400':'t2'">已用 {{ monthUsed(nd) }} · 剩余 {{ monthRemain(nd) }} | {{ trafPct(nd) }}%</span>
+          <span class="jm" :class="trafTextClr(trafPct(nd))">已用 {{ monthUsed(nd) }} · 剩余 {{ monthRemain(nd) }} | {{ trafPct(nd) }}%</span>
         </div>
         <div class="monthly-bar ptr"><div class="bt" :class="trafClr(trafPct(nd))" :style="'width:'+trafPct(nd)+'%'"></div></div>
       </div>
@@ -516,7 +516,10 @@ createApp({
       if(!lim)return 0;
       return Math.min(+((monthBytes(n)/(lim*1073741824)*100).toFixed(1)),100);
     };
-    const trafClr=p=>+p>=90?"bg-red-400":+p>=75?"bg-amber-400":"bg-violet-400";
+    const trafClr=p=>+p>=90?"bg-red-400":+p>=60?"bg-amber-400":"bg-emerald-400";
+    const trafTextClr=p=>+p>=90?"text-red-400":+p>=60?"text-amber-300":"t2";
+    const resTextClr=p=>+p>=85?"text-red-400":+p>=60?"text-amber-300":"t2";
+    const resBarClr=(p,normal)=>+p>=85?"#f87171":+p>=60?"#fbbf24":normal;
 
     const getPmStr=ps=>{
       const cd=(ps.avg_delay_1h ?? ps.current_delay);
@@ -665,7 +668,7 @@ createApp({
     return{
       servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
       showChart,chartName,chartHr,chartSt,
-      fb,pct,daysLeft,expTxt,expClr,fmtUp,trafficLimit,monthUsed,monthRemain,trafPct,trafClr,
+      fb,pct,daysLeft,expTxt,expClr,fmtUp,trafficLimit,monthUsed,monthRemain,trafPct,trafClr,trafTextClr,resTextClr,resBarClr,
       getPmStr,getPmClass,getLoss,getLossClass,shortName,osIcon,
       openChart,closeChart,loadH,toggleLn
     };
@@ -673,29 +676,6 @@ createApp({
 }).mount("#app");
 </script>
 
-<script id="vps-resource-warning">
-(function(){
-  function updateBars(){
-    document.querySelectorAll(".node-card").forEach(function(card){
-      var group = card.querySelector(".grid.grid-cols-2");
-      if(!group) return;
-      var bars = group.querySelectorAll(".bt");
-      [0,1,3].forEach(function(i){
-        var bar = bars[i];
-        if(!bar) return;
-        var pct = parseFloat(bar.style.width) || 0;
-        var normal = i === 0 ? "#38bdf8" : "#34d399";
-        var color = pct >= 85 ? "#f87171" : (pct >= 70 ? "#fbbf24" : normal);
-        bar.style.setProperty("background", color, "important");
-      });
-    });
-  }
-  document.addEventListener("DOMContentLoaded", function(){
-    updateBars();
-    setInterval(updateBars, 1200);
-  });
-})();
-</script>
 
 </body>
 </html>
