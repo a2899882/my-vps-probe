@@ -269,7 +269,7 @@ body::before{
 
           <span v-if="nd.status&&nd.status.country_code&&nd.status.country_code!=='OT'" :class="['fi','fi-'+nd.status.country_code.toLowerCase(),'rounded-sm']"></span>
           <span v-else class="text-[13px] leading-none">🌐</span>
-          <svg class="w-4 h-4 opacity-35 cursor-pointer hover:opacity-90 transition t3" @click="openChart(nd.id,nd.name)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+
         </div>
       </div>
 
@@ -367,138 +367,64 @@ body::before{
   </div>
 
   <div v-if="showDetail && detailNode"
-       class="fixed inset-0 z-[60] flex items-center justify-center"
+       class="fixed inset-0 z-[60] flex items-center justify-center p-0 sm:p-4"
        style="background:rgba(0,0,0,.58);backdrop-filter:blur(8px)"
        @click.self="closeDetail">
-    <div class="cmod rounded-2xl w-full max-w-md mx-4 overflow-hidden">
-      <div class="flex items-center justify-between p-5 border-b dv">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2 text-[16px] font-black t1">
-            <span :class="detailNode.status&&detailNode.status.is_online?'mini-dot glow-online':'mini-dot glow-offline'"></span>
-            <span class="truncate">{{ detailNode.name }}</span>
+    <div class="w-full h-full sm:h-auto sm:max-h-[92vh] sm:max-w-6xl flex flex-col overflow-hidden border sm:rounded-3xl"
+         style="background:linear-gradient(145deg,#111827,#0b1020);border-color:rgba(148,163,184,.18)">
+      <div class="shrink-0 px-5 sm:px-7 py-4 border-b" style="border-color:rgba(148,163,184,.14)">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 text-[16px] font-black t1">
+              <span :class="detailNode.status&&detailNode.status.is_online?'mini-dot glow-online':'mini-dot glow-offline'"></span>
+              <span class="truncate">{{ detailNode.name }}</span>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] t4">
+              <span>{{ (detailNode.status&&detailNode.status.cpu_cores)||0 }} Cores</span>
+              <span>内存 {{ fb((detailNode.status&&detailNode.status.mem_total)||0) }}</span>
+              <span>硬盘 {{ fb((detailNode.status&&detailNode.status.disk_total)||0) }}</span>
+              <span>负载 {{ ((detailNode.status&&detailNode.status.load_1)||0).toFixed(2) }}</span>
+              <span>上报 {{ lastReportText(detailNode.status&&detailNode.status.last_report) }}</span>
+            </div>
           </div>
-          <div class="text-[10px] t4 mt-1">节点状态详情</div>
+          <button type="button" @click="closeDetail" class="shrink-0 t4 hover:text-red-400 transition p-1 text-xl leading-none">×</button>
         </div>
-        <button type="button" @click="closeDetail"
-                class="t4 hover:text-red-400 transition p-1 text-xl leading-none"
-                title="关闭">×</button>
+
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex rounded-xl p-1" style="background:rgba(148,163,184,.09)">
+            <button @click="setTrendMode('resource')" :class="trendMode==='resource'?'bact':'t4'" class="px-4 py-1.5 rounded-lg text-[12px] font-bold">负载</button>
+            <button @click="setTrendMode('ping')" :class="trendMode==='ping'?'bact':'t4'" class="px-4 py-1.5 rounded-lg text-[12px] font-bold">延迟</button>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <button v-for="item in hourChoices" :key="item.h" @click="loadTrend(item.h)" :class="chartHr===item.h?'bact':'t4'" class="px-3 py-1.5 rounded-lg text-[11px] font-bold">{{ item.n }}</button>
+          </div>
+        </div>
       </div>
 
-      <div class="p-5 space-y-4 text-[12px] font-bold">
-        <div class="grid grid-cols-2 gap-3">
-          <div class="rounded-xl px-4 py-3" style="background:rgba(255,255,255,.035)">
-            <div class="t4 text-[10px]">当前状态</div>
-            <div class="mt-1" :class="detailNode.status&&detailNode.status.is_online?'text-emerald-300':'text-red-300'">
-              {{ detailNode.status&&detailNode.status.is_online?'在线':'离线' }}
+      <div class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-5">
+        <template v-if="trendMode==='resource'">
+          <div v-if="!resourcePoints.length" class="h-[390px] flex items-center justify-center t4 text-sm">暂无资源历史</div>
+          <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div v-for="card in resourceCards" :key="card.id" class="rounded-2xl border overflow-hidden" style="background:rgba(15,23,42,.56);border-color:rgba(148,163,184,.13)">
+              <div class="px-4 pt-3 flex items-center justify-between">
+                <span class="text-[12px] font-black text-slate-200">{{ card.title }}</span>
+                <span class="text-[11px] t4">{{ card.note }}</span>
+              </div>
+              <div :id="card.id" class="w-full h-[220px]"></div>
             </div>
           </div>
-          <div class="rounded-xl px-4 py-3" style="background:rgba(255,255,255,.035)">
-            <div class="t4 text-[10px]">最后上报</div>
-            <div class="mt-1 jm t2">{{ lastReportText(detailNode.status&&detailNode.status.last_report) }}</div>
-          </div>
-        </div>
+        </template>
 
-        <div class="grid grid-cols-3 gap-2.5">
-          <div class="rounded-xl p-3" style="background:rgba(56,189,248,.06)">
-            <div class="t4 text-[10px]">CPU 核心</div>
-            <div class="mt-1 text-sky-300">{{ (detailNode.status&&detailNode.status.cpu_cores)||0 }} Cores</div>
+        <template v-else>
+          <div v-if="Object.keys(chartSt).length" class="mb-4 flex flex-wrap gap-2">
+            <button v-for="(st,tgt) in chartSt" :key="tgt" @click="toggleLn(tgt)" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border"
+                    :style="{borderColor:st.c+'66',color:st.on?st.c:'#94a3b8',background:st.on?st.c+'16':'transparent'}">
+              {{ tgt }} · {{ st.avg.toFixed(1) }}ms · {{ st.loss.toFixed(1) }}%
+            </button>
           </div>
-          <div class="rounded-xl p-3" style="background:rgba(52,211,153,.06)">
-            <div class="t4 text-[10px]">内存总量</div>
-            <div class="mt-1 text-emerald-300">{{ fb((detailNode.status&&detailNode.status.mem_total)||0) }}</div>
-          </div>
-          <div class="rounded-xl p-3" style="background:rgba(167,139,250,.06)">
-            <div class="t4 text-[10px]">硬盘总量</div>
-            <div class="mt-1 text-violet-300">{{ fb((detailNode.status&&detailNode.status.disk_total)||0) }}</div>
-          </div>
-        </div>
-
-        <div class="border-t dv pt-3 space-y-3">
-          <div>
-            <div class="flex justify-between mb-1">
-              <span class="t4">CPU</span>
-              <span class="jm" :class="resTextClr(pct(detailNode.status&&detailNode.status.cpu_usage,100))">
-                {{ ((detailNode.status&&detailNode.status.cpu_usage)||0).toFixed(1) }}%
-              </span>
-            </div>
-            <div class="ptr"><div class="bt" :style="'width:'+pct(detailNode.status&&detailNode.status.cpu_usage,100)+'%;background:'+resBarClr(pct(detailNode.status&&detailNode.status.cpu_usage,100),'#38bdf8')"></div></div>
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <span class="t4">内存</span>
-              <span class="jm" :class="resTextClr(pct(detailNode.status&&detailNode.status.mem_used,detailNode.status&&detailNode.status.mem_total))">
-                {{ fb((detailNode.status&&detailNode.status.mem_used)||0) }} / {{ fb((detailNode.status&&detailNode.status.mem_total)||0) }}
-              </span>
-            </div>
-            <div class="ptr"><div class="bt" :style="'width:'+pct(detailNode.status&&detailNode.status.mem_used,detailNode.status&&detailNode.status.mem_total)+'%;background:'+resBarClr(pct(detailNode.status&&detailNode.status.mem_used,detailNode.status&&detailNode.status.mem_total),'#34d399')"></div></div>
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <span class="t4">SWAP</span>
-              <span v-if="detailNode.status&&detailNode.status.swap_total" class="jm t2">
-                {{ fb(detailNode.status.swap_used||0) }} / {{ fb(detailNode.status.swap_total||0) }}
-              </span>
-              <span v-else class="jm t4 opacity-50">OFF</span>
-            </div>
-            <div class="ptr"><div class="bt bg-amber-400" :style="'width:'+pct(detailNode.status&&detailNode.status.swap_used,detailNode.status&&detailNode.status.swap_total)+'%'"></div></div>
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <span class="t4">硬盘</span>
-              <span class="jm" :class="resTextClr(pct(detailNode.status&&detailNode.status.disk_used,detailNode.status&&detailNode.status.disk_total))">
-                {{ fb((detailNode.status&&detailNode.status.disk_used)||0) }} / {{ fb((detailNode.status&&detailNode.status.disk_total)||0) }}
-              </span>
-            </div>
-            <div class="ptr"><div class="bt" :style="'width:'+pct(detailNode.status&&detailNode.status.disk_used,detailNode.status&&detailNode.status.disk_total)+'%;background:'+resBarClr(pct(detailNode.status&&detailNode.status.disk_used,detailNode.status&&detailNode.status.disk_total),'#4ade80')"></div></div>
-          </div>
-        </div>
-
-        <div class="border-t dv pt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-          <div class="flex justify-between gap-3"><span class="t4 shrink-0">运行时长</span><span class="jm t2">{{ fmtUp((detailNode.status&&detailNode.status.uptime)||0) }}</span></div>
-          <div class="flex justify-between gap-3"><span class="t4 shrink-0">系统负载</span><span class="jm t2">{{ ((detailNode.status&&detailNode.status.load_1)||0).toFixed(2) }}</span></div>
-          <div class="flex justify-between gap-3"><span class="t4 shrink-0">实时网络</span><span class="jm t2">↑ {{ fb((detailNode.status&&detailNode.status.net_out_speed)||0) }}/s · ↓ {{ fb((detailNode.status&&detailNode.status.net_in_speed)||0) }}/s</span></div>
-          <div class="flex justify-between gap-3"><span class="t4 shrink-0">累计流量</span><span class="jm t2">↑ {{ fb((detailNode.status&&detailNode.status.net_out_transfer)||0) }} · ↓ {{ fb((detailNode.status&&detailNode.status.net_in_transfer)||0) }}</span></div>
-          <div class="flex justify-between gap-3"><span class="t4 shrink-0">本月流量</span><span class="jm" :class="trafTextClr(trafPct(detailNode))">已用 {{ monthUsed(detailNode) }} · {{ trafPct(detailNode) }}%</span></div>
-          <div class="flex justify-between gap-3"><span class="t4 shrink-0">本月剩余</span><span class="jm t2">{{ monthRemain(detailNode) }} · {{ detailNode._rd }}日重置</span></div>
-          <div class="flex justify-between gap-3"><span class="t4 shrink-0">到期日期</span><span class="jm t2">{{ detailNode._exp }}</span></div>
-          <div class="flex justify-between gap-3"><span class="t4 shrink-0">到期状态</span><span class="jm" :class="expClr(daysLeft(detailNode._exp))">{{ expTxt(daysLeft(detailNode._exp)) }}</span></div>
-        </div>
-
+          <div id="ec" class="w-full h-[390px]"></div>
+        </template>
       </div>
-    </div>
-  </div>
-
-  <div v-if="showChart" class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,.58);backdrop-filter:blur(8px)" @click.self="closeChart">
-    <div class="cmod rounded-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col">
-      <div class="flex justify-between items-center p-5">
-        <h3 class="text-[16px] font-bold flex items-center gap-2 t1">
-          <span style="color:#818cf8;font-size:18px">{{ chartName }}</span> 多链路延迟波动
-          <span class="cap jm">TCP PING</span>
-        </h3>
-        <div class="flex items-center gap-4">
-          <div class="flex bpill rounded-full p-1">
-            <button @click="loadH(1)"  :class="chartHr===1?'bact':'t4'" class="px-4 py-1.5 rounded-full text-[12px] font-bold transition-all">1小时</button>
-            <button @click="loadH(4)"  :class="chartHr===4?'bact':'t4'" class="px-4 py-1.5 rounded-full text-[12px] font-bold transition-all">4小时</button>
-            <button @click="loadH(24)" :class="chartHr===24?'bact':'t4'" class="px-4 py-1.5 rounded-full text-[12px] font-bold transition-all">24小时</button>
-          </div>
-          <button @click="closeChart" class="t4 hover:text-red-400 transition p-1">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-      </div>
-      <div class="px-6 pb-2 flex flex-wrap justify-center gap-3">
-        <div v-for="(st,tgt) in chartSt" :key="tgt"
-             class="px-4 py-2 rounded-xl border-2 cursor-pointer transition-all min-w-[120px] text-center select-none"
-             :style="{borderColor:st.on?st.c:'rgba(148,163,184,.2)',background:st.on?st.c+'18':'transparent',opacity:st.on?1:.38}"
-             @click="toggleLn(tgt)">
-          <div class="text-[13px] font-bold mb-1" :style="{color:st.on?st.c:'#94a3b8'}">{{ tgt }}</div>
-          <div class="text-[11px] jm t3">{{ st.avg>0?st.avg.toFixed(1)+' ms':'-- ms' }} <span class="opacity-40">|</span> <span :class="st.loss>0?'text-red-400 font-bold':''">{{ st.loss.toFixed(1) }}%</span></div>
-        </div>
-      </div>
-      <div class="px-5 pb-5"><div id="ec" class="w-full h-[360px]"></div></div>
     </div>
   </div>
 
@@ -508,8 +434,17 @@ const {createApp,ref,computed,watch,onMounted,onUnmounted,nextTick}=Vue;
 createApp({
   setup(){
     const servers=ref([]),siteName=ref("探针看板"),theme=ref("km");
-    const showChart=ref(false),chartId=ref(""),chartName=ref(""),chartHr=ref(4),chartSt=ref({});
+    const showChart=ref(false),chartId=ref(""),chartName=ref(""),chartHr=ref(1),chartSt=ref({});
     const showDetail=ref(false),detailNode=ref(null);
+    const trendMode=ref("resource"),resourcePoints=ref([]);
+    const hourChoices=[{h:0.25,n:"实时"},{h:1,n:"1小时"},{h:4,n:"4小时"},{h:24,n:"1天"},{h:72,n:"3天"},{h:168,n:"7天"}];
+    const resourceCards=[
+      {id:"rc-cpu",title:"CPU 使用率",note:"百分比"},
+      {id:"rc-mem",title:"内存使用率",note:"百分比"},
+      {id:"rc-disk",title:"硬盘使用率",note:"百分比"},
+      {id:"rc-net",title:"网络速率",note:"上行 / 下行"},
+      {id:"rc-load",title:"系统负载",note:"Load 1"}
+    ];
     const now=ref("");
     let ec=null,ft=null,ct=null,nt=null;
 
@@ -672,14 +607,21 @@ createApp({
       return "🐧";
     };
 
-    const openDetail=node=>{
+    const openDetail=async node=>{
       detailNode.value=node;
+      chartId.value=node.id;
+      chartName.value=node.name;
       showDetail.value=true;
+      trendMode.value="resource";
+      await nextTick();
+      loadTrend(chartHr.value);
     };
 
     const closeDetail=()=>{
       showDetail.value=false;
       detailNode.value=null;
+      if(ec){ec.dispose();ec=null;}
+      disposeResourceCharts();
     };
 
     const lastReportText=ts=>{
@@ -714,6 +656,65 @@ createApp({
     const toggleLn=t=>{
       chartSt.value[t].on=!chartSt.value[t].on;
       ec.dispatchAction({type:"legendToggleSelect",name:t});
+    };
+
+    const resourceCharts={};
+    const disposeResourceCharts=()=>{
+      Object.keys(resourceCharts).forEach(id=>{
+        resourceCharts[id].dispose();
+        delete resourceCharts[id];
+      });
+    };
+    const resourcePct=(used,total)=>total?Math.min(100,Number(used||0)*100/Number(total)):0;
+    const setTrendMode=async mode=>{
+      trendMode.value=mode;
+      await nextTick();
+      loadTrend(chartHr.value);
+    };
+    const loadResources=async hours=>{
+      try{
+        resourcePoints.value=await fetch("/api/resource_history?server_id="+encodeURIComponent(chartId.value)+"&hours="+Math.max(1,Math.ceil(hours))+"&_="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():[]);
+      }catch(e){
+        resourcePoints.value=[];
+      }
+      await nextTick();
+      renderResourceCharts();
+    };
+    const renderResourceCharts=()=>{
+      disposeResourceCharts();
+      const pts=resourcePoints.value||[];
+      const labels=pts.map(x=>String(x.time||"").slice(5,16));
+      const make=(name,data,color)=>({name,type:"line",data,smooth:true,symbol:"none",lineStyle:{width:2,color},areaStyle:{color,opacity:.12}});
+      const draw=(id,series,max)=>{
+        const el=document.getElementById(id);
+        if(!el)return;
+        const c=echarts.init(el,null,{renderer:"canvas"});
+        resourceCharts[id]=c;
+        c.setOption({
+          animation:false,
+          tooltip:{trigger:"axis",backgroundColor:"#111827",borderColor:"#334155",textStyle:{color:"#e2e8f0"}},
+          grid:{left:46,right:18,top:20,bottom:32},
+          xAxis:{type:"category",data:labels,axisLabel:{color:"#94a3b8",fontSize:10},axisLine:{lineStyle:{color:"#334155"}},axisTick:{show:false}},
+          yAxis:{type:"value",max:max||null,axisLabel:{color:"#94a3b8",fontSize:10},splitLine:{lineStyle:{color:"rgba(148,163,184,.12)"}}},
+          series
+        });
+      };
+      draw("rc-cpu",[make("CPU",pts.map(x=>Number(x.cpu_usage||0)),"#38bdf8")],100);
+      draw("rc-mem",[make("内存",pts.map(x=>resourcePct(x.mem_used,x.mem_total)),"#34d399")],100);
+      draw("rc-disk",[make("硬盘",pts.map(x=>resourcePct(x.disk_used,x.disk_total)),"#a78bfa")],100);
+      draw("rc-net",[make("上行 KB/s",pts.map(x=>Number(x.net_out_speed||0)/1024),"#f59e0b"),make("下行 KB/s",pts.map(x=>Number(x.net_in_speed||0)/1024),"#22d3ee")]);
+      draw("rc-load",[make("Load 1",pts.map(x=>Number(x.load_1||0)),"#fb7185")]);
+    };
+    const loadTrend=async h=>{
+      chartHr.value=h;
+      if(trendMode.value==="resource"){
+        if(ec){ec.dispose();ec=null;}
+        await loadResources(h);
+        return;
+      }
+      await nextTick();
+      if(!ec)ec=echarts.init(document.getElementById("ec"),null,{renderer:"canvas"});
+      loadH(h);
     };
 
     const loadH=async(h,showL=true)=>{
@@ -789,7 +790,7 @@ createApp({
       applyTheme();
       fetchData();
       ft=setInterval(fetchData,2000);
-      ct=setInterval(()=>{if(showChart.value&&chartId.value)loadH(chartHr.value,false);},3000);
+      ct=setInterval(()=>{if(showDetail.value&&chartId.value)loadTrend(chartHr.value);},15000);
     });
 
     onUnmounted(()=>{
@@ -800,10 +801,10 @@ createApp({
 
     return{
       servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
-      showChart,chartName,chartHr,chartSt,showDetail,detailNode,
+      showChart,chartName,chartHr,chartSt,showDetail,detailNode,trendMode,resourcePoints,hourChoices,resourceCards,
       fb,pct,daysLeft,expTxt,expClr,fmtUp,trafficLimit,monthUsed,monthRemain,trafPct,trafClr,trafTextClr,resTextClr,resBarClr,
       getPmStr,getPmClass,getLoss,getLossClass,shortName,osIcon,
-      openDetail,closeDetail,lastReportText,openChart,closeChart,loadH,toggleLn
+      openDetail,closeDetail,lastReportText,openChart,closeChart,loadH,loadTrend,toggleLn,setTrendMode
     };
   }
 }).mount("#app");
