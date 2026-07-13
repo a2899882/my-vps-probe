@@ -174,7 +174,7 @@ func connectAndReport() {
 		}
 
 		status.PingStatuses = pingResults
-		status.TCPConnections = tcpEstablishedConnections()
+		status.TCPConnections = tcpSocketConnections()
 		status.UDPConnections = udpSocketConnections()
 		if err := conn.WriteJSON(status); err != nil {
 			return
@@ -183,7 +183,7 @@ func connectAndReport() {
 	}
 }
 
-func tcpEstablishedConnections() uint64 {
+func tcpSocketConnections() uint64 {
 	var count uint64
 	for _, path := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
 		data, err := os.ReadFile(path)
@@ -192,7 +192,7 @@ func tcpEstablishedConnections() uint64 {
 		}
 		for _, line := range strings.Split(string(data), "\n") {
 			fields := strings.Fields(line)
-			if len(fields) > 3 && fields[3] == "01" {
+			if len(fields) > 1 && strings.HasSuffix(fields[0], ":") {
 				count++
 			}
 		}
