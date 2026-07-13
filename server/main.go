@@ -73,9 +73,13 @@ swap_used INTEGER,
 swap_total INTEGER,
 load_1 REAL,
 net_in_speed INTEGER,
-net_out_speed INTEGER
+net_out_speed INTEGER,
+	tcp_connections INTEGER,
+	udp_connections INTEGER
 );`)
 
+	ensureResourceHistoryTCPColumn()
+	ensureResourceHistoryUDPColumn()
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_ping_history_server_time
 ON ping_history(server_id, timestamp);`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_resource_history_server_time
@@ -89,6 +93,42 @@ ON resource_history(server_id, timestamp);`)
 			db.Exec("DELETE FROM resource_history WHERE timestamp <= datetime('now', '-7 days')")
 		}
 	}()
+}
+
+func ensureResourceHistoryTCPColumn() {
+	rows, err := db.Query(`PRAGMA table_info(resource_history)`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, columnType string
+		var defaultValue interface{}
+		if rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk) == nil && name == "tcp_connections" {
+			return
+		}
+	}
+	_, _ = db.Exec(`ALTER TABLE resource_history ADD COLUMN tcp_connections INTEGER`)
+}
+
+func ensureResourceHistoryUDPColumn() {
+	rows, err := db.Query(`PRAGMA table_info(resource_history)`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, columnType string
+		var defaultValue interface{}
+		if rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk) == nil && name == "udp_connections" {
+			return
+		}
+	}
+	_, _ = db.Exec(`ALTER TABLE resource_history ADD COLUMN udp_connections INTEGER`)
 }
 
 func saveHistoryToDB() {
@@ -112,8 +152,8 @@ func saveHistoryToDB() {
 	resourceStmt, err := tx.Prepare(`
 INSERT INTO resource_history (
 server_id, cpu_usage, mem_used, mem_total, disk_used, disk_total,
-swap_used, swap_total, load_1, net_in_speed, net_out_speed
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+swap_used, swap_total, load_1, net_in_speed, net_out_speed, tcp_connections, udp_connections
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `)
 	if err != nil {
 		return
@@ -137,6 +177,8 @@ swap_used, swap_total, load_1, net_in_speed, net_out_speed
 			status.Load1,
 			status.NetInSpeed,
 			status.NetOutSpeed,
+			status.TCPConnections,
+			status.UDPConnections,
 		)
 
 		for _, ping := range status.PingStatuses {
@@ -489,7 +531,7 @@ func main() {
 		rows, err := db.Query(
 			`SELECT datetime(timestamp, 'localtime'), cpu_usage, mem_used, mem_total,
         disk_used, disk_total, swap_used, swap_total, load_1,
-        net_in_speed, net_out_speed
+        net_in_speed, net_out_speed, COALESCE(tcp_connections, 0), COALESCE(udp_connections, 0)
  FROM resource_history
  WHERE server_id = ? AND timestamp >= datetime('now', ?)
  ORDER BY timestamp ASC`,
@@ -503,17 +545,19 @@ func main() {
 		defer rows.Close()
 
 		type ResourcePoint struct {
-			Time        string  `json:"time"`
-			CPUUsage    float64 `json:"cpu_usage"`
-			MemUsed     uint64  `json:"mem_used"`
-			MemTotal    uint64  `json:"mem_total"`
-			DiskUsed    uint64  `json:"disk_used"`
-			DiskTotal   uint64  `json:"disk_total"`
-			SwapUsed    uint64  `json:"swap_used"`
-			SwapTotal   uint64  `json:"swap_total"`
-			Load1       float64 `json:"load_1"`
-			NetInSpeed  uint64  `json:"net_in_speed"`
-			NetOutSpeed uint64  `json:"net_out_speed"`
+			Time           string  `json:"time"`
+			CPUUsage       float64 `json:"cpu_usage"`
+			MemUsed        uint64  `json:"mem_used"`
+			MemTotal       uint64  `json:"mem_total"`
+			DiskUsed       uint64  `json:"disk_used"`
+			DiskTotal      uint64  `json:"disk_total"`
+			SwapUsed       uint64  `json:"swap_used"`
+			SwapTotal      uint64  `json:"swap_total"`
+			Load1          float64 `json:"load_1"`
+			NetInSpeed     uint64  `json:"net_in_speed"`
+			NetOutSpeed    uint64  `json:"net_out_speed"`
+			TCPConnections uint64  `json:"tcp_connections"`
+			UDPConnections uint64  `json:"udp_connections"`
 		}
 
 		points := make([]ResourcePoint, 0)
@@ -531,6 +575,8 @@ func main() {
 				&point.Load1,
 				&point.NetInSpeed,
 				&point.NetOutSpeed,
+				&point.TCPConnections,
+				&point.UDPConnections,
 			) == nil {
 				points = append(points, point)
 			}

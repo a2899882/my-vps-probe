@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"runtime"
+	"os"
 	"strings"
 	"time"
 
@@ -174,11 +174,51 @@ func connectAndReport() {
 		}
 
 		status.PingStatuses = pingResults
+		status.TCPConnections = tcpEstablishedConnections()
+		status.UDPConnections = udpSocketConnections()
 		if err := conn.WriteJSON(status); err != nil {
 			return
 		}
 		time.Sleep(2 * time.Second)
 	}
+}
+
+func tcpEstablishedConnections() uint64 {
+	var count uint64
+	for _, path := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) > 3 && fields[3] == "01" {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func udpSocketConnections() uint64 {
+	var count uint64
+	for _, path := range []string{"/proc/net/udp", "/proc/net/udp6"} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) <= 1 {
+				continue
+			}
+			parts := strings.Split(fields[1], ":")
+			if len(parts) == 2 && parts[1] != "0000" {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func tcpPing(host string) (float64, bool) {

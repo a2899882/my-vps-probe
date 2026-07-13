@@ -309,6 +309,7 @@ body::before{
         <div class="flex justify-between"><span class="t4">网络</span><span class="jm t2">↑ {{ fb((nd.status&&nd.status.net_out_speed)||0) }}/s | ↓ {{ fb((nd.status&&nd.status.net_in_speed)||0) }}/s</span></div>
         <div class="flex justify-between"><span class="t4">流量</span><span class="jm t2">↑ {{ fb((nd.status&&nd.status.net_out_transfer)||0) }} | ↓ {{ fb((nd.status&&nd.status.net_in_transfer)||0) }}</span></div>
         <div class="flex justify-between"><span class="t4">负载</span><span class="jm t2">{{ ((nd.status&&nd.status.load_1)||0).toFixed(2) }}</span></div>
+        <div class="flex justify-between"><span class="t4">连接</span><span class="jm t2">TCP {{ (nd.status&&nd.status.tcp_connections)||0 }} | UDP {{ (nd.status&&nd.status.udp_connections)||0 }}</span></div>
       </div>
 
       <div v-if="nd._tlim>0" class="monthly-usage pt-2 mt-1 border-t dv relative z-20">
@@ -384,6 +385,7 @@ body::before{
               <span>内存 {{ fb((detailNode.status&&detailNode.status.mem_total)||0) }}</span>
               <span>硬盘 {{ fb((detailNode.status&&detailNode.status.disk_total)||0) }}</span>
               <span>负载 {{ ((detailNode.status&&detailNode.status.load_1)||0).toFixed(2) }}</span>
+              <span>TCP {{ (detailNode.status&&detailNode.status.tcp_connections)||0 }} / UDP {{ (detailNode.status&&detailNode.status.udp_connections)||0 }}</span>
               <span>上报 {{ lastReportText(detailNode.status&&detailNode.status.last_report) }}</span>
             </div>
           </div>
@@ -453,7 +455,8 @@ createApp({
       {id:"rc-mem",title:"内存使用率",note:"百分比"},
       {id:"rc-disk",title:"硬盘使用率",note:"百分比"},
       {id:"rc-net",title:"网络速率",note:"上行 / 下行"},
-      {id:"rc-load",title:"系统负载",note:"Load 1"}
+      {id:"rc-load",title:"系统负载",note:"Load 1"},
+      {id:"rc-connections",title:"连接数",note:"TCP / UDP"}
     ];
     const now=ref("");
     let ec=null,ft=null,ct=null,nt=null;
@@ -729,7 +732,8 @@ createApp({
               return title+"<br>"+rows.map(r=>{
                 const isNet=id==="rc-net";
                 const isLoad=id==="rc-load";
-                const value=isNet ? fmtRate(Number(r.value||0)*1024) : fmtNum(r.value,isLoad?2:1)+(isLoad?"":"%");
+                const isConnections=id==="rc-connections";
+                const value=isNet ? fmtRate(Number(r.value||0)*1024) : isConnections ? Math.round(Number(r.value||0)) : fmtNum(r.value,isLoad?2:1)+(isLoad?"":"%");
                 return r.marker+r.seriesName+": "+value;
               }).join("<br>");
             }
@@ -745,6 +749,10 @@ createApp({
       draw("rc-disk",[make("硬盘",pts.map(x=>resourcePct(x.disk_used,x.disk_total)),"#a78bfa")],100);
       draw("rc-net",[make("上行",pts.map(x=>Number(x.net_out_speed||0)/1024),"#f59e0b"),make("下行",pts.map(x=>Number(x.net_in_speed||0)/1024),"#22d3ee")]);
       draw("rc-load",[make("Load 1",pts.map(x=>Number(x.load_1||0)),"#fb7185")]);
+      draw("rc-connections",[
+        make("TCP",pts.map(x=>Number(x.tcp_connections||0)),"#c084fc"),
+        make("UDP",pts.map(x=>Number(x.udp_connections||0)),"#22d3ee")
+      ]);
     };
     const loadTrend=async h=>{
       chartHr.value=h;

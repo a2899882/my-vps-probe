@@ -33,7 +33,7 @@ type CardPingStatus struct {
 
 type ServerStatus struct {
 	ServerID         string           `json:"server_id"`
-        LastReport       int64            `json:"last_report"`
+	LastReport       int64            `json:"last_report"`
 	IsOnline         bool             `json:"is_online"`
 	Uptime           uint64           `json:"uptime"`
 	Load1            float64          `json:"load_1"`
@@ -49,6 +49,8 @@ type ServerStatus struct {
 	NetOutSpeed      uint64           `json:"net_out_speed"`
 	NetInTransfer    uint64           `json:"net_in_transfer"`
 	NetOutTransfer   uint64           `json:"net_out_transfer"`
+	TCPConnections   uint64           `json:"tcp_connections"`
+	UDPConnections   uint64           `json:"udp_connections"`
 	CountryCode      string           `json:"country_code"`
 	PingStatuses     []PingResult     `json:"ping_statuses"`
 	CardPingStatuses []CardPingStatus `json:"card_ping_statuses"`
