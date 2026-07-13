@@ -416,6 +416,15 @@ body::before{
         </template>
 
         <template v-else>
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap gap-1">
+              <button @click="pingSmooth=!pingSmooth;loadH(chartHr,false)" :class="pingSmooth?'bact':'t4'" class="px-3 py-1.5 rounded-lg text-[11px] font-bold">趋势平滑</button>
+              <button @click="pingConnect=!pingConnect;loadH(chartHr,false)" :class="pingConnect?'bact':'t4'" class="px-3 py-1.5 rounded-lg text-[11px] font-bold">断点标记</button>
+              <button @click="pingQuarter=!pingQuarter;loadH(chartHr,false)" :class="pingQuarter?'bact':'t4'" class="px-3 py-1.5 rounded-lg text-[11px] font-bold">四分之一</button>
+              <button @click="toggleAllPing" class="px-3 py-1.5 rounded-lg text-[11px] font-bold t4 hover:text-slate-100">{{ allPingOn?'隐藏全部':'显示全部' }}</button>
+            </div>
+            <span class="text-[10px] t4">{{ pingConnect?'异常时刻已标记':'异常时刻不标记' }}</span>
+          </div>
           <div v-if="Object.keys(chartSt).length" class="mb-4 flex flex-wrap gap-2">
             <button v-for="(st,tgt) in chartSt" :key="tgt" @click="toggleLn(tgt)" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border"
                     :style="{borderColor:st.c+'66',color:st.on?st.c:'#94a3b8',background:st.on?st.c+'16':'transparent'}">
@@ -437,6 +446,7 @@ createApp({
     const showChart=ref(false),chartId=ref(""),chartName=ref(""),chartHr=ref(1),chartSt=ref({});
     const showDetail=ref(false),detailNode=ref(null);
     const trendMode=ref("resource"),resourcePoints=ref([]);
+    const pingSmooth=ref(true),pingConnect=ref(false),pingQuarter=ref(false);
     const hourChoices=[{h:0.25,n:"实时"},{h:1,n:"1小时"},{h:4,n:"4小时"},{h:24,n:"1天"},{h:72,n:"3天"},{h:168,n:"7天"}];
     const resourceCards=[
       {id:"rc-cpu",title:"CPU 使用率",note:"百分比"},
@@ -655,10 +665,27 @@ createApp({
 
     const toggleLn=t=>{
       chartSt.value[t].on=!chartSt.value[t].on;
-      ec.dispatchAction({type:"legendToggleSelect",name:t});
+      loadH(chartHr.value,false);
+    };
+    const allPingOn=computed(()=>Object.values(chartSt.value).some(x=>x.on));
+    const toggleAllPing=()=>{
+      const next=!allPingOn.value;
+      Object.values(chartSt.value).forEach(x=>x.on=next);
+      loadH(chartHr.value,false);
     };
 
     const resourceCharts={};
+    const fmtNum=(v,d=1)=>Number(v||0).toFixed(d);
+    const fmtRate=v=>{
+      v=Number(v||0);
+      if(v>=1048576)return (v/1048576).toFixed(1)+" MB/s";
+      if(v>=1024)return (v/1024).toFixed(1)+" KB/s";
+      return Math.round(v)+" B/s";
+    };
+    const resizeCharts=()=>{
+      if(ec)ec.resize();
+      Object.values(resourceCharts).forEach(c=>c.resize());
+    };
     const disposeResourceCharts=()=>{
       Object.keys(resourceCharts).forEach(id=>{
         resourceCharts[id].dispose();
@@ -692,7 +719,21 @@ createApp({
         resourceCharts[id]=c;
         c.setOption({
           animation:false,
-          tooltip:{trigger:"axis",backgroundColor:"#111827",borderColor:"#334155",textStyle:{color:"#e2e8f0"}},
+          tooltip:{
+            trigger:"axis",
+            backgroundColor:"#111827",
+            borderColor:"#334155",
+            textStyle:{color:"#e2e8f0"},
+            formatter:rows=>{
+              const title=rows[0]&&rows[0].axisValueLabel||"";
+              return title+"<br>"+rows.map(r=>{
+                const isNet=id==="rc-net";
+                const isLoad=id==="rc-load";
+                const value=isNet ? fmtRate(Number(r.value||0)*1024) : fmtNum(r.value,isLoad?2:1)+(isLoad?"":"%");
+                return r.marker+r.seriesName+": "+value;
+              }).join("<br>");
+            }
+          },
           grid:{left:46,right:18,top:20,bottom:32},
           xAxis:{type:"category",data:labels,axisLabel:{color:"#94a3b8",fontSize:10},axisLine:{lineStyle:{color:"#334155"}},axisTick:{show:false}},
           yAxis:{type:"value",max:max||null,axisLabel:{color:"#94a3b8",fontSize:10},splitLine:{lineStyle:{color:"rgba(148,163,184,.12)"}}},
@@ -702,7 +743,7 @@ createApp({
       draw("rc-cpu",[make("CPU",pts.map(x=>Number(x.cpu_usage||0)),"#38bdf8")],100);
       draw("rc-mem",[make("内存",pts.map(x=>resourcePct(x.mem_used,x.mem_total)),"#34d399")],100);
       draw("rc-disk",[make("硬盘",pts.map(x=>resourcePct(x.disk_used,x.disk_total)),"#a78bfa")],100);
-      draw("rc-net",[make("上行 KB/s",pts.map(x=>Number(x.net_out_speed||0)/1024),"#f59e0b"),make("下行 KB/s",pts.map(x=>Number(x.net_in_speed||0)/1024),"#22d3ee")]);
+      draw("rc-net",[make("上行",pts.map(x=>Number(x.net_out_speed||0)/1024),"#f59e0b"),make("下行",pts.map(x=>Number(x.net_in_speed||0)/1024),"#22d3ee")]);
       draw("rc-load",[make("Load 1",pts.map(x=>Number(x.load_1||0)),"#fb7185")]);
     };
     const loadTrend=async h=>{
@@ -732,12 +773,31 @@ createApp({
           if(dv>0){tm[ts][tgt].s+=dv;tm[ts][tgt].c++;}else tm[ts][tgt].f++;
           tgts.add(tgt);
         });
-        const times=Object.keys(tm).sort();
+        const allTimes=Object.keys(tm).sort();
+        const times=pingQuarter.value?allTimes.filter((_,i)=>i%4===0):allTimes;
         const labels=times.map(t=>t.slice(11,16));
+        const isPingVisible=tgt=>!chartSt.value[tgt]||chartSt.value[tgt].on!==false;
+        const breakMarks=times.filter(t=>Object.entries(tm[t]).some(([tgt,p])=>
+          isPingVisible(tgt)&&(p.f>0||p.c===0)
+        )).map(t=>({
+          xAxis:t.slice(11,16),
+          lineStyle:{color:"rgba(56,189,248,.78)",width:1.3,type:"solid"},
+          label:{show:false}
+        }));
+        const movingAverage=(arr,span=7)=>arr.map((v,i)=>{
+          if(v===null||v===undefined)return null;
+          let sum=0,count=0;
+          for(let j=Math.max(0,i-span);j<=Math.min(arr.length-1,i+span);j++){
+            const n=arr[j];
+            if(n!==null&&n!==undefined){sum+=n;count++;}
+          }
+          return count?sum/count:v;
+        });
         const colors=["#818cf8","#34d399","#f43f5e","#f59e0b","#38bdf8","#a78bfa"];
         const stats={},series=[];
         Array.from(tgts).forEach((tgt,i)=>{
           const c=colors[i%colors.length];
+          const on=chartSt.value[tgt]?chartSt.value[tgt].on:true;
           const pts=[];let sd=0,sc=0,sf=0,sn=0;
           times.forEach(t=>{
             const p=tm[t][tgt];
@@ -746,14 +806,20 @@ createApp({
             pts.push((p.f>0||p.c===0)?null:p.s/p.c);
             if(p.c>0){sd+=p.s;sc+=p.c;}
           });
-          stats[tgt]={c,on:true,avg:sc>0?sd/sc:0,loss:sn>0?sf/sn*100:0};
+          const shownPts=pingSmooth.value?movingAverage(pts):pts;
+          stats[tgt]={c,on,avg:sc>0?sd/sc:0,loss:sn>0?sf/sn*100:0};
           series.push({
-            name:tgt,type:"line",smooth:true,connectNulls:false,symbol:"none",sampling:"lttb",z:3,
+            name:tgt,type:"line",smooth:false,connectNulls:pingConnect.value,symbol:"none",sampling:"lttb",z:3,
             itemStyle:{color:c},
-            lineStyle:{width:2.2,opacity:.96},
-            areaStyle:{opacity:.42,color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:c+"16"},{offset:.62,color:c+"08"},{offset:1,color:c+"00"}])},
+            lineStyle:{width:2.2,opacity:on?.96:0},
+            areaStyle:{opacity:on?.42:0,color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:c+"16"},{offset:.62,color:c+"08"},{offset:1,color:c+"00"}])},
             emphasis:{focus:"series"},
-            data:pts
+            markLine:i===0&&pingConnect.value&&allPingOn.value&&breakMarks.length?{
+              silent:true,
+              symbol:"none",
+              data:breakMarks
+            }:undefined,
+            data:shownPts
           });
         });
         chartSt.value=stats;
@@ -787,6 +853,7 @@ createApp({
     };
 
     onMounted(()=>{
+      window.addEventListener("resize",resizeCharts);
       applyTheme();
       fetchData();
       ft=setInterval(fetchData,2000);
@@ -797,14 +864,16 @@ createApp({
       clearInterval(ft);
       clearInterval(ct);
       clearInterval(nt);
+      window.removeEventListener("resize",resizeCharts);
+      disposeResourceCharts();
     });
 
     return{
       servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
-      showChart,chartName,chartHr,chartSt,showDetail,detailNode,trendMode,resourcePoints,hourChoices,resourceCards,
+      showChart,chartName,chartHr,chartSt,showDetail,detailNode,trendMode,resourcePoints,pingSmooth,pingConnect,pingQuarter,allPingOn,hourChoices,resourceCards,
       fb,pct,daysLeft,expTxt,expClr,fmtUp,trafficLimit,monthUsed,monthRemain,trafPct,trafClr,trafTextClr,resTextClr,resBarClr,
       getPmStr,getPmClass,getLoss,getLossClass,shortName,osIcon,
-      openDetail,closeDetail,lastReportText,openChart,closeChart,loadH,loadTrend,toggleLn,setTrendMode
+      openDetail,closeDetail,lastReportText,openChart,closeChart,loadH,loadTrend,toggleLn,toggleAllPing,setTrendMode
     };
   }
 }).mount("#app");
