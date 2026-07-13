@@ -10,6 +10,7 @@ import (
 	"my-vps-probe/common"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -49,31 +50,101 @@ func basicAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 func initDB() {
 	db, _ = sql.Open("sqlite", "data.db")
-	db.Exec(`CREATE TABLE IF NOT EXISTS ping_history (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, server_id TEXT, target_name TEXT, delay REAL, loss_rate REAL);`)
+
+	db.Exec(`CREATE TABLE IF NOT EXISTS ping_history (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+server_id TEXT,
+target_name TEXT,
+delay REAL,
+loss_rate REAL
+);`)
+
+	db.Exec(`CREATE TABLE IF NOT EXISTS resource_history (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+server_id TEXT,
+cpu_usage REAL,
+mem_used INTEGER,
+mem_total INTEGER,
+disk_used INTEGER,
+disk_total INTEGER,
+swap_used INTEGER,
+swap_total INTEGER,
+load_1 REAL,
+net_in_speed INTEGER,
+net_out_speed INTEGER
+);`)
+
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_ping_history_server_time
+ON ping_history(server_id, timestamp);`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_resource_history_server_time
+ON resource_history(server_id, timestamp);`)
+
 	go func() {
 		for {
 			time.Sleep(1 * time.Minute)
 			saveHistoryToDB()
-			db.Exec("DELETE FROM ping_history WHERE timestamp <= datetime('now', '-3 days')")
+			db.Exec("DELETE FROM ping_history WHERE timestamp <= datetime('now', '-7 days')")
+			db.Exec("DELETE FROM resource_history WHERE timestamp <= datetime('now', '-7 days')")
 		}
 	}()
 }
+
 func saveHistoryToDB() {
 	mapMutex.RLock()
 	defer mapMutex.RUnlock()
-	tx, _ := db.Begin()
+
+	tx, err := db.Begin()
+	if err != nil {
+		return
+	}
 	defer tx.Commit()
-	stmt, _ := tx.Prepare("INSERT INTO ping_history (server_id, target_name, delay, loss_rate) VALUES (?, ?, ?, ?)")
-	defer stmt.Close()
+
+	pingStmt, err := tx.Prepare(
+		"INSERT INTO ping_history (server_id, target_name, delay, loss_rate) VALUES (?, ?, ?, ?)",
+	)
+	if err != nil {
+		return
+	}
+	defer pingStmt.Close()
+
+	resourceStmt, err := tx.Prepare(`
+INSERT INTO resource_history (
+server_id, cpu_usage, mem_used, mem_total, disk_used, disk_total,
+swap_used, swap_total, load_1, net_in_speed, net_out_speed
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`)
+	if err != nil {
+		return
+	}
+	defer resourceStmt.Close()
+
 	for serverID, status := range serverStatusMap {
 		if !status.IsOnline {
 			continue
 		}
+
+		resourceStmt.Exec(
+			serverID,
+			status.CPUUsage,
+			status.MemUsed,
+			status.MemTotal,
+			status.DiskUsed,
+			status.DiskTotal,
+			status.SwapUsed,
+			status.SwapTotal,
+			status.Load1,
+			status.NetInSpeed,
+			status.NetOutSpeed,
+		)
+
 		for _, ping := range status.PingStatuses {
-			stmt.Exec(serverID, ping.TargetName, ping.CurrentDelay, ping.LossRate)
+			pingStmt.Exec(serverID, ping.TargetName, ping.CurrentDelay, ping.LossRate)
 		}
 	}
 }
+
 func loadConfig() {
 	data, err := os.ReadFile("config.json")
 	if err == nil {
@@ -336,7 +407,7 @@ func main() {
 			}
 			st.ServerID = cNode.ID
 			st.IsOnline = true
-                        st.LastReport = time.Now().Unix()
+			st.LastReport = time.Now().Unix()
 			mapMutex.Lock()
 			serverStatusMap[cNode.ID] = st
 			mapMutex.Unlock()
@@ -365,25 +436,104 @@ func main() {
 		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")
 		w.Header().Set("Pragma", "no-cache")
 		w.Header().Set("Expires", "0")
+
 		serverID := r.URL.Query().Get("server_id")
-		hours := r.URL.Query().Get("hours")
-		if hours == "" {
-			hours = "24"
+		hours, err := strconv.Atoi(r.URL.Query().Get("hours"))
+		if err != nil || hours < 1 || hours > 168 {
+			hours = 24
 		}
-		query := fmt.Sprintf(`SELECT datetime(timestamp, 'localtime'), target_name, delay, loss_rate FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', '-%s hours') ORDER BY timestamp ASC`, hours)
-		rows, _ := db.Query(query, serverID)
+
+		rows, err := db.Query(
+			`SELECT datetime(timestamp, 'localtime'), target_name, delay, loss_rate
+ FROM ping_history
+ WHERE server_id = ? AND timestamp >= datetime('now', ?)
+ ORDER BY timestamp ASC`,
+			serverID,
+			fmt.Sprintf("-%d hours", hours),
+		)
+		if err != nil {
+			json.NewEncoder(w).Encode([]interface{}{})
+			return
+		}
 		defer rows.Close()
+
 		type DataPoint struct {
 			Time   string  `json:"time"`
 			Target string  `json:"target"`
 			Delay  float64 `json:"delay"`
 			Loss   float64 `json:"loss"`
 		}
+
 		points := make([]DataPoint, 0)
 		for rows.Next() {
-			var p DataPoint
-			rows.Scan(&p.Time, &p.Target, &p.Delay, &p.Loss)
-			points = append(points, p)
+			var point DataPoint
+			if rows.Scan(&point.Time, &point.Target, &point.Delay, &point.Loss) == nil {
+				points = append(points, point)
+			}
+		}
+		json.NewEncoder(w).Encode(points)
+	})
+
+	http.HandleFunc("/api/resource_history", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+
+		serverID := r.URL.Query().Get("server_id")
+		hours, err := strconv.Atoi(r.URL.Query().Get("hours"))
+		if err != nil || hours < 1 || hours > 168 {
+			hours = 1
+		}
+
+		rows, err := db.Query(
+			`SELECT datetime(timestamp, 'localtime'), cpu_usage, mem_used, mem_total,
+        disk_used, disk_total, swap_used, swap_total, load_1,
+        net_in_speed, net_out_speed
+ FROM resource_history
+ WHERE server_id = ? AND timestamp >= datetime('now', ?)
+ ORDER BY timestamp ASC`,
+			serverID,
+			fmt.Sprintf("-%d hours", hours),
+		)
+		if err != nil {
+			json.NewEncoder(w).Encode([]interface{}{})
+			return
+		}
+		defer rows.Close()
+
+		type ResourcePoint struct {
+			Time        string  `json:"time"`
+			CPUUsage    float64 `json:"cpu_usage"`
+			MemUsed     uint64  `json:"mem_used"`
+			MemTotal    uint64  `json:"mem_total"`
+			DiskUsed    uint64  `json:"disk_used"`
+			DiskTotal   uint64  `json:"disk_total"`
+			SwapUsed    uint64  `json:"swap_used"`
+			SwapTotal   uint64  `json:"swap_total"`
+			Load1       float64 `json:"load_1"`
+			NetInSpeed  uint64  `json:"net_in_speed"`
+			NetOutSpeed uint64  `json:"net_out_speed"`
+		}
+
+		points := make([]ResourcePoint, 0)
+		for rows.Next() {
+			var point ResourcePoint
+			if rows.Scan(
+				&point.Time,
+				&point.CPUUsage,
+				&point.MemUsed,
+				&point.MemTotal,
+				&point.DiskUsed,
+				&point.DiskTotal,
+				&point.SwapUsed,
+				&point.SwapTotal,
+				&point.Load1,
+				&point.NetInSpeed,
+				&point.NetOutSpeed,
+			) == nil {
+				points = append(points, point)
+			}
 		}
 		json.NewEncoder(w).Encode(points)
 	})
