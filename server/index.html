@@ -251,8 +251,18 @@ body::before{
     </div>
   </div>
 
+  <div class="gc mb-3 px-4 py-3 flex flex-wrap gap-2 items-center">
+    <button v-for="g in groupTabs" :key="g.key" @click="activeGroup=g.key"
+      class="px-3 py-1.5 rounded-full text-xs font-black transition border"
+      :class="activeGroup===g.key
+        ? 'bg-violet-500 text-white border-violet-400 shadow-lg'
+        : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'">
+      {{ g.name }} <span class="opacity-75">({{ g.count }})</span>
+    </button>
+  </div>
+
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 pb-8">
-    <div v-for="nd in servers" :key="nd.id" class="gc node-card card-polish p-4 flex flex-col relative overflow-hidden">
+    <div v-for="nd in displayServers" :key="nd.id" class="gc node-card card-polish p-4 flex flex-col relative overflow-hidden">
       <div v-if="!nd.status||!nd.status.is_online" class="absolute inset-0 pointer-events-none z-0" style="background:repeating-linear-gradient(-45deg,transparent,transparent 10px,rgba(239,68,68,.06) 10px,rgba(239,68,68,.06) 20px)"></div>
       <div v-if="!nd.status||!nd.status.is_online" class="absolute inset-0 border border-red-500/20 rounded-[18px] pointer-events-none z-10"></div>
 
@@ -325,9 +335,16 @@ body::before{
           <span class="text-[10px] t4 font-bold">延迟</span>
           <span class="cap jm">TCP</span>
           <span style="font-size:8px;color:rgba(100,116,139,.55)">60格 = 60分钟</span>
+            <button
+              v-if="cardPingCount(nd)>3"
+              type="button"
+              @click="togglePingFold(nd)"
+              class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-md transition"
+              style="color:#a5b4fc;background:rgba(99,102,241,.13);border:1px solid rgba(129,140,248,.20)"
+            >{{ pingFoldOpen(nd) ? '收起' : '展开（共 ' + cardPingCount(nd) + ' 个）' }}</button>
         </div>
         <template v-if="nd.status&&nd.status.ping_statuses&&nd.status.ping_statuses.length>0">
-          <div v-for="ps in ((nd.status && nd.status.card_ping_statuses) || [])" :key="ps.target_name" class="pr">
+          <div v-for="ps in visibleCardPings(nd)"" :key="ps.target_name" class="pr">
             <span class="pn t3">{{ ps.target_name }}</span>
             <div class="pbars">
               <div v-for="i in Math.max(0,60-(ps.history_60?ps.history_60.length:0))" :key="'e'+i" class="pb pb-n"></div>
@@ -344,7 +361,7 @@ body::before{
           <div class="ploss-row">
             <span class="ploss-label t4">丢包率</span>
             <span
-              v-for="ps in ((nd.status && nd.status.card_ping_statuses) || [])"
+              v-for="ps in visibleCardPings(nd)""
               :key="'lp'+ps.target_name"
               class="ploss-item"
               :class="getLossClass(ps)"
@@ -445,6 +462,7 @@ const {createApp,ref,computed,watch,onMounted,onUnmounted,nextTick}=Vue;
 createApp({
   setup(){
     const servers=ref([]),siteName=ref("探针看板"),theme=ref("km");
+    const pingFoldState=ref({});
     const showChart=ref(false),chartId=ref(""),chartName=ref(""),chartHr=ref(1),chartSt=ref({});
     const showDetail=ref(false),detailNode=ref(null);
     const trendMode=ref("resource"),resourcePoints=ref([]);
@@ -514,11 +532,28 @@ createApp({
       }catch(e){}
     };
 
-    const onlineCnt=computed(()=>servers.value.filter(n=>n.status&&n.status.is_online).length);
-    const totIn=computed(()=>servers.value.reduce((a,c)=>a+((c.status&&c.status.net_in_transfer)||0),0));
-    const totOut=computed(()=>servers.value.reduce((a,c)=>a+((c.status&&c.status.net_out_transfer)||0),0));
-    const spIn=computed(()=>servers.value.reduce((a,c)=>a+((c.status&&c.status.net_in_speed)||0),0));
-    const spOut=computed(()=>servers.value.reduce((a,c)=>a+((c.status&&c.status.net_out_speed)||0),0));
+    const activeGroup=ref('__all__');
+    const groupTabs=computed(()=>{
+      const groups={};
+      servers.value.forEach(n=>{
+        const group=String(n.group||'').trim();
+        if(group) groups[group]=(groups[group]||0)+1;
+      });
+      return [
+        {key:'__all__',name:'全部',count:servers.value.length},
+        ...Object.keys(groups)
+          .sort((a,b)=>a.localeCompare(b,'zh-Hans-CN'))
+          .map(group=>({key:group,name:group,count:groups[group]}))
+      ];
+    });
+    const displayServers=computed(()=>activeGroup.value==='__all__'
+      ? servers.value
+      : servers.value.filter(n=>String(n.group||'').trim()===activeGroup.value));
+    const onlineCnt=computed(()=>displayServers.value.filter(n=>n.status&&n.status.is_online).length);
+    const totIn=computed(()=>displayServers.value.reduce((a,c)=>a+((c.status&&c.status.net_in_transfer)||0),0));
+    const totOut=computed(()=>displayServers.value.reduce((a,c)=>a+((c.status&&c.status.net_out_transfer)||0),0));
+    const spIn=computed(()=>displayServers.value.reduce((a,c)=>a+((c.status&&c.status.net_in_speed)||0),0));
+    const spOut=computed(()=>displayServers.value.reduce((a,c)=>a+((c.status&&c.status.net_out_speed)||0),0));
 
     const fb=b=>{
       if(!b||b===0)return"0 B";
@@ -576,6 +611,19 @@ createApp({
     const trafTextClr=p=>+p>=90?"text-red-400":+p>=60?"text-amber-300":"t2";
     const resTextClr=p=>+p>=85?"text-red-400":+p>=60?"text-amber-300":"t2";
     const resBarClr=(p,normal)=>+p>=85?"#f87171":+p>=60?"#fbbf24":normal;
+
+    const cardPingList=nd=>((nd&&nd.status&&nd.status.card_ping_statuses)||[]);
+    const cardPingCount=nd=>cardPingList(nd).length;
+    const pingFoldOpen=nd=>!!pingFoldState.value[(nd&&nd.id)||''];
+    const visibleCardPings=nd=>{
+      const list=cardPingList(nd);
+      return pingFoldOpen(nd) ? list : list.slice(0,3);
+    };
+    const togglePingFold=nd=>{
+      const id=(nd&&nd.id)||'';
+      if(!id)return;
+      pingFoldState.value={...pingFoldState.value,[id]:!pingFoldState.value[id]};
+    };
 
     const getPmStr=ps=>{
       const cd=(ps.avg_delay_1h ?? ps.current_delay);
@@ -877,10 +925,11 @@ createApp({
     });
 
     return{
-      servers,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
+      servers,displayServers,groupTabs,activeGroup,siteName,theme,toggleTheme,now,onlineCnt,totIn,totOut,spIn,spOut,
       showChart,chartName,chartHr,chartSt,showDetail,detailNode,trendMode,resourcePoints,pingSmooth,pingConnect,pingQuarter,allPingOn,hourChoices,resourceCards,
       fb,pct,daysLeft,expTxt,expClr,fmtUp,trafficLimit,monthUsed,monthRemain,trafPct,trafClr,trafTextClr,resTextClr,resBarClr,
       getPmStr,getPmClass,getLoss,getLossClass,shortName,osIcon,
+      cardPingCount,pingFoldOpen,visibleCardPings,togglePingFold,
       openDetail,closeDetail,lastReportText,openChart,closeChart,loadH,loadTrend,toggleLn,toggleAllPing,setTrendMode
     };
   }

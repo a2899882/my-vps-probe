@@ -10,7 +10,7 @@ SERVICE_NAME="probe-server"
 echo "==> 1. install packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y git curl wget tar ca-certificates
+apt-get install -y git curl wget tar ca-certificates build-essential
 
 if ! command -v go >/dev/null 2>&1; then
   echo "==> 2. install golang ${GO_VERSION}"
@@ -32,9 +32,18 @@ else
   git -C "${INSTALL_DIR}" pull --ff-only origin "${BRANCH}"
 fi
 
-echo "==> 4. build server"
+echo "==> 4. build server and Linux agents"
 cd "${INSTALL_DIR}"
-/usr/local/go/bin/go build -o "${INSTALL_DIR}/probe-server" ./server
+GO_BIN="/usr/local/go/bin/go"
+[ -x "$GO_BIN" ] || GO_BIN="$(command -v go)"
+
+"$GO_BIN" build -o "${INSTALL_DIR}/probe-server" ./server
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "$GO_BIN" build -o "${INSTALL_DIR}/server/probe-agent-amd64" ./agent
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "$GO_BIN" build -o "${INSTALL_DIR}/server/probe-agent-arm64" ./agent
+chmod 0755 \
+  "${INSTALL_DIR}/probe-server" \
+  "${INSTALL_DIR}/server/probe-agent-amd64" \
+  "${INSTALL_DIR}/server/probe-agent-arm64"
 
 echo "==> 5. install systemd service"
 cat > /etc/systemd/system/${SERVICE_NAME}.service <<EOF

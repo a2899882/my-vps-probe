@@ -21,6 +21,7 @@ type AppConfig struct {
 	AdminPass string              `json:"admin_pass"`
 	Nodes     []common.NodeConfig `json:"nodes"`
 	PingTasks []common.PingTask   `json:"ping_tasks"`
+	Telegram  TelegramConfig      `json:"telegram"`
 }
 
 var (
@@ -84,6 +85,11 @@ net_out_speed INTEGER,
 ON ping_history(server_id, timestamp);`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_resource_history_server_time
 ON resource_history(server_id, timestamp);`)
+
+	db.Exec(`CREATE TABLE IF NOT EXISTS notification_events (
+event_key TEXT PRIMARY KEY,
+sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);`)
 
 	go func() {
 		for {
@@ -212,6 +218,23 @@ func loadConfig() {
 
 var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
 
+func pingTasksForNode(tasks []common.PingTask, nodeID string) []common.PingTask {
+	out := make([]common.PingTask, 0, len(tasks))
+	for _, t := range tasks {
+		if t.NodeIDs == nil {
+			out = append(out, t)
+			continue
+		}
+		for _, id := range t.NodeIDs {
+			if id == nodeID {
+				out = append(out, t)
+				break
+			}
+		}
+	}
+	return out
+}
+
 func buildCardPingStatuses(serverID string) []common.CardPingStatus {
 	rows, err := db.Query(`SELECT datetime(timestamp, 'localtime'), target_name, delay FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', '-1 hours') ORDER BY timestamp ASC`, serverID)
 	if err != nil {
@@ -251,12 +274,22 @@ func buildCardPingStatuses(serverID string) []common.CardPingStatus {
 	}
 
 	configMutex.RLock()
-	taskOrder := make([]string, 0, len(appConfig.PingTasks))
-	for _, t := range appConfig.PingTasks {
-		taskOrder = append(taskOrder, t.Name)
-		targetSet[t.Name] = true
-	}
+	tasks := pingTasksForNode(appConfig.PingTasks, serverID)
 	configMutex.RUnlock()
+	taskOrder := make([]string, 0, len(tasks))
+	allowed := map[string]bool{}
+	for _, t := range tasks {
+		taskOrder = append(taskOrder, t.Name)
+		allowed[t.Name] = true
+	}
+	for name := range targetSet {
+		if !allowed[name] {
+			delete(targetSet, name)
+		}
+	}
+	for _, name := range taskOrder {
+		targetSet[name] = true
+	}
 
 	ordered := make([]string, 0, len(targetSet))
 	used := map[string]bool{}
@@ -323,6 +356,7 @@ func buildCardPingStatuses(serverID string) []common.CardPingStatus {
 func main() {
 	loadConfig()
 	initDB()
+	startNotificationWorker()
 	defer db.Close()
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")
@@ -361,6 +395,7 @@ func main() {
 			configMutex.RLock()
 			safeConfig := appConfig
 			safeConfig.AdminPass = ""
+			safeConfig.Telegram.Token = ""
 			json.NewEncoder(w).Encode(safeConfig)
 			configMutex.RUnlock()
 		} else if r.Method == "POST" {
@@ -370,6 +405,10 @@ func main() {
 				if newConfig.AdminPass == "" {
 					newConfig.AdminPass = appConfig.AdminPass
 				}
+				if newConfig.Telegram.Token == "" {
+					newConfig.Telegram.Token = appConfig.Telegram.Token
+				}
+				newConfig.Telegram.normalize()
 				appConfig = newConfig
 				data, _ := json.MarshalIndent(appConfig, "", "  ")
 				os.WriteFile("config.json", data, 0600)
@@ -396,7 +435,7 @@ func main() {
 						mapMutex.Unlock()
 						continue
 					}
-					if err := conn.WriteJSON(common.AgentInstruction{ServerName: name, PingTasks: pTasks}); err != nil {
+					if err := conn.WriteJSON(common.AgentInstruction{ServerName: name, PingTasks: pingTasksForNode(pTasks, id)}); err != nil {
 						conn.Close()
 						delete(activeConns, id)
 						mapMutex.Lock()
@@ -411,6 +450,26 @@ func main() {
 			}
 		}
 	}))
+	http.HandleFunc("/api/admin/telegram/test", basicAuth(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		configMutex.RLock()
+		tg := appConfig.Telegram
+		configMutex.RUnlock()
+		if !tg.Enabled || tg.Token == "" || tg.ChatID == "" {
+			http.Error(w, "请先启用 TG 通知，并填写 Bot Token 与 Chat ID 后保存", http.StatusBadRequest)
+			return
+		}
+		if err := sendTelegram(tg, "✅ My VPS Probe 测试通知\nTG 通知配置成功。"); err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		w.Write([]byte(`{"status":"ok"}`))
+	}))
+
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("token")
 		configMutex.RLock()
@@ -432,7 +491,12 @@ func main() {
 		activeConns[cNode.ID] = conn
 		connMutex.Unlock()
 		defer func() { connMutex.Lock(); delete(activeConns, cNode.ID); connMutex.Unlock() }()
-		conn.WriteJSON(common.AgentInstruction{ServerName: cNode.Name, PingTasks: pTasks})
+		connMutex.Lock()
+		writeErr := conn.WriteJSON(common.AgentInstruction{ServerName: cNode.Name, PingTasks: pingTasksForNode(pTasks, cNode.ID)})
+		connMutex.Unlock()
+		if writeErr != nil {
+			return
+		}
 		mapMutex.Lock()
 		st := serverStatusMap[cNode.ID]
 		st.IsOnline = true
@@ -480,6 +544,17 @@ func main() {
 		w.Header().Set("Expires", "0")
 
 		serverID := r.URL.Query().Get("server_id")
+
+		// 图表仅显示当前仍分配给该节点的任务；SQLite 中的旧历史不删除。
+		configMutex.RLock()
+		currentTasks := pingTasksForNode(appConfig.PingTasks, serverID)
+		configMutex.RUnlock()
+
+		allowedTargets := make(map[string]bool, len(currentTasks))
+		for _, task := range currentTasks {
+			allowedTargets[task.Name] = true
+		}
+
 		hours, err := strconv.Atoi(r.URL.Query().Get("hours"))
 		if err != nil || hours < 1 || hours > 168 {
 			hours = 24
@@ -509,7 +584,7 @@ func main() {
 		points := make([]DataPoint, 0)
 		for rows.Next() {
 			var point DataPoint
-			if rows.Scan(&point.Time, &point.Target, &point.Delay, &point.Loss) == nil {
+			if rows.Scan(&point.Time, &point.Target, &point.Delay, &point.Loss) == nil && allowedTargets[point.Target] {
 				points = append(points, point)
 			}
 		}

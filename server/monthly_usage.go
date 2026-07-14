@@ -19,14 +19,15 @@ type monthlyUsageRecord struct {
 }
 
 type FrontendNode struct {
-        ID             string              `json:"id"`
-        Name           string              `json:"name"`
-        ExpireDate     string              `json:"expire_date"`
-        Region         string              `json:"region"`
-        Status         common.ServerStatus `json:"status"`
-        MonthUsed      uint64              `json:"month_used"`
-        TrafficLimitGB int                 `json:"traffic_limit_gb"`
-        ResetDay       int                 `json:"reset_day"`
+	ID             string              `json:"id"`
+	Name           string              `json:"name"`
+	ExpireDate     string              `json:"expire_date"`
+	Region         string              `json:"region"`
+	Group          string              `json:"group"`
+	Status         common.ServerStatus `json:"status"`
+	MonthUsed      uint64              `json:"month_used"`
+	TrafficLimitGB int                 `json:"traffic_limit_gb"`
+	ResetDay       int                 `json:"reset_day"`
 }
 
 var monthlyUsageMutex sync.Mutex
@@ -154,13 +155,14 @@ func buildFrontendNode(n common.NodeConfig, st common.ServerStatus) FrontendNode
 	_, limitGB, resetDay := parseNodeQuota(n.ExpireDate)
 	updateMonthlyUsage(n.ID, n.ExpireDate, st.NetInTransfer, st.NetOutTransfer)
 	return FrontendNode{
-                ID:             n.ID,
-                Name:           n.Name,
-                ExpireDate:     n.ExpireDate,
-                Region:         n.Region,
-                Status:         st,
-                MonthUsed:      getMonthlyUsage(n.ID),
-                TrafficLimitGB: limitGB,
-                ResetDay:       resetDay,
-        }
+		ID:             n.ID,
+		Name:           n.Name,
+		ExpireDate:     n.ExpireDate,
+		Region:         n.Region,
+		Group:          n.Group,
+		Status:         st,
+		MonthUsed:      getMonthlyUsage(n.ID),
+		TrafficLimitGB: limitGB,
+		ResetDay:       resetDay,
+	}
 }

@@ -76,7 +76,37 @@ func connectAndReport() {
 		return
 	}
 
+	updates := make(chan common.AgentInstruction, 1)
+	disconnected := make(chan struct{})
+	go func() {
+		defer close(disconnected)
+		for {
+			var next common.AgentInstruction
+			if err := conn.ReadJSON(&next); err != nil {
+				return
+			}
+			select {
+			case updates <- next:
+			default:
+				select {
+				case <-updates:
+				default:
+				}
+				select {
+				case updates <- next:
+				default:
+				}
+			}
+		}
+	}()
+
 	for {
+		select {
+		case instr = <-updates:
+		case <-disconnected:
+			return
+		default:
+		}
 		status := common.ServerStatus{IsOnline: true, CountryCode: globalCountryCode}
 		if h, err := host.Info(); err == nil && h != nil {
 			status.Uptime = h.Uptime
@@ -179,7 +209,12 @@ func connectAndReport() {
 		if err := conn.WriteJSON(status); err != nil {
 			return
 		}
-		time.Sleep(2 * time.Second)
+		select {
+		case instr = <-updates:
+		case <-disconnected:
+			return
+		case <-time.After(2 * time.Second):
+		}
 	}
 }
 

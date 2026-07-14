@@ -23,3 +23,7 @@ server/*.bak
 *.dark-loss.bak.*
 *.light-ui.bak.*
 go*.linux-amd64.tar.gz
+# Local migration backups and temporary restore files
+backups/
+*.tar.gz
+.restore-*/

@@ -1,8 +1,9 @@
 package common
 
 type PingTask struct {
-	Name string `json:"name"`
-	Host string `json:"host"`
+	Name    string   `json:"name"`
+	Host    string   `json:"host"`
+	NodeIDs []string `json:"node_ids,omitempty"`
 }
 type NodeConfig struct {
 	ID         string `json:"id"`
@@ -10,6 +11,7 @@ type NodeConfig struct {
 	Token      string `json:"token"`
 	ExpireDate string `json:"expire_date"`
 	Region     string `json:"region"`
+	Group      string `json:"group"`
 }
 type AppConfig struct {
 	SiteName  string       `json:"site_name"`
