@@ -73,7 +73,9 @@ func runNotifications() {
 	for _, node := range nodes {
 		st := statuses[node.ID]
 		offlineKey := "offline:" + node.ID
-		isOffline := !st.IsOnline || st.LastReport == 0 || now.Sub(time.Unix(st.LastReport, 0)) >= threshold
+		// 仅在节点曾成功上报、且最后上报距今达到后台配置阈值时告警。
+		// WebSocket 瞬时断开不会立即推送 TG，避免短暂抖动造成误报。
+		isOffline := st.LastReport > 0 && now.Sub(time.Unix(st.LastReport, 0)) >= threshold
 
 		if isOffline {
 			if claimEvent(offlineKey) {
