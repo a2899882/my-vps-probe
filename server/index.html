@@ -209,6 +209,18 @@ body::before{
 }
 </style>
 
+
+<style id="mobile-render-fix">
+[v-cloak]{display:none!important}
+@media (max-width:768px){
+  body{padding:10px;background-attachment:scroll}
+  .gc{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .node-card{min-height:0}
+  .gc:hover,.card-polish:hover{transform:none}
+  .bt,.ping-panel .pr{transition:none}
+}
+</style>
+
 </head>
 <body>
 <div id="app" class="w-full max-w-[1680px] mx-auto">
@@ -344,7 +356,7 @@ body::before{
             >{{ pingFoldOpen(nd) ? '收起' : '展开（共 ' + cardPingCount(nd) + ' 个）' }}</button>
         </div>
         <template v-if="nd.status&&nd.status.ping_statuses&&nd.status.ping_statuses.length>0">
-          <div v-for="ps in visibleCardPings(nd)"" :key="ps.target_name" class="pr">
+          <div v-for="ps in visibleCardPings(nd)" :key="ps.target_name" class="pr">
             <span class="pn t3">{{ ps.target_name }}</span>
             <div class="pbars">
               <div v-for="i in Math.max(0,60-(ps.history_60?ps.history_60.length:0))" :key="'e'+i" class="pb pb-n"></div>
@@ -361,7 +373,7 @@ body::before{
           <div class="ploss-row">
             <span class="ploss-label t4">丢包率</span>
             <span
-              v-for="ps in visibleCardPings(nd)""
+              v-for="ps in visibleCardPings(nd)"
               :key="'lp'+ps.target_name"
               class="ploss-item"
               :class="getLossClass(ps)"
