@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,25 +11,32 @@ import (
 	_ "modernc.org/sqlite"
 	"my-vps-probe/common"
 	"net/http"
+	"net/url"
 	"os"
+	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
 type AppConfig struct {
-	SiteName  string              `json:"site_name"`
-	AdminUser string              `json:"admin_user"`
-	AdminPass string              `json:"admin_pass"`
-	Nodes     []common.NodeConfig `json:"nodes"`
-	PingTasks []common.PingTask   `json:"ping_tasks"`
-	Telegram  TelegramConfig      `json:"telegram"`
+	SiteName             string              `json:"site_name"`
+	AdminUser            string              `json:"admin_user"`
+	AdminPass            string              `json:"admin_pass"`
+	Nodes                []common.NodeConfig `json:"nodes"`
+	PingTasks            []common.PingTask   `json:"ping_tasks"`
+	Telegram             TelegramConfig      `json:"telegram"`
+	HistoryDays          int                 `json:"history_days"`
+	PublicRefreshSeconds int                 `json:"public_refresh_seconds"`
+	AgentReportSeconds   int                 `json:"agent_report_seconds"`
 }
 
 var (
 	serverStatusMap = make(map[string]common.ServerStatus)
-	activeConns     = make(map[string]*websocket.Conn) // 【新增】连接池
-	connMutex       sync.Mutex                         // 保护连接池
+	activeConns     = make(map[string]*agentConnection)
+	connMutex       sync.Mutex
 	appConfig       AppConfig
 	configMutex     sync.RWMutex
 	mapMutex        sync.RWMutex
@@ -41,7 +50,9 @@ func basicAuth(next http.HandlerFunc) http.HandlerFunc {
 		expectedUser := appConfig.AdminUser
 		expectedPass := appConfig.AdminPass
 		configMutex.RUnlock()
-		if !ok || user != expectedUser || pass != expectedPass {
+		userOK := subtle.ConstantTimeCompare([]byte(user), []byte(expectedUser)) == 1
+		passOK := subtle.ConstantTimeCompare([]byte(pass), []byte(expectedPass)) == 1
+		if !ok || !userOK || !passOK {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -50,9 +61,25 @@ func basicAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 func initDB() {
-	db, _ = sql.Open("sqlite", "data.db")
+	var err error
+	db, err = sql.Open("sqlite", "file:data.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)")
+	if err != nil {
+		log.Fatalf("open database: %v", err)
+	}
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(2)
+	for _, pragma := range []string{
+		`PRAGMA journal_mode=WAL`,
+		`PRAGMA synchronous=NORMAL`,
+		`PRAGMA busy_timeout=5000`,
+		`PRAGMA foreign_keys=ON`,
+	} {
+		if _, err := db.Exec(pragma); err != nil {
+			log.Printf("database pragma failed: %v", err)
+		}
+	}
 
-	db.Exec(`CREATE TABLE IF NOT EXISTS ping_history (
+	mustExecDB(`CREATE TABLE IF NOT EXISTS ping_history (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 server_id TEXT,
@@ -61,7 +88,7 @@ delay REAL,
 loss_rate REAL
 );`)
 
-	db.Exec(`CREATE TABLE IF NOT EXISTS resource_history (
+	mustExecDB(`CREATE TABLE IF NOT EXISTS resource_history (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 server_id TEXT,
@@ -81,24 +108,54 @@ net_out_speed INTEGER,
 
 	ensureResourceHistoryTCPColumn()
 	ensureResourceHistoryUDPColumn()
-	db.Exec(`CREATE INDEX IF NOT EXISTS idx_ping_history_server_time
+	mustExecDB(`CREATE INDEX IF NOT EXISTS idx_ping_history_server_time
 ON ping_history(server_id, timestamp);`)
-	db.Exec(`CREATE INDEX IF NOT EXISTS idx_resource_history_server_time
+	mustExecDB(`CREATE INDEX IF NOT EXISTS idx_resource_history_server_time
 ON resource_history(server_id, timestamp);`)
 
-	db.Exec(`CREATE TABLE IF NOT EXISTS notification_events (
+	mustExecDB(`CREATE TABLE IF NOT EXISTS notification_events (
 event_key TEXT PRIMARY KEY,
 sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );`)
 
 	go func() {
+		historyTicker := time.NewTicker(time.Minute)
+		cleanupTicker := time.NewTicker(time.Hour)
+		defer historyTicker.Stop()
+		defer cleanupTicker.Stop()
 		for {
-			time.Sleep(1 * time.Minute)
-			saveHistoryToDB()
-			db.Exec("DELETE FROM ping_history WHERE timestamp <= datetime('now', '-7 days')")
-			db.Exec("DELETE FROM resource_history WHERE timestamp <= datetime('now', '-7 days')")
+			select {
+			case <-historyTicker.C:
+				saveHistoryToDB()
+				flushMonthlyUsage()
+			case <-cleanupTicker.C:
+				cleanupHistory()
+			}
 		}
 	}()
+}
+
+func mustExecDB(query string, args ...interface{}) {
+	if _, err := db.Exec(query, args...); err != nil {
+		log.Fatalf("database init failed: %v", err)
+	}
+}
+
+func cleanupHistory() {
+	configMutex.RLock()
+	days := appConfig.HistoryDays
+	configMutex.RUnlock()
+	if days < 1 || days > 365 {
+		days = 7
+	}
+	cutoff := fmt.Sprintf("-%d days", days)
+	if _, err := db.Exec("DELETE FROM ping_history WHERE timestamp <= datetime('now', ?)", cutoff); err != nil {
+		log.Printf("cleanup ping history: %v", err)
+	}
+	if _, err := db.Exec("DELETE FROM resource_history WHERE timestamp <= datetime('now', ?)", cutoff); err != nil {
+		log.Printf("cleanup resource history: %v", err)
+	}
+	_, _ = db.Exec("DELETE FROM notification_events WHERE sent_at <= datetime('now', '-400 days')")
 }
 
 func ensureResourceHistoryTCPColumn() {
@@ -139,13 +196,18 @@ func ensureResourceHistoryUDPColumn() {
 
 func saveHistoryToDB() {
 	mapMutex.RLock()
-	defer mapMutex.RUnlock()
+	statuses := make(map[string]common.ServerStatus, len(serverStatusMap))
+	for id, status := range serverStatusMap {
+		statuses[id] = status
+	}
+	mapMutex.RUnlock()
 
 	tx, err := db.Begin()
 	if err != nil {
+		log.Printf("begin history transaction: %v", err)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Rollback()
 
 	pingStmt, err := tx.Prepare(
 		"INSERT INTO ping_history (server_id, target_name, delay, loss_rate) VALUES (?, ?, ?, ?)",
@@ -166,7 +228,7 @@ swap_used, swap_total, load_1, net_in_speed, net_out_speed, tcp_connections, udp
 	}
 	defer resourceStmt.Close()
 
-	for serverID, status := range serverStatusMap {
+	for serverID, status := range statuses {
 		if !status.IsOnline {
 			continue
 		}
@@ -191,16 +253,25 @@ swap_used, swap_total, load_1, net_in_speed, net_out_speed, tcp_connections, udp
 			pingStmt.Exec(serverID, ping.TargetName, ping.CurrentDelay, ping.LossRate)
 		}
 	}
+	if err := tx.Commit(); err != nil {
+		log.Printf("commit history: %v", err)
+	}
 }
 
 func loadConfig() {
 	data, err := os.ReadFile("config.json")
+	isNew := err != nil
 	if err == nil {
-		json.Unmarshal(data, &appConfig)
+		if err := json.Unmarshal(data, &appConfig); err != nil {
+			log.Fatalf("config.json 格式错误: %v", err)
+		}
 	} else {
-		appConfig = AppConfig{SiteName: "探针看板", AdminUser: "admin", AdminPass: "123456", Nodes: []common.NodeConfig{{ID: "node-1", Name: "主控测试机", Token: "my_secret_token_123", ExpireDate: "2027/05/13", Region: "CN"}}, PingTasks: []common.PingTask{{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80"}, {Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80"}, {Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80"}}}
-		data, _ := json.MarshalIndent(appConfig, "", "  ")
-		os.WriteFile("config.json", data, 0600)
+		appConfig = AppConfig{
+			SiteName: "探针看板", AdminUser: "admin", AdminPass: "123456",
+			HistoryDays: 7, PublicRefreshSeconds: 3, AgentReportSeconds: 3,
+			Nodes:     []common.NodeConfig{{ID: "node-1", Name: "主控测试机", Token: "my_secret_token_123", ExpireDate: "2027/05/13", Region: "CN"}},
+			PingTasks: []common.PingTask{{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80"}, {Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80"}, {Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80"}},
+		}
 	}
 	if appConfig.AdminUser == "" {
 		appConfig.AdminUser = "admin"
@@ -211,12 +282,39 @@ func loadConfig() {
 	if appConfig.SiteName == "" {
 		appConfig.SiteName = "探针看板"
 	}
-	if len(appConfig.PingTasks) == 0 {
+	if isNew && len(appConfig.PingTasks) == 0 {
 		appConfig.PingTasks = []common.PingTask{{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80"}, {Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80"}, {Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80"}}
+	}
+	normalizeAppConfig(&appConfig)
+	if err := saveAppConfig(appConfig); err != nil {
+		log.Fatalf("保存规范化配置失败: %v", err)
 	}
 }
 
-var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+func normalizeAppConfig(c *AppConfig) {
+	if c.HistoryDays < 1 || c.HistoryDays > 365 {
+		c.HistoryDays = 7
+	}
+	if c.PublicRefreshSeconds < 2 || c.PublicRefreshSeconds > 60 {
+		c.PublicRefreshSeconds = 3
+	}
+	if c.AgentReportSeconds < 2 || c.AgentReportSeconds > 60 {
+		c.AgentReportSeconds = 3
+	}
+	c.Telegram.normalize()
+}
+
+var upgrader = websocket.Upgrader{
+	HandshakeTimeout: 10 * time.Second,
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" { // Agent clients do not send a browser Origin header.
+			return true
+		}
+		u, err := url.Parse(origin)
+		return err == nil && strings.EqualFold(u.Host, r.Host)
+	},
+}
 
 func pingTasksForNode(tasks []common.PingTask, nodeID string) []common.PingTask {
 	out := make([]common.PingTask, 0, len(tasks))
@@ -235,7 +333,7 @@ func pingTasksForNode(tasks []common.PingTask, nodeID string) []common.PingTask 
 	return out
 }
 
-func buildCardPingStatuses(serverID string) []common.CardPingStatus {
+func queryCardPingStatuses(serverID string) []common.CardPingStatus {
 	rows, err := db.Query(`SELECT datetime(timestamp, 'localtime'), target_name, delay FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', '-1 hours') ORDER BY timestamp ASC`, serverID)
 	if err != nil {
 		return []common.CardPingStatus{}
@@ -307,7 +405,7 @@ func buildCardPingStatuses(serverID string) []common.CardPingStatus {
 
 	out := make([]common.CardPingStatus, 0, len(ordered))
 	for _, tgt := range ordered {
-		hist := make([]float64, 0, 60)
+		hist := make([]*float64, 0, 60)
 		valid := 0
 		fail := 0
 		sum := 0.0
@@ -315,10 +413,11 @@ func buildCardPingStatuses(serverID string) []common.CardPingStatus {
 		for _, mk := range minutes {
 			v, ok := bucket[tgt][mk]
 			if !ok {
-				hist = append(hist, 0)
+				hist = append(hist, nil)
 				continue
 			}
-			hist = append(hist, v)
+			value := v
+			hist = append(hist, &value)
 			seen++
 			if v > 0 {
 				valid++
@@ -337,8 +436,8 @@ func buildCardPingStatuses(serverID string) []common.CardPingStatus {
 		}
 		current := 0.0
 		for i := len(hist) - 1; i >= 0; i-- {
-			if hist[i] != 0 {
-				current = hist[i]
+			if hist[i] != nil {
+				current = *hist[i]
 				break
 			}
 		}
@@ -390,65 +489,101 @@ func main() {
 	})
 	http.HandleFunc("/download/agent.go", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "agent/main.go") })
 	http.HandleFunc("/api/admin/config", basicAuth(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.Method == "GET" {
+		switch r.Method {
+		case http.MethodGet:
 			configMutex.RLock()
 			safeConfig := appConfig
+			safeConfig.Nodes = append([]common.NodeConfig(nil), appConfig.Nodes...)
+			safeConfig.PingTasks = append([]common.PingTask(nil), appConfig.PingTasks...)
 			safeConfig.AdminPass = ""
 			safeConfig.Telegram.Token = ""
-			json.NewEncoder(w).Encode(safeConfig)
 			configMutex.RUnlock()
-		} else if r.Method == "POST" {
+			writeJSON(w, http.StatusOK, safeConfig)
+		case http.MethodPost:
+			r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
 			var newConfig AppConfig
-			if err := json.NewDecoder(r.Body).Decode(&newConfig); err == nil {
-				configMutex.Lock()
-				if newConfig.AdminPass == "" {
-					newConfig.AdminPass = appConfig.AdminPass
-				}
-				if newConfig.Telegram.Token == "" {
-					newConfig.Telegram.Token = appConfig.Telegram.Token
-				}
-				newConfig.Telegram.normalize()
-				appConfig = newConfig
-				data, _ := json.MarshalIndent(appConfig, "", "  ")
-				os.WriteFile("config.json", data, 0600)
-				configMutex.Unlock()
-				// 热下发新配置：不强制断开在线 Agent，直接推送最新指令
-				configMutex.RLock()
-				pTasks := appConfig.PingTasks
-				nodeNameMap := map[string]string{}
-				for _, n := range appConfig.Nodes {
-					nodeNameMap[n.ID] = n.Name
-				}
-				configMutex.RUnlock()
+			if err := json.NewDecoder(r.Body).Decode(&newConfig); err != nil {
+				writeAPIError(w, http.StatusBadRequest, "配置格式无效："+err.Error())
+				return
+			}
 
-				connMutex.Lock()
-				for id, conn := range activeConns {
+			configMutex.Lock()
+			if newConfig.AdminPass == "" {
+				newConfig.AdminPass = appConfig.AdminPass
+			}
+			if newConfig.Telegram.Token == "" {
+				newConfig.Telegram.Token = appConfig.Telegram.Token
+			}
+			if err := validateConfig(&newConfig); err != nil {
+				configMutex.Unlock()
+				writeAPIError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			if err := saveAppConfig(newConfig); err != nil {
+				configMutex.Unlock()
+				log.Printf("save config: %v", err)
+				writeAPIError(w, http.StatusInternalServerError, "配置写入失败")
+				return
+			}
+			appConfig = newConfig
+			pTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
+			reportSeconds := appConfig.AgentReportSeconds
+			nodeNameMap := map[string]string{}
+			for _, n := range appConfig.Nodes {
+				nodeNameMap[n.ID] = n.Name
+			}
+			configMutex.Unlock()
+			mapMutex.Lock()
+			for id := range serverStatusMap {
+				if _, exists := nodeNameMap[id]; !exists {
+					delete(serverStatusMap, id)
+				}
+			}
+			mapMutex.Unlock()
+			invalidateCardPingCache()
+
+			// Hot-push settings without forcing healthy agents to reconnect.
+			connMutex.Lock()
+			connections := make(map[string]*agentConnection, len(activeConns))
+			for id, conn := range activeConns {
+				connections[id] = conn
+			}
+			connMutex.Unlock()
+			var pushWG sync.WaitGroup
+			pushLimit := make(chan struct{}, 16)
+			for id, conn := range connections {
+				pushWG.Add(1)
+				go func(id string, conn *agentConnection) {
+					defer pushWG.Done()
+					pushLimit <- struct{}{}
+					defer func() { <-pushLimit }()
 					name, ok := nodeNameMap[id]
 					if !ok {
-						conn.Close()
-						delete(activeConns, id)
-						mapMutex.Lock()
-						st := serverStatusMap[id]
-						st.IsOnline = false
-						serverStatusMap[id] = st
-						mapMutex.Unlock()
-						continue
+						removeActiveConnection(id, conn)
+						_ = conn.close()
+						return
 					}
-					if err := conn.WriteJSON(common.AgentInstruction{ServerName: name, PingTasks: pingTasksForNode(pTasks, id)}); err != nil {
-						conn.Close()
-						delete(activeConns, id)
-						mapMutex.Lock()
-						st := serverStatusMap[id]
-						st.IsOnline = false
-						serverStatusMap[id] = st
-						mapMutex.Unlock()
+					instruction := common.AgentInstruction{ServerName: name, PingTasks: pingTasksForNode(pTasks, id), ReportSeconds: reportSeconds}
+					if err := conn.writeJSON(instruction); err != nil {
+						removeActiveConnection(id, conn)
+						_ = conn.close()
+						markNodeOffline(id)
 					}
-				}
-				connMutex.Unlock()
-				w.Write([]byte(`{"status":"ok"}`))
+				}(id, conn)
 			}
+			pushWG.Wait()
+			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		default:
+			w.Header().Set("Allow", "GET, POST")
+			writeAPIError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 		}
+	}))
+	http.HandleFunc("/api/admin/runtime", basicAuth(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeAPIError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+			return
+		}
+		writeJSON(w, http.StatusOK, adminRuntimeSnapshot())
 	}))
 	http.HandleFunc("/api/admin/telegram/test", basicAuth(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -473,27 +608,42 @@ func main() {
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("token")
 		configMutex.RLock()
-		var cNode *common.NodeConfig
+		var cNode common.NodeConfig
+		found := false
 		for _, n := range appConfig.Nodes {
 			if n.Token == token {
-				cNode = &n
+				cNode = n
+				found = true
 				break
 			}
 		}
-		pTasks := appConfig.PingTasks
+		pTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
+		reportSeconds := appConfig.AgentReportSeconds
 		configMutex.RUnlock()
-		if cNode == nil {
+		if !found {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		conn, _ := upgrader.Upgrade(w, r, nil)
-		defer conn.Close()
+		rawConn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		conn := &agentConnection{conn: rawConn}
+		defer conn.close()
 		connMutex.Lock()
+		if old := activeConns[cNode.ID]; old != nil && old != conn {
+			_ = old.close()
+		}
 		activeConns[cNode.ID] = conn
 		connMutex.Unlock()
-		defer func() { connMutex.Lock(); delete(activeConns, cNode.ID); connMutex.Unlock() }()
-		connMutex.Lock()
-		writeErr := conn.WriteJSON(common.AgentInstruction{ServerName: cNode.Name, PingTasks: pingTasksForNode(pTasks, cNode.ID)})
-		connMutex.Unlock()
+		defer func() {
+			connMutex.Lock()
+			if activeConns[cNode.ID] == conn {
+				delete(activeConns, cNode.ID)
+			}
+			connMutex.Unlock()
+		}()
+		writeErr := conn.writeJSON(common.AgentInstruction{ServerName: cNode.Name, PingTasks: pingTasksForNode(pTasks, cNode.ID), ReportSeconds: reportSeconds})
 		if writeErr != nil {
 			return
 		}
@@ -503,12 +653,13 @@ func main() {
 		serverStatusMap[cNode.ID] = st
 		mapMutex.Unlock()
 		for {
-			if err := conn.ReadJSON(&st); err != nil {
-				mapMutex.Lock()
-				st = serverStatusMap[cNode.ID]
-				st.IsOnline = false
-				serverStatusMap[cNode.ID] = st
-				mapMutex.Unlock()
+			if err := conn.conn.ReadJSON(&st); err != nil {
+				connMutex.Lock()
+				isCurrent := activeConns[cNode.ID] == conn
+				connMutex.Unlock()
+				if isCurrent {
+					markNodeOffline(cNode.ID)
+				}
 				break
 			}
 			st.ServerID = cNode.ID
@@ -521,21 +672,39 @@ func main() {
 		}
 	})
 	http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")
 		w.Header().Set("Pragma", "no-cache")
 		w.Header().Set("Expires", "0")
 		configMutex.RLock()
+		nodeConfigs := append([]common.NodeConfig(nil), appConfig.Nodes...)
+		pingTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
+		siteName := appConfig.SiteName
+		refreshSeconds := appConfig.PublicRefreshSeconds
+		configMutex.RUnlock()
 		mapMutex.RLock()
-		var nodes []FrontendNode
-		for _, n := range appConfig.Nodes {
-			st := serverStatusMap[n.ID]
-			st.CardPingStatuses = buildCardPingStatuses(n.ID)
+		statuses := make(map[string]common.ServerStatus, len(serverStatusMap))
+		for id, status := range serverStatusMap {
+			statuses[id] = status
+		}
+		mapMutex.RUnlock()
+
+		nodes := make([]FrontendNode, 0, len(nodeConfigs))
+		for _, n := range nodeConfigs {
+			st := statuses[n.ID]
+			st.CardPingStatuses = cardPingStatuses(n.ID)
 			nodes = append(nodes, buildFrontendNode(n, st))
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{"site_name": appConfig.SiteName, "nodes": nodes, "ping_tasks": appConfig.PingTasks})
-		mapMutex.RUnlock()
-		configMutex.RUnlock()
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"site_name": siteName, "nodes": nodes, "ping_tasks": pingTasks,
+			"refresh_seconds": refreshSeconds, "updated_at": time.Now().Unix(),
+		})
+	})
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if err := db.Ping(); err != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, "database unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	http.HandleFunc("/api/ping_history", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -555,8 +724,8 @@ func main() {
 			allowedTargets[task.Name] = true
 		}
 
-		hours, err := strconv.Atoi(r.URL.Query().Get("hours"))
-		if err != nil || hours < 1 || hours > 168 {
+		hours, err := strconv.ParseFloat(r.URL.Query().Get("hours"), 64)
+		if err != nil || hours < 0.25 || hours > 8760 {
 			hours = 24
 		}
 
@@ -566,7 +735,7 @@ func main() {
  WHERE server_id = ? AND timestamp >= datetime('now', ?)
  ORDER BY timestamp ASC`,
 			serverID,
-			fmt.Sprintf("-%d hours", hours),
+			fmt.Sprintf("-%g hours", hours),
 		)
 		if err != nil {
 			json.NewEncoder(w).Encode([]interface{}{})
@@ -658,6 +827,28 @@ func main() {
 		}
 		json.NewEncoder(w).Encode(points)
 	})
-	fmt.Println("🚀 服务端热刷新机制已激活！")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	fmt.Println("🚀 My VPS Probe 已启动，监听 :8080")
+	server := &http.Server{
+		Addr:              ":8080",
+		Handler:           securityHeaders(gzipTextResponses(http.DefaultServeMux)),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
+	errCh := make(chan error, 1)
+	go func() { errCh <- server.ListenAndServe() }()
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	select {
+	case sig := <-stop:
+		log.Printf("received %s, shutting down", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+		flushMonthlyUsage()
+	case err := <-errCh:
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}
 }

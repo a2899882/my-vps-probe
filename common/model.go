@@ -21,16 +21,17 @@ type AppConfig struct {
 	PingTasks []PingTask   `json:"ping_tasks"`
 }
 type AgentInstruction struct {
-	ServerName string     `json:"server_name"`
-	PingTasks  []PingTask `json:"ping_tasks"`
+	ServerName    string     `json:"server_name"`
+	PingTasks     []PingTask `json:"ping_tasks"`
+	ReportSeconds int        `json:"report_seconds,omitempty"`
 }
 
 type CardPingStatus struct {
-	TargetName   string    `json:"target_name"`
-	History60    []float64 `json:"history_60"`
-	AvgDelay1H   float64   `json:"avg_delay_1h"`
-	LossRate1H   float64   `json:"loss_rate_1h"`
-	CurrentDelay float64   `json:"current_delay"`
+	TargetName   string     `json:"target_name"`
+	History60    []*float64 `json:"history_60"`
+	AvgDelay1H   float64    `json:"avg_delay_1h"`
+	LossRate1H   float64    `json:"loss_rate_1h"`
+	CurrentDelay float64    `json:"current_delay"`
 }
 
 type ServerStatus struct {

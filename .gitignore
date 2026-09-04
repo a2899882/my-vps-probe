@@ -1,19 +1,24 @@
+# Runtime configuration and state
 config.json
 data.db
-probe-agent
-data.db
-config.json
-server.log
-data.db
-config.json
-server.log
-
-# runtime state
+data.db-shm
+data.db-wal
 usage_state.json
-usage_state.json.bak.*
-server/*.bak
+server.log
 
-# Local editor / repair backups
+# Locally built executables
+probe-server
+probe-agent
+probe-agent-amd64
+probe-agent-arm64
+server/probe-agent-amd64
+server/probe-agent-arm64
+server/.probe-agent-*.new
+.probe-server.new
+
+# Backups and temporary migration files
+backups/
+*.tar.gz
 *.bak
 *.bak.*
 *.before-*
@@ -22,8 +27,4 @@ server/*.bak
 *.compact.bak.*
 *.dark-loss.bak.*
 *.light-ui.bak.*
-go*.linux-amd64.tar.gz
-# Local migration backups and temporary restore files
-backups/
-*.tar.gz
 .restore-*/

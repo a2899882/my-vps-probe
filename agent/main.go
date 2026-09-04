@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -35,11 +37,12 @@ var (
 
 func init() {
 	go func() {
-		resp, err := http.Get("http://ip-api.com/json/")
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Get("https://api.country.is/")
 		if err == nil {
 			defer resp.Body.Close()
 			var res struct {
-				CountryCode string `json:"countryCode"`
+				CountryCode string `json:"country"`
 			}
 			json.NewDecoder(resp.Body).Decode(&res)
 			if res.CountryCode != "" {
@@ -50,8 +53,16 @@ func init() {
 }
 
 func main() {
-	flag.StringVar(&serverAddr, "server", "localhost:8080", "主控地址")
-	flag.StringVar(&token, "token", "123", "Token")
+	defaultServer := os.Getenv("PROBE_SERVER")
+	if defaultServer == "" {
+		defaultServer = "localhost:8080"
+	}
+	defaultToken := os.Getenv("PROBE_TOKEN")
+	if defaultToken == "" {
+		defaultToken = "123"
+	}
+	flag.StringVar(&serverAddr, "server", defaultServer, "主控地址")
+	flag.StringVar(&token, "token", defaultToken, "Token")
 	flag.Parse()
 	for {
 		connectAndReport()
@@ -60,12 +71,12 @@ func main() {
 }
 
 func connectAndReport() {
-	cleanAddr := strings.TrimPrefix(strings.TrimPrefix(serverAddr, "http://"), "https://")
-	wsScheme := "ws://"
-	if strings.HasPrefix(serverAddr, "https://") || strings.HasSuffix(serverAddr, ":443") {
-		wsScheme = "wss://"
+	endpoint, err := makeWebSocketURL(serverAddr, token)
+	if err != nil {
+		return
 	}
-	conn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("%s%s/ws?token=%s", wsScheme, cleanAddr, token), nil)
+	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
+	conn, _, err := dialer.Dial(endpoint, nil)
 	if err != nil {
 		return
 	}
@@ -136,7 +147,7 @@ func connectAndReport() {
 			status.NetInTransfer = n[0].BytesRecv
 			status.NetOutTransfer = n[0].BytesSent
 			now := time.Now()
-			if lastNetBytesRecv > 0 && !lastNetAt.IsZero() {
+			if lastNetBytesRecv > 0 && !lastNetAt.IsZero() && n[0].BytesRecv >= lastNetBytesRecv && n[0].BytesSent >= lastNetBytesSent {
 				secs := now.Sub(lastNetAt).Seconds()
 				if secs > 0 {
 					status.NetInSpeed = uint64(float64(n[0].BytesRecv-lastNetBytesRecv) / secs)
@@ -158,9 +169,10 @@ func connectAndReport() {
 		}
 		trackers = newTrackers
 
+		pingProbes := runPingTasks(instr.PingTasks)
 		var pingResults []common.PingResult
-		for _, task := range instr.PingTasks {
-			delay, success := tcpPing(task.Host)
+		for i, task := range instr.PingTasks {
+			delay, success := pingProbes[i].delay, pingProbes[i].success
 			t := trackers[task.Name]
 
 			if success {
@@ -209,13 +221,70 @@ func connectAndReport() {
 		if err := conn.WriteJSON(status); err != nil {
 			return
 		}
+		reportSeconds := instr.ReportSeconds
+		if reportSeconds < 2 || reportSeconds > 60 {
+			reportSeconds = 3
+		}
+		timer := time.NewTimer(time.Duration(reportSeconds) * time.Second)
 		select {
 		case instr = <-updates:
+			if !timer.Stop() {
+				<-timer.C
+			}
 		case <-disconnected:
+			if !timer.Stop() {
+				<-timer.C
+			}
 			return
-		case <-time.After(2 * time.Second):
+		case <-timer.C:
 		}
 	}
+}
+
+func makeWebSocketURL(raw, authToken string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("empty server address")
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "http://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("invalid server address")
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		u.Scheme = "wss"
+	} else {
+		u.Scheme = "ws"
+	}
+	u.Path = strings.TrimRight(u.Path, "/") + "/ws"
+	query := u.Query()
+	query.Set("token", authToken)
+	u.RawQuery = query.Encode()
+	return u.String(), nil
+}
+
+type pingProbe struct {
+	delay   float64
+	success bool
+}
+
+func runPingTasks(tasks []common.PingTask) []pingProbe {
+	results := make([]pingProbe, len(tasks))
+	var wg sync.WaitGroup
+	limit := make(chan struct{}, 8)
+	for i, task := range tasks {
+		wg.Add(1)
+		go func(index int, target string) {
+			defer wg.Done()
+			limit <- struct{}{}
+			results[index].delay, results[index].success = tcpPing(target)
+			<-limit
+		}(i, task.Host)
+	}
+	wg.Wait()
+	return results
 }
 
 func tcpSocketConnections() uint64 {

@@ -33,6 +33,7 @@ type FrontendNode struct {
 var monthlyUsageMutex sync.Mutex
 var monthlyUsageState map[string]monthlyUsageRecord
 var monthlyUsageLoaded bool
+var monthlyUsageDirty bool
 
 func loadMonthlyUsageLocked() {
 	if monthlyUsageLoaded {
@@ -49,12 +50,28 @@ func loadMonthlyUsageLocked() {
 	}
 }
 
-func saveMonthlyUsageLocked() {
+func saveMonthlyUsageLocked() error {
 	if monthlyUsageState == nil {
 		monthlyUsageState = map[string]monthlyUsageRecord{}
 	}
-	data, _ := json.MarshalIndent(monthlyUsageState, "", "  ")
-	_ = os.WriteFile("usage_state.json", data, 0644)
+	data, err := json.MarshalIndent(monthlyUsageState, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := writeFileAtomic("usage_state.json", data, 0600); err != nil {
+		return err
+	}
+	monthlyUsageDirty = false
+	return nil
+}
+
+func flushMonthlyUsage() {
+	monthlyUsageMutex.Lock()
+	defer monthlyUsageMutex.Unlock()
+	loadMonthlyUsageLocked()
+	if monthlyUsageDirty {
+		_ = saveMonthlyUsageLocked()
+	}
 }
 
 func normalizeResetDay(day int) int {
@@ -128,14 +145,16 @@ func updateMonthlyUsage(nodeID, raw string, inTransfer, outTransfer uint64) {
 		if total >= rec.LastTotal {
 			rec.Used += total - rec.LastTotal
 		} else {
-			rec.Used = 0
+			// Network counters reset after a reboot. Preserve usage accumulated in
+			// this billing cycle and continue from the new counter baseline.
+			rec.LastTotal = total
 		}
 		rec.LastTotal = total
 		rec.UpdatedAt = time.Now().Unix()
 	}
 
 	monthlyUsageState[nodeID] = rec
-	saveMonthlyUsageLocked()
+	monthlyUsageDirty = true
 }
 
 func getMonthlyUsage(nodeID string) uint64 {
@@ -153,7 +172,6 @@ func getMonthlyUsage(nodeID string) uint64 {
 
 func buildFrontendNode(n common.NodeConfig, st common.ServerStatus) FrontendNode {
 	_, limitGB, resetDay := parseNodeQuota(n.ExpireDate)
-	updateMonthlyUsage(n.ID, n.ExpireDate, st.NetInTransfer, st.NetOutTransfer)
 	return FrontendNode{
 		ID:             n.ID,
 		Name:           n.Name,

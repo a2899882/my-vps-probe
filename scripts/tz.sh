@@ -30,6 +30,7 @@ update_master() {
   REPO_DIR="$(detect_repo || true)"
   GO_BIN="$(get_go_bin || true)"
   BIN_PATH="$(get_service_bin || true)"
+  local build_dir
 
   if [ -z "$REPO_DIR" ]; then
     echo -e "${RED}❌ 找不到主控仓库目录${RESET}"
@@ -46,13 +47,48 @@ update_master() {
   [ -n "$BIN_PATH" ] || BIN_PATH="$REPO_DIR/probe-server"
 
   cd "$REPO_DIR"
+  # Older releases tracked generated binaries. Restore only those known build
+  # artifacts before pulling the source-only lightweight release.
+  git restore --worktree --staged \
+    probe-server probe-agent-amd64 probe-agent-arm64 \
+    server/probe-agent-amd64 server/probe-agent-arm64 \
+    go1.22.4.linux-amd64.tar.gz 2>/dev/null || true
   git fetch origin
   git checkout main
   git pull --ff-only origin main
-  "$GO_BIN" build -o "$BIN_PATH" ./server
+
+  build_dir="$(mktemp -d)"
+  if ! "$GO_BIN" build -trimpath -ldflags="-s -w" -o "$build_dir/probe-server" ./server ||
+     ! CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "$GO_BIN" build -trimpath -ldflags="-s -w" -o "$build_dir/probe-agent-amd64" ./agent ||
+     ! CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "$GO_BIN" build -trimpath -ldflags="-s -w" -o "$build_dir/probe-agent-arm64" ./agent; then
+    rm -rf "$build_dir"
+    echo -e "${RED}❌ 编译失败，现有服务未被替换${RESET}"
+    read -n 1 -s -r -p "按任意键返回..."
+    return
+  fi
+
+  install -m 0755 "$build_dir/probe-server" "$BIN_PATH"
+  install -m 0755 "$build_dir/probe-agent-amd64" "$REPO_DIR/server/probe-agent-amd64"
+  install -m 0755 "$build_dir/probe-agent-arm64" "$REPO_DIR/server/probe-agent-arm64"
+  rm -rf "$build_dir"
 
   systemctl daemon-reload
   systemctl restart probe-server
+
+  local healthy=0
+  for _ in {1..20}; do
+    if curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1; then
+      healthy=1
+      break
+    fi
+    sleep 1
+  done
+  if [ "$healthy" -ne 1 ]; then
+    echo -e "${RED}❌ 主控更新后健康检查失败，请查看服务日志${RESET}"
+    systemctl --no-pager --full status probe-server || true
+    read -n 1 -s -r -p "按任意键返回..."
+    return
+  fi
 
   echo -e "${GREEN}✅ 主控更新完成${RESET}"
   systemctl --no-pager --full status probe-server || true
@@ -77,6 +113,7 @@ bind_domain() {
   apt-get install -y caddy
   cat > /etc/caddy/Caddyfile <<EOF
 $domain {
+  encode zstd gzip
   reverse_proxy localhost:8080
 }
 EOF
@@ -154,7 +191,12 @@ create_master_backup() {
   fi
 
   install -m 600 "$repo_dir/config.json" "$work_dir/config.json"
-  install -m 600 "$repo_dir/data.db" "$work_dir/data.db"
+  if command -v sqlite3 >/dev/null 2>&1; then
+    sqlite3 "$repo_dir/data.db" ".backup '$work_dir/data.db'"
+    chmod 600 "$work_dir/data.db"
+  else
+    install -m 600 "$repo_dir/data.db" "$work_dir/data.db"
+  fi
 
   if [ -f "$repo_dir/usage_state.json" ]; then
     install -m 600 "$repo_dir/usage_state.json" "$work_dir/usage_state.json"
