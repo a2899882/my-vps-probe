@@ -12,8 +12,17 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y git curl wget tar ca-certificates build-essential
 
-if ! command -v go >/dev/null 2>&1; then
-  echo "==> 2. install golang ${GO_VERSION}"
+install_go=true
+if command -v go >/dev/null 2>&1; then
+  current_go_version="$(go version 2>/dev/null | awk '{sub(/^go/, "", $3); print $3}')"
+  if [ -n "$current_go_version" ] &&
+     [ "$(printf '%s\n' "$GO_VERSION" "$current_go_version" | sort -V | head -n 1)" = "$GO_VERSION" ]; then
+    install_go=false
+  fi
+fi
+
+if $install_go; then
+  echo "==> 2. install/upgrade golang ${GO_VERSION}"
   cd /tmp
   machine_arch="$(uname -m)"
   case "$machine_arch" in
@@ -27,6 +36,8 @@ if ! command -v go >/dev/null 2>&1; then
   rm -rf /usr/local/go
   tar -C /usr/local -xzf "$archive"
   ln -sf /usr/local/go/bin/go /usr/local/bin/go
+else
+  echo "==> 2. golang ${current_go_version} is ready"
 fi
 
 echo "==> 3. clone or update repo"
