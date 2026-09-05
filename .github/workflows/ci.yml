@@ -24,7 +24,9 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Shell syntax
-        run: bash -n install-master.sh install.sh scripts/tz.sh uninstall-agent.sh
+        run: |
+          bash -n install-master.sh scripts/tz.sh install.sh uninstall-agent.sh
+          sh -n install.sh uninstall-agent.sh
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

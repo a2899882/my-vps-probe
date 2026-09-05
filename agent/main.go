@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -116,6 +117,7 @@ func connectAndReport() {
 	}()
 
 	for {
+		iterationStarted := time.Now()
 		select {
 		case instr = <-updates:
 		case <-disconnected:
@@ -132,22 +134,22 @@ func connectAndReport() {
 			status.Load1 = l.Load1
 		}
 		if c, err := cpu.Percent(0, false); err == nil && len(c) > 0 {
-			status.CPUUsage = c[0]
+			status.CPUUsage = safeMetric(c[0], 0, 100)
 		}
 		if cores, err := cpu.Counts(true); err == nil {
 			status.CPUCores = cores
 		}
 		if v, err := mem.VirtualMemory(); err == nil && v != nil {
 			status.MemTotal = v.Total
-			status.MemUsed = v.Used
+			status.MemUsed = safeUsed(v.Total, v.Used, v.Available)
 		}
 		if s, err := mem.SwapMemory(); err == nil && s != nil {
 			status.SwapTotal = s.Total
-			status.SwapUsed = s.Used
+			status.SwapUsed = safeUsed(s.Total, s.Used, s.Free)
 		}
 		if d, err := disk.Usage("/"); err == nil && d != nil {
 			status.DiskTotal = d.Total
-			status.DiskUsed = d.Used
+			status.DiskUsed = safeUsed(d.Total, d.Used, d.Free)
 		}
 		validNetwork := false
 		status.NetworkValid = &validNetwork
@@ -223,7 +225,10 @@ func connectAndReport() {
 		if reportSeconds < 2 || reportSeconds > 60 {
 			reportSeconds = 3
 		}
-		timer := time.NewTimer(time.Duration(reportSeconds) * time.Second)
+		// Keep reports start-to-start at the configured interval. Sleeping for a
+		// full interval after collection made one-second Ping timeouts turn a
+		// nominal 3-second report cadence into 4-5 seconds on NAT/slow networks.
+		timer := time.NewTimer(reportWait(reportSeconds, iterationStarted, time.Now()))
 		select {
 		case instr = <-updates:
 			if !timer.Stop() {
@@ -237,6 +242,37 @@ func connectAndReport() {
 		case <-timer.C:
 		}
 	}
+}
+
+func safeMetric(value, minValue, maxValue float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return minValue
+	}
+	return min(max(value, minValue), maxValue)
+}
+
+func safeUsed(total, used, available uint64) uint64 {
+	if total == 0 {
+		return 0
+	}
+	if used <= total {
+		return used
+	}
+	if available <= total {
+		return total - available
+	}
+	return 0
+}
+
+func reportWait(seconds int, started, now time.Time) time.Duration {
+	if seconds < 2 || seconds > 60 {
+		seconds = 3
+	}
+	wait := time.Duration(seconds)*time.Second - now.Sub(started)
+	if wait < 0 {
+		return 0
+	}
+	return wait
 }
 
 func makeWebSocketURL(raw, authToken string) (string, error) {

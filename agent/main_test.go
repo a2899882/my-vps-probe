@@ -1,8 +1,10 @@
 package main
 
 import (
+	"math"
 	"net/url"
 	"testing"
+	"time"
 )
 
 func TestMakeWebSocketURL(t *testing.T) {
@@ -33,6 +35,30 @@ func TestMakeWebSocketURL(t *testing.T) {
 				t.Fatalf("token roundtrip = %q", got)
 			}
 		})
+	}
+}
+
+func TestMetricGuardsHandleBrokenContainerCounters(t *testing.T) {
+	// Affected OpenVZ/LXC kernels can expose Available > Total. Older gopsutil
+	// releases underflow Used into a value close to MaxUint64.
+	if got := safeUsed(1024, ^uint64(0)-99, 2048); got != 0 {
+		t.Fatalf("underflowed memory used = %d", got)
+	}
+	if got := safeUsed(1024, 9000, 124); got != 900 {
+		t.Fatalf("available fallback = %d", got)
+	}
+	if got := safeMetric(math.Inf(1), 0, 100); got != 0 {
+		t.Fatalf("infinite metric = %v", got)
+	}
+}
+
+func TestReportWaitIncludesCollectionTime(t *testing.T) {
+	started := time.Unix(100, 0)
+	if got := reportWait(3, started, started.Add(900*time.Millisecond)); got != 2100*time.Millisecond {
+		t.Fatalf("wait = %v", got)
+	}
+	if got := reportWait(3, started, started.Add(4*time.Second)); got != 0 {
+		t.Fatalf("overrun wait = %v", got)
 	}
 }
 

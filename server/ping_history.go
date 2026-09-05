@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -97,13 +99,15 @@ func flushPingMinutes(now time.Time, includeCurrent bool) {
 	if len(snapshot) == 0 {
 		return
 	}
-	tx, err := db.Begin()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		log.Printf("begin ping history: %v", err)
 		return
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare(`INSERT INTO ping_history(timestamp,server_id,target_name,delay,loss_rate) VALUES(?,?,?,?,?)`)
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO ping_history(timestamp,server_id,target_name,delay,loss_rate) VALUES(?,?,?,?,?)`)
 	if err != nil {
 		log.Printf("prepare ping history: %v", err)
 		return
@@ -111,7 +115,7 @@ func flushPingMinutes(now time.Time, includeCurrent bool) {
 	defer stmt.Close()
 	for k, v := range snapshot {
 		delay, loss := v.values()
-		if _, err := stmt.Exec(time.Unix(k.Minute*60, 0).UTC().Format("2006-01-02 15:04:05"), k.Server, k.Target, delay, loss); err != nil {
+		if _, err := stmt.ExecContext(ctx, time.Unix(k.Minute*60, 0).UTC().Format("2006-01-02 15:04:05"), k.Server, k.Target, delay, loss); err != nil {
 			log.Printf("write ping history: %v", err)
 			return
 		}
@@ -138,18 +142,19 @@ type pingHistoryPoint struct {
 	Delay, Loss float64
 }
 type cachedPingHistory struct {
-	Minute int64
-	Points []pingHistoryPoint
+	Minute   int64
+	ByServer map[string][]pingHistoryPoint
+	Loaded   map[string]bool
 }
 
 var pingHistoryCache = struct {
 	sync.Mutex
-	items map[string]cachedPingHistory
-}{items: make(map[string]cachedPingHistory)}
+	entry cachedPingHistory
+}{}
 
 func invalidateCardPingCache() {
 	pingHistoryCache.Lock()
-	pingHistoryCache.items = make(map[string]cachedPingHistory)
+	pingHistoryCache.entry = cachedPingHistory{}
 	pingHistoryCache.Unlock()
 }
 
@@ -171,19 +176,102 @@ func readCardPingHistory(database *sql.DB, id string, now time.Time) ([]pingHist
 	return points, rows.Err()
 }
 
-func cardPingStatuses(id string, tasks []common.PingTask, st common.ServerStatus, reportSeconds int, now time.Time) []common.CardPingStatus {
-	// A small per-minute cache avoids N SQL queries on every dashboard poll.
-	// Serialize cache reads with buffer removal so no snapshot falls in between.
-	pingHistoryCache.Lock()
-	entry, ok := pingHistoryCache.items[id]
-	if !ok || entry.Minute != now.Unix()/60 {
-		points, err := readCardPingHistory(db, id, now)
-		if err != nil {
-			log.Printf("read card ping history: %v", err)
-		} else {
-			entry = cachedPingHistory{Minute: now.Unix() / 60, Points: points}
-			pingHistoryCache.items[id] = entry
+// Load the complete recent card window in one indexed query. The previous
+// per-node cache still performed up to N SQLite queries after every minute
+// flush; with 56 nodes that made /api/status take 7-9 seconds and caused the
+// apparent 5-6 second (or worse) refresh lag in the browser.
+func readAllCardPingHistory(database *sql.DB, ids []string, now time.Time) (map[string][]pingHistoryPoint, error) {
+	if len(ids) == 0 {
+		return make(map[string][]pingHistoryPoint), nil
+	}
+	start := time.Unix((now.Unix()/60-59)*60, 0).UTC().Format("2006-01-02 15:04:05")
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, 0, len(ids)+1)
+	args = append(args, start)
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	query := `SELECT unixepoch(timestamp)/60,server_id,target_name,delay,loss_rate FROM ping_history WHERE timestamp>=? AND server_id IN (` + strings.Join(placeholders, ",") + `) ORDER BY server_id,timestamp,id`
+	rows, err := database.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	byServer := make(map[string][]pingHistoryPoint)
+	for rows.Next() {
+		var server string
+		var point pingHistoryPoint
+		if err := rows.Scan(&point.Minute, &server, &point.Target, &point.Delay, &point.Loss); err != nil {
+			return nil, err
 		}
+		byServer[server] = append(byServer[server], point)
+	}
+	return byServer, rows.Err()
+}
+
+func primeCardPingHistory(ids []string, now time.Time) {
+	pingHistoryCache.Lock()
+	defer pingHistoryCache.Unlock()
+	entry := pingHistoryCache.entry
+	minute := now.Unix() / 60
+	allLoaded := entry.Minute == minute && entry.ByServer != nil && entry.Loaded != nil
+	if allLoaded {
+		for _, id := range ids {
+			if !entry.Loaded[id] {
+				allLoaded = false
+				break
+			}
+		}
+	}
+	if allLoaded {
+		return
+	}
+	requested := make([]string, 0, len(ids)+len(entry.Loaded))
+	seen := make(map[string]bool, len(ids)+len(entry.Loaded))
+	if entry.Minute == minute {
+		for id := range entry.Loaded {
+			if !seen[id] {
+				seen[id] = true
+				requested = append(requested, id)
+			}
+		}
+	}
+	for _, id := range ids {
+		if id != "" && !seen[id] {
+			seen[id] = true
+			requested = append(requested, id)
+		}
+	}
+	byServer, err := readAllCardPingHistory(db, requested, now)
+	if err != nil {
+		log.Printf("read card ping history: %v", err)
+		// Cache an empty database part for this minute too. Retrying the same
+		// busy query once per node would amplify a transient DB problem N times;
+		// pending in-memory minutes and current values remain available.
+		byServer = make(map[string][]pingHistoryPoint)
+	}
+	pingHistoryCache.entry = cachedPingHistory{Minute: minute, ByServer: byServer, Loaded: seen}
+}
+
+func cardPingStatuses(id string, tasks []common.PingTask, st common.ServerStatus, reportSeconds int, now time.Time) []common.CardPingStatus {
+	// Serialize the cache swap with buffer removal so a committed minute never
+	// disappears between the database snapshot and the in-memory pending set.
+	minute := now.Unix() / 60
+	var entry cachedPingHistory
+	for {
+		primeCardPingHistory([]string{id}, now)
+		pingHistoryCache.Lock()
+		entry = pingHistoryCache.entry
+		if entry.Minute == minute && entry.ByServer != nil && entry.Loaded[id] {
+			break
+		}
+		// A minute flush may invalidate the cache after primeCardPingHistory
+		// returns. Retry before taking the pending-buffer snapshot so that the
+		// just-committed minute cannot disappear from both sources.
+		pingHistoryCache.Unlock()
 	}
 	pingBuffer.RLock()
 	buffer := make(map[pingMinuteKey]pingMinute)
@@ -194,7 +282,7 @@ func cardPingStatuses(id string, tasks []common.PingTask, st common.ServerStatus
 	}
 	pingBuffer.RUnlock()
 	pingHistoryCache.Unlock()
-	return buildCardPingStatuses(id, tasks, entry.Points, buffer, st, reportSeconds, now)
+	return buildCardPingStatuses(id, tasks, entry.ByServer[id], buffer, st, reportSeconds, now)
 }
 
 func buildCardPingStatuses(id string, tasks []common.PingTask, points []pingHistoryPoint, pending map[pingMinuteKey]pingMinute, st common.ServerStatus, reportSeconds int, now time.Time) []common.CardPingStatus {
