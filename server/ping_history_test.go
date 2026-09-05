@@ -123,3 +123,27 @@ func TestPingKeepsExactlyOneResultPerTargetAndMinute(t *testing.T) {
 		}
 	}
 }
+
+func TestBatchCardHistoryPartitionsNodes(t *testing.T) {
+	database := notificationTestDB(t)
+	now := time.Date(2026, 9, 5, 5, 10, 30, 0, time.UTC)
+	minute := now.Add(-time.Minute).UTC().Truncate(time.Minute).Format("2006-01-02 15:04:05")
+	for _, row := range []struct {
+		id    string
+		delay float64
+	}{{"node-a", 12}, {"node-b", 160}} {
+		if _, err := database.Exec(`INSERT INTO ping_history(timestamp,server_id,target_name,delay,loss_rate) VALUES(?,?,?,?,0)`, minute, row.id, "TCP", row.delay); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := readAllCardPingHistory(database, []string{"node-a", "node-b", "missing"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got["node-a"]) != 1 || got["node-a"][0].Delay != 12 || len(got["node-b"]) != 1 || got["node-b"][0].Delay != 160 {
+		t.Fatalf("batch history was not partitioned: %+v", got)
+	}
+	if len(got["missing"]) != 0 {
+		t.Fatalf("missing node received history: %+v", got["missing"])
+	}
+}

@@ -108,8 +108,7 @@ net_out_speed INTEGER,
 	udp_connections INTEGER
 );`)
 
-	ensureResourceHistoryTCPColumn()
-	ensureResourceHistoryUDPColumn()
+	ensureResourceHistoryColumns()
 	mustExecDB(`CREATE INDEX IF NOT EXISTS idx_ping_history_server_time
 ON ping_history(server_id, timestamp);`)
 	mustExecDB(`CREATE INDEX IF NOT EXISTS idx_resource_history_server_time
@@ -128,18 +127,21 @@ sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	backgroundWorkers.Add(1)
 	go func() {
 		defer backgroundWorkers.Done()
-		historyTicker := time.NewTicker(time.Minute)
+		// Align archive points to wall-clock minutes. Resource history is saved
+		// first so a temporary Ping backlog cannot starve all resource charts.
+		minuteTimer := time.NewTimer(time.Until(time.Now().Truncate(time.Minute).Add(time.Minute)))
 		cleanupTicker := time.NewTicker(time.Hour)
-		defer historyTicker.Stop()
+		defer minuteTimer.Stop()
 		defer cleanupTicker.Stop()
 		for {
 			select {
 			case <-backgroundStop:
 				return
-			case tick := <-historyTicker.C:
-				flushPingMinutes(tick, false)
+			case tick := <-minuteTimer.C:
 				saveHistoryToDB()
+				flushPingMinutes(tick, false)
 				flushMonthlyUsage()
+				minuteTimer.Reset(time.Until(time.Now().Truncate(time.Minute).Add(time.Minute)))
 			case <-cleanupTicker.C:
 				cleanupHistory()
 			}
@@ -169,102 +171,6 @@ func cleanupHistory() {
 	}
 	_, _ = db.Exec("DELETE FROM notification_events WHERE event_key LIKE 'expiry:%' AND sent_at <= datetime('now', '-7 days')")
 	_, _ = db.Exec("DELETE FROM notification_log WHERE created_at < datetime('now', '-7 days') OR id NOT IN (SELECT id FROM notification_log ORDER BY id DESC LIMIT 1000)")
-}
-
-func ensureResourceHistoryTCPColumn() {
-	rows, err := db.Query(`PRAGMA table_info(resource_history)`)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var cid, notNull, pk int
-		var name, columnType string
-		var defaultValue interface{}
-		if rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk) == nil && name == "tcp_connections" {
-			return
-		}
-	}
-	_, _ = db.Exec(`ALTER TABLE resource_history ADD COLUMN tcp_connections INTEGER`)
-}
-
-func ensureResourceHistoryUDPColumn() {
-	rows, err := db.Query(`PRAGMA table_info(resource_history)`)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var cid, notNull, pk int
-		var name, columnType string
-		var defaultValue interface{}
-		if rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk) == nil && name == "udp_connections" {
-			return
-		}
-	}
-	_, _ = db.Exec(`ALTER TABLE resource_history ADD COLUMN udp_connections INTEGER`)
-}
-
-func saveHistoryToDB() {
-	mapMutex.RLock()
-	statuses := make(map[string]common.ServerStatus, len(serverStatusMap))
-	for id, status := range serverStatusMap {
-		statuses[id] = status
-	}
-	mapMutex.RUnlock()
-
-	tx, err := db.Begin()
-	if err != nil {
-		log.Printf("begin history transaction: %v", err)
-		return
-	}
-	defer tx.Rollback()
-
-	resourceStmt, err := tx.Prepare(`
-INSERT INTO resource_history (
-server_id, cpu_usage, mem_used, mem_total, disk_used, disk_total,
-swap_used, swap_total, load_1, net_in_speed, net_out_speed, tcp_connections, udp_connections
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`)
-	if err != nil {
-		return
-	}
-	defer resourceStmt.Close()
-
-	for serverID, status := range statuses {
-		configMutex.RLock()
-		reportSeconds := appConfig.AgentReportSeconds
-		configMutex.RUnlock()
-		if !statusIsFresh(status, reportSeconds, time.Now()) {
-			continue
-		}
-
-		_, writeErr := resourceStmt.Exec(
-			serverID,
-			status.CPUUsage,
-			status.MemUsed,
-			status.MemTotal,
-			status.DiskUsed,
-			status.DiskTotal,
-			status.SwapUsed,
-			status.SwapTotal,
-			status.Load1,
-			status.NetInSpeed,
-			status.NetOutSpeed,
-			status.TCPConnections,
-			status.UDPConnections,
-		)
-		if writeErr != nil {
-			log.Printf("write resource history: %v", writeErr)
-			return
-		}
-
-	}
-	if err := tx.Commit(); err != nil {
-		log.Printf("commit history: %v", err)
-	}
 }
 
 func loadConfig() {
@@ -565,6 +471,8 @@ func main() {
 				break
 			}
 			now := time.Now()
+			next, corrected := sanitizeReportedStatus(next, st)
+			logStatusCorrections(cNode.ID, corrected, now)
 			configMutex.RLock()
 			currentNode, valid := configuredNode(appConfig.Nodes, cNode.ID, token)
 			tg := appConfig.Telegram
@@ -613,16 +521,22 @@ func main() {
 		}
 		mapMutex.RUnlock()
 
+		now := time.Now()
+		cardNodeIDs := make([]string, 0, len(nodeConfigs))
+		for _, node := range nodeConfigs {
+			cardNodeIDs = append(cardNodeIDs, node.ID)
+		}
+		primeCardPingHistory(cardNodeIDs, now)
 		nodes := make([]FrontendNode, 0, len(nodeConfigs))
 		for _, n := range nodeConfigs {
 			st := statuses[n.ID]
-			st.IsOnline = statusIsFresh(st, reportSeconds, time.Now())
-			st.CardPingStatuses = cardPingStatuses(n.ID, pingTasksForNode(pingTasks, n.ID), st, reportSeconds, time.Now())
+			st.IsOnline = statusIsFresh(st, reportSeconds, now)
+			st.CardPingStatuses = cardPingStatuses(n.ID, pingTasksForNode(pingTasks, n.ID), st, reportSeconds, now)
 			nodes = append(nodes, buildFrontendNode(n, st))
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"site_name": siteName, "nodes": nodes, "ping_tasks": pingTasks,
-			"refresh_seconds": refreshSeconds, "updated_at": time.Now().Unix(),
+			"refresh_seconds": refreshSeconds, "updated_at": now.Unix(),
 		})
 	})
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -630,7 +544,7 @@ func main() {
 			writeAPIError(w, http.StatusServiceUnavailable, "database unavailable")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "resource_history": resourceHistorySnapshot()})
 	})
 	http.HandleFunc("/api/ping_history", trendHistoryHandler("ping"))
 	http.HandleFunc("/api/resource_history", trendHistoryHandler("resource"))

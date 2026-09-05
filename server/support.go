@@ -281,6 +281,6 @@ func adminRuntimeSnapshot() map[string]interface{} {
 	return map[string]interface{}{
 		"updated_at": time.Now().Unix(), "online": online, "total": total,
 		"database_bytes": dbBytes, "history_days": historyDays, "nodes": runtimeNodes,
-		"traffic": traffic,
+		"traffic": traffic, "resource_history": resourceHistorySnapshot(),
 	}
 }

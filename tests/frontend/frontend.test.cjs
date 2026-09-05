@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const cp = require('node:child_process');
 const { compile } = require('@vue/compiler-dom');
 const root = path.resolve(__dirname, '../..');
 
@@ -182,6 +183,22 @@ test('Ping display uses 60-minute averages and 150ms color thresholds', () => {
 test('public cards do not expose internal node IDs', () => {
   const html = fs.readFileSync(path.join(root, 'server/index.html'), 'utf8');
   assert.doesNotMatch(html, /class="node-id/);
+});
+
+test('public polling keeps configured start-to-start cadence', () => {
+  const api = loadUI('index.html');
+  assert.equal(api.pollDelay(3, 1000, 1800), 2200);
+  assert.equal(api.pollDelay(3, 1000, 4500), 250, 'slow request scheduled another full interval');
+});
+
+test('agent deployment command bootstraps Alpine and uses POSIX sh', () => {
+  const api = loadUI('admin.html');
+  const command = api.deployCmd({ token: "token-with-'quote" });
+  assert.match(command, /command -v apk/);
+  assert.match(command, /sh "\$f" -s/);
+  assert.doesNotMatch(command, /\| bash/);
+  assert.match(command, /token-with-/);
+  assert.equal(cp.spawnSync('sh', ['-n', '-c', command]).status, 0, command);
 });
 
 test('80-node Vue rendering keeps clock, theme and detail updates out of card subtrees', async t => {
