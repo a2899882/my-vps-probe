@@ -86,7 +86,7 @@ func sanitizeReportedStatus(status, previous common.ServerStatus) (common.Server
 	}
 
 	capacities := []struct {
-		name                       string
+		name                        string
 		used, total                 *uint64
 		previousUsed, previousTotal uint64
 	}{
