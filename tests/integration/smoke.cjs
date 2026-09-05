@@ -78,7 +78,7 @@ async function calibrate(id, amount) {
     const ping = (await read('/api/status')).nodes[0].status.card_ping_statuses[0];
     assert.equal(ping.history_60[59], 16); assert.equal(ping.history_60[58], null); assert.equal(ping.success_minutes, 1);
     const liveTrend = await read('/api/resource_history?server_id=n1&hours=0.25');
-    assert.equal(liveTrend.length, 1); assert.equal(liveTrend[0].live, true); assert.equal(liveTrend[0].cpu_usage, 95);
+    assert.deepEqual(liveTrend, [], 'a live singleton was exposed as a historical trend');
     await Promise.all(Array.from({ length: 20 }, async (_, i) => { ws.send(JSON.stringify({ ...sample, cpu_usage: i })); await read('/api/status'); }));
     await calibrate('n1', '1.5');
     ws.send(JSON.stringify({ ...sample, net_in_transfer: 200, net_out_transfer: 300 }));
