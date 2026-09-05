@@ -1,0 +1,6 @@
+{
+  "name": "probe-frontend-checks",
+  "private": true,
+  "scripts": { "test": "node --test frontend.test.cjs" },
+  "devDependencies": { "@vue/compiler-dom": "3.5.13" }
+}

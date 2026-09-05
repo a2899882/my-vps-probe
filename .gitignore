@@ -28,3 +28,6 @@ backups/
 *.dark-loss.bak.*
 *.light-ui.bak.*
 .restore-*/
+
+# Frontend test dependencies (not needed on a VPS)
+node_modules/

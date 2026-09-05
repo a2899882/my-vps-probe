@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -70,7 +71,9 @@ func flushMonthlyUsage() {
 	defer monthlyUsageMutex.Unlock()
 	loadMonthlyUsageLocked()
 	if monthlyUsageDirty {
-		_ = saveMonthlyUsageLocked()
+		if err := saveMonthlyUsageLocked(); err != nil {
+			log.Printf("flush monthly usage: %v", err)
+		}
 	}
 }
 
@@ -179,8 +182,21 @@ func buildFrontendNode(n common.NodeConfig, st common.ServerStatus) FrontendNode
 		Region:         n.Region,
 		Group:          n.Group,
 		Status:         st,
-		MonthUsed:      getMonthlyUsage(n.ID),
+		MonthUsed:      getMonthlyUsageForCycle(n.ID, n.ExpireDate, time.Now()),
 		TrafficLimitGB: limitGB,
 		ResetDay:       resetDay,
 	}
+}
+
+// An offline node also shows zero once its billing cycle has rolled over.
+func getMonthlyUsageForCycle(id, raw string, now time.Time) uint64 {
+	monthlyUsageMutex.Lock()
+	defer monthlyUsageMutex.Unlock()
+	loadMonthlyUsageLocked()
+	_, _, day := parseNodeQuota(raw)
+	rec := monthlyUsageState[id]
+	if rec.CycleKey != usageCycleKey(now, day) {
+		return 0
+	}
+	return rec.Used
 }

@@ -71,6 +71,8 @@ update_master() {
   install -m 0755 "$build_dir/probe-agent-amd64" "$REPO_DIR/server/probe-agent-amd64"
   install -m 0755 "$build_dir/probe-agent-arm64" "$REPO_DIR/server/probe-agent-arm64"
   rm -rf "$build_dir"
+  # Keep the installed management command in sync with future repository fixes.
+  install -m 0755 "$REPO_DIR/scripts/tz.sh" /usr/local/bin/tz
 
   systemctl daemon-reload
   systemctl restart probe-server

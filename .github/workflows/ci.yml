@@ -25,6 +25,13 @@ jobs:
         run: go vet ./...
       - name: Shell syntax
         run: bash -n install-master.sh install.sh scripts/tz.sh uninstall-agent.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tests/frontend/package-lock.json
+      - name: Frontend template and interaction checks
+        run: npm ci --prefix tests/frontend --ignore-scripts --no-audit --no-fund && npm test --prefix tests/frontend
       - name: Build release targets
         run: |
           go build -trimpath -o /tmp/probe-server ./server

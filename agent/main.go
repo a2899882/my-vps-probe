@@ -31,11 +31,12 @@ var (
 	trackers                           = make(map[string]*PingTracker)
 	serverAddr, token                  string
 	globalCountryCode                  = "OT"
+	countryMutex                       sync.RWMutex
 	lastNetBytesRecv, lastNetBytesSent uint64
 	lastNetAt                          time.Time
 )
 
-func init() {
+func startCountryLookup() {
 	go func() {
 		client := &http.Client{Timeout: 5 * time.Second}
 		resp, err := client.Get("https://api.country.is/")
@@ -46,7 +47,9 @@ func init() {
 			}
 			json.NewDecoder(resp.Body).Decode(&res)
 			if res.CountryCode != "" {
+				countryMutex.Lock()
 				globalCountryCode = res.CountryCode
+				countryMutex.Unlock()
 			}
 		}
 	}()
@@ -64,6 +67,7 @@ func main() {
 	flag.StringVar(&serverAddr, "server", defaultServer, "主控地址")
 	flag.StringVar(&token, "token", defaultToken, "Token")
 	flag.Parse()
+	startCountryLookup()
 	for {
 		connectAndReport()
 		time.Sleep(5 * time.Second)
@@ -118,7 +122,9 @@ func connectAndReport() {
 			return
 		default:
 		}
+		countryMutex.RLock()
 		status := common.ServerStatus{IsOnline: true, CountryCode: globalCountryCode}
+		countryMutex.RUnlock()
 		if h, err := host.Info(); err == nil && h != nil {
 			status.Uptime = h.Uptime
 		}
@@ -218,6 +224,7 @@ func connectAndReport() {
 		status.PingStatuses = pingResults
 		status.TCPConnections = tcpSocketConnections()
 		status.UDPConnections = udpSocketConnections()
+		_ = conn.SetWriteDeadline(time.Now().Add(15 * time.Second))
 		if err := conn.WriteJSON(status); err != nil {
 			return
 		}

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"my-vps-probe/common"
 )
 
 var validNodeID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
@@ -33,37 +32,6 @@ func (c *agentConnection) writeJSON(value interface{}) error {
 
 func (c *agentConnection) close() error {
 	return c.conn.Close()
-}
-
-type cachedCardPings struct {
-	loadedAt time.Time
-	items    []common.CardPingStatus
-}
-
-var (
-	cardPingCacheMu sync.RWMutex
-	cardPingCache   = map[string]cachedCardPings{}
-)
-
-func cardPingStatuses(serverID string) []common.CardPingStatus {
-	cardPingCacheMu.RLock()
-	entry, ok := cardPingCache[serverID]
-	cardPingCacheMu.RUnlock()
-	if ok && time.Since(entry.loadedAt) < 50*time.Second {
-		return entry.items
-	}
-
-	items := queryCardPingStatuses(serverID)
-	cardPingCacheMu.Lock()
-	cardPingCache[serverID] = cachedCardPings{loadedAt: time.Now(), items: items}
-	cardPingCacheMu.Unlock()
-	return items
-}
-
-func invalidateCardPingCache() {
-	cardPingCacheMu.Lock()
-	cardPingCache = map[string]cachedCardPings{}
-	cardPingCacheMu.Unlock()
 }
 
 func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
@@ -163,6 +131,18 @@ func validateConfig(config *AppConfig) error {
 		tokens[node.Token] = true
 	}
 
+	excluded := make([]string, 0, len(config.Telegram.ExcludedNodeIDs))
+	seenExcluded := map[string]bool{}
+	for _, id := range config.Telegram.ExcludedNodeIDs {
+		if ids[id] && !seenExcluded[id] {
+			excluded = append(excluded, id)
+			seenExcluded[id] = true
+		}
+	}
+	config.Telegram.ExcludedNodeIDs = excluded
+	if config.Telegram.Enabled && (config.Telegram.Token == "" || config.Telegram.ChatID == "") {
+		return errors.New("启用 Telegram 通知需要填写 Bot Token 和 Chat ID")
+	}
 	pingNames := make(map[string]bool, len(config.PingTasks))
 	for i := range config.PingTasks {
 		task := &config.PingTasks[i]
@@ -262,10 +242,14 @@ type nodeRuntime struct {
 }
 
 func adminRuntimeSnapshot() map[string]interface{} {
+	configMutex.RLock()
+	reportSeconds := appConfig.AgentReportSeconds
+	configMutex.RUnlock()
 	mapMutex.RLock()
 	runtimeNodes := make(map[string]nodeRuntime, len(serverStatusMap))
 	online := 0
 	for id, status := range serverStatusMap {
+		status.IsOnline = statusIsFresh(status, reportSeconds, time.Now())
 		if status.IsOnline {
 			online++
 		}

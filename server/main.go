@@ -34,13 +34,16 @@ type AppConfig struct {
 }
 
 var (
-	serverStatusMap = make(map[string]common.ServerStatus)
-	activeConns     = make(map[string]*agentConnection)
-	connMutex       sync.Mutex
-	appConfig       AppConfig
-	configMutex     sync.RWMutex
-	mapMutex        sync.RWMutex
-	db              *sql.DB
+	serverStatusMap   = make(map[string]common.ServerStatus)
+	activeConns       = make(map[string]*agentConnection)
+	connMutex         sync.Mutex
+	appConfig         AppConfig
+	configMutex       sync.RWMutex
+	mapMutex          sync.RWMutex
+	db                *sql.DB
+	backgroundStop    = make(chan struct{})
+	backgroundWorkers sync.WaitGroup
+	connectionWorkers sync.WaitGroup
 )
 
 func basicAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -118,14 +121,24 @@ event_key TEXT PRIMARY KEY,
 sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );`)
 
+	mustExecDB(`CREATE TABLE IF NOT EXISTS notification_log (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+ node_id TEXT, kind TEXT, status TEXT, message TEXT, error TEXT
+);`)
+
+	backgroundWorkers.Add(1)
 	go func() {
+		defer backgroundWorkers.Done()
 		historyTicker := time.NewTicker(time.Minute)
 		cleanupTicker := time.NewTicker(time.Hour)
 		defer historyTicker.Stop()
 		defer cleanupTicker.Stop()
 		for {
 			select {
-			case <-historyTicker.C:
+			case <-backgroundStop:
+				return
+			case tick := <-historyTicker.C:
+				flushPingMinutes(tick, false)
 				saveHistoryToDB()
 				flushMonthlyUsage()
 			case <-cleanupTicker.C:
@@ -155,7 +168,8 @@ func cleanupHistory() {
 	if _, err := db.Exec("DELETE FROM resource_history WHERE timestamp <= datetime('now', ?)", cutoff); err != nil {
 		log.Printf("cleanup resource history: %v", err)
 	}
-	_, _ = db.Exec("DELETE FROM notification_events WHERE sent_at <= datetime('now', '-400 days')")
+	_, _ = db.Exec("DELETE FROM notification_events WHERE event_key LIKE 'expiry:%' AND sent_at <= datetime('now', '-7 days')")
+	_, _ = db.Exec("DELETE FROM notification_log WHERE created_at < datetime('now', '-7 days') OR id NOT IN (SELECT id FROM notification_log ORDER BY id DESC LIMIT 1000)")
 }
 
 func ensureResourceHistoryTCPColumn() {
@@ -209,14 +223,6 @@ func saveHistoryToDB() {
 	}
 	defer tx.Rollback()
 
-	pingStmt, err := tx.Prepare(
-		"INSERT INTO ping_history (server_id, target_name, delay, loss_rate) VALUES (?, ?, ?, ?)",
-	)
-	if err != nil {
-		return
-	}
-	defer pingStmt.Close()
-
 	resourceStmt, err := tx.Prepare(`
 INSERT INTO resource_history (
 server_id, cpu_usage, mem_used, mem_total, disk_used, disk_total,
@@ -229,11 +235,14 @@ swap_used, swap_total, load_1, net_in_speed, net_out_speed, tcp_connections, udp
 	defer resourceStmt.Close()
 
 	for serverID, status := range statuses {
-		if !status.IsOnline {
+		configMutex.RLock()
+		reportSeconds := appConfig.AgentReportSeconds
+		configMutex.RUnlock()
+		if !statusIsFresh(status, reportSeconds, time.Now()) {
 			continue
 		}
 
-		resourceStmt.Exec(
+		_, writeErr := resourceStmt.Exec(
 			serverID,
 			status.CPUUsage,
 			status.MemUsed,
@@ -248,10 +257,11 @@ swap_used, swap_total, load_1, net_in_speed, net_out_speed, tcp_connections, udp
 			status.TCPConnections,
 			status.UDPConnections,
 		)
-
-		for _, ping := range status.PingStatuses {
-			pingStmt.Exec(serverID, ping.TargetName, ping.CurrentDelay, ping.LossRate)
+		if writeErr != nil {
+			log.Printf("write resource history: %v", writeErr)
+			return
 		}
+
 	}
 	if err := tx.Commit(); err != nil {
 		log.Printf("commit history: %v", err)
@@ -329,125 +339,6 @@ func pingTasksForNode(tasks []common.PingTask, nodeID string) []common.PingTask 
 				break
 			}
 		}
-	}
-	return out
-}
-
-func queryCardPingStatuses(serverID string) []common.CardPingStatus {
-	rows, err := db.Query(`SELECT datetime(timestamp, 'localtime'), target_name, delay FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', '-1 hours') ORDER BY timestamp ASC`, serverID)
-	if err != nil {
-		return []common.CardPingStatus{}
-	}
-	defer rows.Close()
-
-	type item struct {
-		t      string
-		target string
-		delay  float64
-	}
-	var items []item
-	targetSet := map[string]bool{}
-	for rows.Next() {
-		var it item
-		rows.Scan(&it.t, &it.target, &it.delay)
-		if len(it.t) >= 16 {
-			it.t = it.t[:16]
-		}
-		items = append(items, it)
-		targetSet[it.target] = true
-	}
-
-	minutes := make([]string, 0, 60)
-	now := time.Now().Truncate(time.Minute)
-	for i := 59; i >= 0; i-- {
-		minutes = append(minutes, now.Add(-time.Duration(i)*time.Minute).Format("2006-01-02 15:04"))
-	}
-
-	bucket := map[string]map[string]float64{}
-	for _, it := range items {
-		if _, ok := bucket[it.target]; !ok {
-			bucket[it.target] = map[string]float64{}
-		}
-		bucket[it.target][it.t] = it.delay
-	}
-
-	configMutex.RLock()
-	tasks := pingTasksForNode(appConfig.PingTasks, serverID)
-	configMutex.RUnlock()
-	taskOrder := make([]string, 0, len(tasks))
-	allowed := map[string]bool{}
-	for _, t := range tasks {
-		taskOrder = append(taskOrder, t.Name)
-		allowed[t.Name] = true
-	}
-	for name := range targetSet {
-		if !allowed[name] {
-			delete(targetSet, name)
-		}
-	}
-	for _, name := range taskOrder {
-		targetSet[name] = true
-	}
-
-	ordered := make([]string, 0, len(targetSet))
-	used := map[string]bool{}
-	for _, name := range taskOrder {
-		if targetSet[name] {
-			ordered = append(ordered, name)
-			used[name] = true
-		}
-	}
-	for name := range targetSet {
-		if !used[name] {
-			ordered = append(ordered, name)
-		}
-	}
-
-	out := make([]common.CardPingStatus, 0, len(ordered))
-	for _, tgt := range ordered {
-		hist := make([]*float64, 0, 60)
-		valid := 0
-		fail := 0
-		sum := 0.0
-		seen := 0
-		for _, mk := range minutes {
-			v, ok := bucket[tgt][mk]
-			if !ok {
-				hist = append(hist, nil)
-				continue
-			}
-			value := v
-			hist = append(hist, &value)
-			seen++
-			if v > 0 {
-				valid++
-				sum += v
-			} else {
-				fail++
-			}
-		}
-		avg := 0.0
-		if valid > 0 {
-			avg = sum / float64(valid)
-		}
-		loss := 0.0
-		if seen > 0 {
-			loss = float64(fail) / float64(seen) * 100.0
-		}
-		current := 0.0
-		for i := len(hist) - 1; i >= 0; i-- {
-			if hist[i] != nil {
-				current = *hist[i]
-				break
-			}
-		}
-		out = append(out, common.CardPingStatus{
-			TargetName:   tgt,
-			History60:    hist,
-			AvgDelay1H:   avg,
-			LossRate1H:   loss,
-			CurrentDelay: current,
-		})
 	}
 	return out
 }
@@ -585,6 +476,7 @@ func main() {
 		}
 		writeJSON(w, http.StatusOK, adminRuntimeSnapshot())
 	}))
+	http.HandleFunc("/api/admin/notifications", basicAuth(notificationLogHandler))
 	http.HandleFunc("/api/admin/telegram/test", basicAuth(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
@@ -598,8 +490,11 @@ func main() {
 			http.Error(w, "请先启用 TG 通知，并填写 Bot Token 与 Chat ID 后保存", http.StatusBadRequest)
 			return
 		}
-		if err := sendTelegram(tg, "✅ My VPS Probe 测试通知\nTG 通知配置成功。"); err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
+		testMessage := "✅ My VPS Probe 测试通知\nTG 通知配置成功。"
+		sendErr := sendTelegram(tg, testMessage)
+		recordNotificationDelivery([]notification{{Kind: "test", Message: testMessage}}, sendErr, time.Now())
+		if sendErr != nil {
+			http.Error(w, sendErr.Error(), http.StatusBadGateway)
 			return
 		}
 		w.Write([]byte(`{"status":"ok"}`))
@@ -628,6 +523,8 @@ func main() {
 		if err != nil {
 			return
 		}
+		connectionWorkers.Add(1)
+		defer connectionWorkers.Done()
 		conn := &agentConnection{conn: rawConn}
 		defer conn.close()
 		connMutex.Lock()
@@ -640,6 +537,7 @@ func main() {
 			connMutex.Lock()
 			if activeConns[cNode.ID] == conn {
 				delete(activeConns, cNode.ID)
+				markNodeOffline(cNode.ID)
 			}
 			connMutex.Unlock()
 		}()
@@ -652,8 +550,12 @@ func main() {
 		st.IsOnline = true
 		serverStatusMap[cNode.ID] = st
 		mapMutex.Unlock()
+		conn.conn.SetReadLimit(2 << 20)
 		for {
-			if err := conn.conn.ReadJSON(&st); err != nil {
+			// Decode into a new value so readers never share a slice being mutated.
+			var next common.ServerStatus
+			_ = conn.conn.SetReadDeadline(time.Now().Add(reportFreshness(reportSeconds)))
+			if err := conn.conn.ReadJSON(&next); err != nil {
 				connMutex.Lock()
 				isCurrent := activeConns[cNode.ID] == conn
 				connMutex.Unlock()
@@ -662,13 +564,25 @@ func main() {
 				}
 				break
 			}
+			now := time.Now()
+			configMutex.RLock()
+			currentNode, valid := configuredNode(appConfig.Nodes, cNode.ID, token)
+			tg := appConfig.Telegram
+			reportSeconds = appConfig.AgentReportSeconds
+			configMutex.RUnlock()
+			if !valid {
+				break
+			}
+			st = next
 			st.ServerID = cNode.ID
 			st.IsOnline = true
-			st.LastReport = time.Now().Unix()
+			st.LastReport = now.Unix()
 			mapMutex.Lock()
 			serverStatusMap[cNode.ID] = st
 			mapMutex.Unlock()
-			updateMonthlyUsage(cNode.ID, cNode.ExpireDate, st.NetInTransfer, st.NetOutTransfer)
+			updateMonthlyUsage(currentNode.ID, currentNode.ExpireDate, st.NetInTransfer, st.NetOutTransfer)
+			recordPingSamples(cNode.ID, st.PingStatuses, now)
+			resourceMonitor.observe(currentNode, st, tg, reportSeconds, now)
 		}
 	})
 	http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
@@ -680,6 +594,7 @@ func main() {
 		pingTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
 		siteName := appConfig.SiteName
 		refreshSeconds := appConfig.PublicRefreshSeconds
+		reportSeconds := appConfig.AgentReportSeconds
 		configMutex.RUnlock()
 		mapMutex.RLock()
 		statuses := make(map[string]common.ServerStatus, len(serverStatusMap))
@@ -691,7 +606,8 @@ func main() {
 		nodes := make([]FrontendNode, 0, len(nodeConfigs))
 		for _, n := range nodeConfigs {
 			st := statuses[n.ID]
-			st.CardPingStatuses = cardPingStatuses(n.ID)
+			st.IsOnline = statusIsFresh(st, reportSeconds, time.Now())
+			st.CardPingStatuses = cardPingStatuses(n.ID, pingTasksForNode(pingTasks, n.ID), st, reportSeconds, time.Now())
 			nodes = append(nodes, buildFrontendNode(n, st))
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -845,6 +761,15 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = server.Shutdown(ctx)
+		close(backgroundStop)
+		backgroundWorkers.Wait()
+		connMutex.Lock()
+		for _, conn := range activeConns {
+			_ = conn.close()
+		}
+		connMutex.Unlock()
+		connectionWorkers.Wait()
+		flushPingMinutes(time.Now(), true)
 		flushMonthlyUsage()
 	case err := <-errCh:
 		if err != nil && err != http.ErrServerClosed {
