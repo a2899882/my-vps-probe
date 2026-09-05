@@ -40,6 +40,11 @@ type CardPingStatus struct {
 }
 
 type ServerStatus struct {
+	// Optional fields keep old agents compatible. A failed collection must not
+	// be interpreted as a counter reset; per-interface counters avoid cancellation.
+	NetworkValid     *bool            `json:"network_valid,omitempty"`
+	BootID           string           `json:"boot_id,omitempty"`
+	NetCounters      []NetCounter     `json:"net_counters,omitempty"`
 	ServerID         string           `json:"server_id"`
 	LastReport       int64            `json:"last_report"`
 	IsOnline         bool             `json:"is_online"`
@@ -62,6 +67,12 @@ type ServerStatus struct {
 	CountryCode      string           `json:"country_code"`
 	PingStatuses     []PingResult     `json:"ping_statuses"`
 	CardPingStatuses []CardPingStatus `json:"card_ping_statuses"`
+}
+
+type NetCounter struct {
+	Name string `json:"name"`
+	In   uint64 `json:"in"`
+	Out  uint64 `json:"out"`
 }
 
 type PingResult struct {

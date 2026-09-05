@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -379,6 +378,7 @@ func main() {
 		http.ServeFile(w, r, "install.sh")
 	})
 	http.HandleFunc("/download/agent.go", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "agent/main.go") })
+	http.HandleFunc("/api/admin/traffic", basicAuth(trafficCalibrationHandler))
 	http.HandleFunc("/api/admin/config", basicAuth(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -569,18 +569,28 @@ func main() {
 			currentNode, valid := configuredNode(appConfig.Nodes, cNode.ID, token)
 			tg := appConfig.Telegram
 			reportSeconds = appConfig.AgentReportSeconds
-			configMutex.RUnlock()
 			if !valid {
+				configMutex.RUnlock()
+				break
+			}
+			// Serialize a replacement connection with its last report. Keep the
+			// quota configuration stable until the corresponding counters commit.
+			connMutex.Lock()
+			if activeConns[cNode.ID] != conn {
+				connMutex.Unlock()
+				configMutex.RUnlock()
 				break
 			}
 			st = next
 			st.ServerID = cNode.ID
 			st.IsOnline = true
 			st.LastReport = now.Unix()
+			observeMonthlyUsage(currentNode.ID, currentNode.ExpireDate, st, now)
 			mapMutex.Lock()
 			serverStatusMap[cNode.ID] = st
 			mapMutex.Unlock()
-			updateMonthlyUsage(currentNode.ID, currentNode.ExpireDate, st.NetInTransfer, st.NetOutTransfer)
+			connMutex.Unlock()
+			configMutex.RUnlock()
 			recordPingSamples(cNode.ID, st.PingStatuses, now)
 			resourceMonitor.observe(currentNode, st, tg, reportSeconds, now)
 		}
@@ -622,127 +632,8 @@ func main() {
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	http.HandleFunc("/api/ping_history", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-
-		serverID := r.URL.Query().Get("server_id")
-
-		// 图表仅显示当前仍分配给该节点的任务；SQLite 中的旧历史不删除。
-		configMutex.RLock()
-		currentTasks := pingTasksForNode(appConfig.PingTasks, serverID)
-		configMutex.RUnlock()
-
-		allowedTargets := make(map[string]bool, len(currentTasks))
-		for _, task := range currentTasks {
-			allowedTargets[task.Name] = true
-		}
-
-		hours, err := strconv.ParseFloat(r.URL.Query().Get("hours"), 64)
-		if err != nil || hours < 0.25 || hours > 8760 {
-			hours = 24
-		}
-
-		rows, err := db.Query(
-			`SELECT datetime(timestamp, 'localtime'), target_name, delay, loss_rate
- FROM ping_history
- WHERE server_id = ? AND timestamp >= datetime('now', ?)
- ORDER BY timestamp ASC`,
-			serverID,
-			fmt.Sprintf("-%g hours", hours),
-		)
-		if err != nil {
-			json.NewEncoder(w).Encode([]interface{}{})
-			return
-		}
-		defer rows.Close()
-
-		type DataPoint struct {
-			Time   string  `json:"time"`
-			Target string  `json:"target"`
-			Delay  float64 `json:"delay"`
-			Loss   float64 `json:"loss"`
-		}
-
-		points := make([]DataPoint, 0)
-		for rows.Next() {
-			var point DataPoint
-			if rows.Scan(&point.Time, &point.Target, &point.Delay, &point.Loss) == nil && allowedTargets[point.Target] {
-				points = append(points, point)
-			}
-		}
-		json.NewEncoder(w).Encode(points)
-	})
-
-	http.HandleFunc("/api/resource_history", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-
-		serverID := r.URL.Query().Get("server_id")
-		hours, err := strconv.Atoi(r.URL.Query().Get("hours"))
-		if err != nil || hours < 1 || hours > 168 {
-			hours = 1
-		}
-
-		rows, err := db.Query(
-			`SELECT datetime(timestamp, 'localtime'), cpu_usage, mem_used, mem_total,
-        disk_used, disk_total, swap_used, swap_total, load_1,
-        net_in_speed, net_out_speed, COALESCE(tcp_connections, 0), COALESCE(udp_connections, 0)
- FROM resource_history
- WHERE server_id = ? AND timestamp >= datetime('now', ?)
- ORDER BY timestamp ASC`,
-			serverID,
-			fmt.Sprintf("-%d hours", hours),
-		)
-		if err != nil {
-			json.NewEncoder(w).Encode([]interface{}{})
-			return
-		}
-		defer rows.Close()
-
-		type ResourcePoint struct {
-			Time           string  `json:"time"`
-			CPUUsage       float64 `json:"cpu_usage"`
-			MemUsed        uint64  `json:"mem_used"`
-			MemTotal       uint64  `json:"mem_total"`
-			DiskUsed       uint64  `json:"disk_used"`
-			DiskTotal      uint64  `json:"disk_total"`
-			SwapUsed       uint64  `json:"swap_used"`
-			SwapTotal      uint64  `json:"swap_total"`
-			Load1          float64 `json:"load_1"`
-			NetInSpeed     uint64  `json:"net_in_speed"`
-			NetOutSpeed    uint64  `json:"net_out_speed"`
-			TCPConnections uint64  `json:"tcp_connections"`
-			UDPConnections uint64  `json:"udp_connections"`
-		}
-
-		points := make([]ResourcePoint, 0)
-		for rows.Next() {
-			var point ResourcePoint
-			if rows.Scan(
-				&point.Time,
-				&point.CPUUsage,
-				&point.MemUsed,
-				&point.MemTotal,
-				&point.DiskUsed,
-				&point.DiskTotal,
-				&point.SwapUsed,
-				&point.SwapTotal,
-				&point.Load1,
-				&point.NetInSpeed,
-				&point.NetOutSpeed,
-				&point.TCPConnections,
-				&point.UDPConnections,
-			) == nil {
-				points = append(points, point)
-			}
-		}
-		json.NewEncoder(w).Encode(points)
-	})
+	http.HandleFunc("/api/ping_history", trendHistoryHandler("ping"))
+	http.HandleFunc("/api/resource_history", trendHistoryHandler("resource"))
 	fmt.Println("🚀 My VPS Probe 已启动，监听 :8080")
 	server := &http.Server{
 		Addr:              ":8080",

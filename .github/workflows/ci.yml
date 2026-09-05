@@ -37,3 +37,5 @@ jobs:
           go build -trimpath -o /tmp/probe-server ./server
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o /tmp/probe-agent-amd64 ./agent
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -o /tmp/probe-agent-arm64 ./agent
+      - name: Server and synthetic agent integration
+        run: node tests/integration/smoke.cjs /tmp/probe-server

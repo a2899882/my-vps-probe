@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"my-vps-probe/common"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -244,6 +245,7 @@ type nodeRuntime struct {
 func adminRuntimeSnapshot() map[string]interface{} {
 	configMutex.RLock()
 	reportSeconds := appConfig.AgentReportSeconds
+	nodeConfigs := append([]common.NodeConfig(nil), appConfig.Nodes...)
 	configMutex.RUnlock()
 	mapMutex.RLock()
 	runtimeNodes := make(map[string]nodeRuntime, len(serverStatusMap))
@@ -260,6 +262,10 @@ func adminRuntimeSnapshot() map[string]interface{} {
 		}
 	}
 	mapMutex.RUnlock()
+	traffic := make(map[string]trafficUsageView, len(nodeConfigs))
+	for _, n := range nodeConfigs {
+		traffic[n.ID] = monthlyUsageSnapshot(n, time.Now())
+	}
 
 	configMutex.RLock()
 	total := len(appConfig.Nodes)
@@ -275,5 +281,6 @@ func adminRuntimeSnapshot() map[string]interface{} {
 	return map[string]interface{}{
 		"updated_at": time.Now().Unix(), "online": online, "total": total,
 		"database_bytes": dbBytes, "history_days": historyDays, "nodes": runtimeNodes,
+		"traffic": traffic,
 	}
 }

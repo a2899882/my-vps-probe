@@ -87,11 +87,18 @@ func resourceValue(kind string, n common.NodeConfig, s common.ServerStatus, now 
 	case "disk":
 		return utilization(s.DiskUsed, s.DiskTotal)
 	case "traffic":
+		if s.NetworkValid != nil && !*s.NetworkValid {
+			return 0, "", false
+		}
 		_, limit, day := parseNodeQuota(n.ExpireDate)
 		if limit <= 0 {
 			return 0, "", false
 		}
-		used := getMonthlyUsageForCycle(n.ID, n.ExpireDate, now)
+		usage := monthlyUsageSnapshot(n, now)
+		if usage.Error {
+			return 0, "", false
+		}
+		used := usage.Used
 		value := float64(used) / float64(limit) / 1073741824 * 100
 		return value, fmt.Sprintf("%.2f / %d GB，每月 %d 日重置", float64(used)/1073741824, limit, day), true
 	}

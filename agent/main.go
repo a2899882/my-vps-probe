@@ -28,12 +28,10 @@ type PingTracker struct {
 }
 
 var (
-	trackers                           = make(map[string]*PingTracker)
-	serverAddr, token                  string
-	globalCountryCode                  = "OT"
-	countryMutex                       sync.RWMutex
-	lastNetBytesRecv, lastNetBytesSent uint64
-	lastNetAt                          time.Time
+	trackers          = make(map[string]*PingTracker)
+	serverAddr, token string
+	globalCountryCode = "OT"
+	countryMutex      sync.RWMutex
 )
 
 func startCountryLookup() {
@@ -86,6 +84,8 @@ func connectAndReport() {
 	}
 	defer conn.Close()
 
+	networkState := networkTracker{}
+	bootID, _ := os.ReadFile("/proc/sys/kernel/random/boot_id")
 	var instr common.AgentInstruction
 	if err := conn.ReadJSON(&instr); err != nil {
 		return
@@ -123,7 +123,7 @@ func connectAndReport() {
 		default:
 		}
 		countryMutex.RLock()
-		status := common.ServerStatus{IsOnline: true, CountryCode: globalCountryCode}
+		status := common.ServerStatus{IsOnline: true, CountryCode: globalCountryCode, BootID: strings.TrimSpace(string(bootID))}
 		countryMutex.RUnlock()
 		if h, err := host.Info(); err == nil && h != nil {
 			status.Uptime = h.Uptime
@@ -149,20 +149,11 @@ func connectAndReport() {
 			status.DiskTotal = d.Total
 			status.DiskUsed = d.Used
 		}
-		if n, err := psnet.IOCounters(false); err == nil && len(n) > 0 {
-			status.NetInTransfer = n[0].BytesRecv
-			status.NetOutTransfer = n[0].BytesSent
-			now := time.Now()
-			if lastNetBytesRecv > 0 && !lastNetAt.IsZero() && n[0].BytesRecv >= lastNetBytesRecv && n[0].BytesSent >= lastNetBytesSent {
-				secs := now.Sub(lastNetAt).Seconds()
-				if secs > 0 {
-					status.NetInSpeed = uint64(float64(n[0].BytesRecv-lastNetBytesRecv) / secs)
-					status.NetOutSpeed = uint64(float64(n[0].BytesSent-lastNetBytesSent) / secs)
-				}
-			}
-			lastNetBytesRecv = n[0].BytesRecv
-			lastNetBytesSent = n[0].BytesSent
-			lastNetAt = now
+		validNetwork := false
+		status.NetworkValid = &validNetwork
+		if n, err := psnet.IOCounters(true); err == nil && len(n) > 0 {
+			validNetwork = true
+			networkState.observe(n, status.BootID, time.Now(), &status)
 		}
 
 		newTrackers := make(map[string]*PingTracker)

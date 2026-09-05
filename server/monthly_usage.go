@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -13,28 +14,45 @@ import (
 )
 
 type monthlyUsageRecord struct {
-	CycleKey  string `json:"cycle_key"`
-	LastTotal uint64 `json:"last_total"`
-	Used      uint64 `json:"used"`
-	UpdatedAt int64  `json:"updated_at"`
+	CycleKey        string                       `json:"cycle_key"`
+	LastTotal       uint64                       `json:"last_total"`
+	Used            uint64                       `json:"used"`
+	UpdatedAt       int64                        `json:"updated_at"`
+	LastIn          uint64                       `json:"last_in"`
+	LastOut         uint64                       `json:"last_out"`
+	LastUptime      uint64                       `json:"last_uptime"`
+	BootID          string                       `json:"boot_id,omitempty"`
+	CountersReady   bool                         `json:"counters_ready"`
+	BaselinePending bool                         `json:"baseline_pending,omitempty"`
+	LastCounters    map[string]common.NetCounter `json:"last_counters,omitempty"`
+	Revision        uint64                       `json:"revision"`
+	CalibratedAt    int64                        `json:"calibrated_at,omitempty"`
+	CalibratedUsed  uint64                       `json:"calibrated_used,omitempty"`
+	CalibratedCycle string                       `json:"calibrated_cycle,omitempty"`
+	PreviousUsed    uint64                       `json:"previous_used,omitempty"`
+	Note            string                       `json:"note,omitempty"`
 }
 
 type FrontendNode struct {
-	ID             string              `json:"id"`
-	Name           string              `json:"name"`
-	ExpireDate     string              `json:"expire_date"`
-	Region         string              `json:"region"`
-	Group          string              `json:"group"`
-	Status         common.ServerStatus `json:"status"`
-	MonthUsed      uint64              `json:"month_used"`
-	TrafficLimitGB int                 `json:"traffic_limit_gb"`
-	ResetDay       int                 `json:"reset_day"`
+	ID                string              `json:"id"`
+	Name              string              `json:"name"`
+	ExpireDate        string              `json:"expire_date"`
+	Region            string              `json:"region"`
+	Group             string              `json:"group"`
+	Status            common.ServerStatus `json:"status"`
+	MonthUsed         uint64              `json:"month_used"`
+	MonthCalibratedAt int64               `json:"month_calibrated_at,omitempty"`
+	MonthUsageError   bool                `json:"month_usage_error,omitempty"`
+	TrafficLimitGB    int                 `json:"traffic_limit_gb"`
+	ResetDay          int                 `json:"reset_day"`
 }
 
 var monthlyUsageMutex sync.Mutex
 var monthlyUsageState map[string]monthlyUsageRecord
 var monthlyUsageLoaded bool
 var monthlyUsageDirty bool
+var monthlyUsagePath = "usage_state.json"
+var monthlyUsageLoadError error
 
 func loadMonthlyUsageLocked() {
 	if monthlyUsageLoaded {
@@ -42,16 +60,24 @@ func loadMonthlyUsageLocked() {
 	}
 	monthlyUsageLoaded = true
 	monthlyUsageState = map[string]monthlyUsageRecord{}
-	data, err := os.ReadFile("usage_state.json")
+	data, err := os.ReadFile(monthlyUsagePath)
 	if err == nil {
-		_ = json.Unmarshal(data, &monthlyUsageState)
+		monthlyUsageLoadError = json.Unmarshal(data, &monthlyUsageState)
 		if monthlyUsageState == nil {
 			monthlyUsageState = map[string]monthlyUsageRecord{}
 		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		monthlyUsageLoadError = err
+	}
+	if monthlyUsageLoadError != nil {
+		log.Printf("monthly state could not be loaded; preserving original file: %v", monthlyUsageLoadError)
 	}
 }
 
 func saveMonthlyUsageLocked() error {
+	if monthlyUsageLoadError != nil {
+		return monthlyUsageLoadError
+	}
 	if monthlyUsageState == nil {
 		monthlyUsageState = map[string]monthlyUsageRecord{}
 	}
@@ -59,7 +85,7 @@ func saveMonthlyUsageLocked() error {
 	if err != nil {
 		return err
 	}
-	if err := writeFileAtomic("usage_state.json", data, 0600); err != nil {
+	if err := writeFileAtomic(monthlyUsagePath, data, 0600); err != nil {
 		return err
 	}
 	monthlyUsageDirty = false
@@ -127,35 +153,93 @@ func usageCycleKey(now time.Time, resetDay int) string {
 }
 
 func updateMonthlyUsage(nodeID, raw string, inTransfer, outTransfer uint64) {
+	observeMonthlyUsage(nodeID, raw, common.ServerStatus{NetInTransfer: inTransfer, NetOutTransfer: outTransfer}, time.Now())
+}
+
+func addUsage(a, b uint64) uint64 {
+	if ^uint64(0)-a < b {
+		return ^uint64(0)
+	}
+	return a + b
+}
+
+func counterDelta(current, previous uint64) uint64 {
+	if current < previous {
+		return 0 // Unknown reset: rebaseline instead of importing unverified history.
+	}
+	return current - previous
+}
+
+func observeMonthlyUsage(nodeID, raw string, status common.ServerStatus, now time.Time) {
+	if status.NetworkValid != nil && !*status.NetworkValid {
+		return
+	}
 	monthlyUsageMutex.Lock()
 	defer monthlyUsageMutex.Unlock()
 
 	loadMonthlyUsageLocked()
-
-	_, _, resetDay := parseNodeQuota(raw)
-	total := inTransfer + outTransfer
-	key := usageCycleKey(time.Now(), resetDay)
-	rec := monthlyUsageState[nodeID]
-
-	if rec.CycleKey == "" || rec.CycleKey != key {
-		rec = monthlyUsageRecord{
-			CycleKey:  key,
-			LastTotal: total,
-			Used:      0,
-			UpdatedAt: time.Now().Unix(),
-		}
-	} else {
-		if total >= rec.LastTotal {
-			rec.Used += total - rec.LastTotal
-		} else {
-			// Network counters reset after a reboot. Preserve usage accumulated in
-			// this billing cycle and continue from the new counter baseline.
-			rec.LastTotal = total
-		}
-		rec.LastTotal = total
-		rec.UpdatedAt = time.Now().Unix()
+	if monthlyUsageLoadError != nil {
+		return
 	}
 
+	_, _, resetDay := parseNodeQuota(raw)
+	total := addUsage(status.NetInTransfer, status.NetOutTransfer)
+	key := usageCycleKey(now, resetDay)
+	rec := monthlyUsageState[nodeID]
+	first := rec.CycleKey == "" || rec.BaselinePending
+	newCycle := rec.CycleKey != key
+	if newCycle {
+		rec.Used = 0
+		rec.Note = "新账期从首次有效上报建立基线"
+	}
+	if !first && !newCycle {
+		var delta uint64
+		reboot := rec.LastUptime > 0 && status.Uptime > 0 && status.Uptime < rec.LastUptime
+		if rec.BootID != "" && status.BootID != "" {
+			reboot = rec.BootID != status.BootID
+		}
+		switch {
+		case reboot:
+			// We know the new counters began during this same cycle. Include the
+			// first report after reboot, even if it exceeds the old counter value.
+			delta = total
+			rec.Note = "已识别系统重启，保留账期用量并接续新计数"
+		case !rec.CountersReady:
+			delta = counterDelta(total, rec.LastTotal) // One-time legacy migration.
+		case len(status.NetCounters) > 0 && len(rec.LastCounters) > 0:
+			seen := make(map[string]bool, len(status.NetCounters))
+			for _, counter := range status.NetCounters {
+				if seen[counter.Name] {
+					continue
+				}
+				seen[counter.Name] = true
+				previous, exists := rec.LastCounters[counter.Name]
+				if !exists {
+					continue // A newly seen interface establishes its own baseline.
+				}
+				delta = addUsage(delta, addUsage(counterDelta(counter.In, previous.In), counterDelta(counter.Out, previous.Out)))
+			}
+		default:
+			delta = addUsage(counterDelta(status.NetInTransfer, rec.LastIn), counterDelta(status.NetOutTransfer, rec.LastOut))
+		}
+		if !reboot && (status.NetInTransfer < rec.LastIn || status.NetOutTransfer < rec.LastOut) {
+			rec.Note = "网卡计数发生变化，下降方向已重新建立基线；可按账单校准"
+		}
+		rec.Used = addUsage(rec.Used, delta)
+	}
+	if first && rec.CalibratedAt == 0 {
+		rec.Note = "从接入探针开始累计；接入前的用量可手动补齐"
+	}
+	rec.LastCounters = nil
+	if len(status.NetCounters) > 0 {
+		rec.LastCounters = make(map[string]common.NetCounter, len(status.NetCounters))
+		for _, counter := range status.NetCounters {
+			rec.LastCounters[counter.Name] = counter
+		}
+	}
+	rec.CycleKey, rec.LastTotal, rec.UpdatedAt = key, total, now.Unix()
+	rec.LastIn, rec.LastOut, rec.LastUptime, rec.BootID = status.NetInTransfer, status.NetOutTransfer, status.Uptime, status.BootID
+	rec.CountersReady, rec.BaselinePending = true, false
 	monthlyUsageState[nodeID] = rec
 	monthlyUsageDirty = true
 }
@@ -175,16 +259,21 @@ func getMonthlyUsage(nodeID string) uint64 {
 
 func buildFrontendNode(n common.NodeConfig, st common.ServerStatus) FrontendNode {
 	_, limitGB, resetDay := parseNodeQuota(n.ExpireDate)
+	usage := monthlyUsageSnapshot(n, time.Now())
+	st.NetCounters = nil // Per-interface accounting state is not needed by the public cards.
+	st.BootID = ""
 	return FrontendNode{
-		ID:             n.ID,
-		Name:           n.Name,
-		ExpireDate:     n.ExpireDate,
-		Region:         n.Region,
-		Group:          n.Group,
-		Status:         st,
-		MonthUsed:      getMonthlyUsageForCycle(n.ID, n.ExpireDate, time.Now()),
-		TrafficLimitGB: limitGB,
-		ResetDay:       resetDay,
+		ID:                n.ID,
+		Name:              n.Name,
+		ExpireDate:        n.ExpireDate,
+		Region:            n.Region,
+		Group:             n.Group,
+		Status:            st,
+		MonthUsed:         usage.Used,
+		MonthCalibratedAt: usage.CalibratedAt,
+		MonthUsageError:   usage.Error,
+		TrafficLimitGB:    limitGB,
+		ResetDay:          resetDay,
 	}
 }
 
