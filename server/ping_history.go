@@ -32,8 +32,11 @@ func (p pingMinute) values() (float64, float64) {
 	return delay, loss
 }
 
-// Keep real received samples until the minute is closed and committed. A delayed
-// database write must not move a sample into a neighbouring minute.
+// Keep one real probe result per target and UTC minute until that minute is
+// closed and committed. Agents can report status more frequently than Ping is
+// displayed; retaining the first valid result gives every card cell one clear
+// one-minute meaning without manufacturing averages from repeated reports.
+// A delayed database write must not move a sample into a neighbouring minute.
 var pingFlushMu sync.Mutex
 
 var pingBuffer = struct {
@@ -50,11 +53,13 @@ func recordPingSamples(id string, pings []common.PingResult, now time.Time) {
 			continue
 		}
 		key := pingMinuteKey{id, p.TargetName, minute}
-		v := pingBuffer.items[key]
-		v.Count++
+		if _, recorded := pingBuffer.items[key]; recorded {
+			continue
+		}
+		v := pingMinute{Count: 1}
 		if p.CurrentDelay >= 0 {
-			v.Success++
-			v.Sum += p.CurrentDelay
+			v.Success = 1
+			v.Sum = p.CurrentDelay
 		}
 		pingBuffer.items[key] = v
 	}

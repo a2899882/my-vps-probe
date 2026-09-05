@@ -203,6 +203,12 @@ func trendHistoryHandler(kind string) http.HandlerFunc {
 }
 
 func appendLiveResourcePoint(points []map[string]interface{}, id string, step, reportSeconds int, now time.Time) []map[string]interface{} {
+	// A single live value is not a trend and renders as a misleading isolated
+	// dot. Wait for the first committed minute; once history exists, a fresh
+	// status may still extend or merge into the continuous line below.
+	if len(points) == 0 {
+		return points
+	}
 	mapMutex.RLock()
 	status, ok := serverStatusMap[id]
 	mapMutex.RUnlock()
@@ -239,9 +245,6 @@ func appendLiveResourcePoint(points []map[string]interface{}, id string, step, r
 		"net_out_speed":   status.NetOutSpeed,
 		"tcp_connections": status.TCPConnections,
 		"udp_connections": status.UDPConnections,
-	}
-	if len(points) == 0 {
-		return append(points, live)
 	}
 	last := points[len(points)-1]
 	lastBucket, _ := numericValue(last["ts"])

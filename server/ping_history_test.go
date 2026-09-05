@@ -97,10 +97,29 @@ func TestPingDatabaseFailureRetriesWithoutInventingData(t *testing.T) {
 		t.Fatal("successful retry did not clear buffer")
 	}
 	p := cardPingStatuses("n", []common.PingTask{{Name: "TCP"}}, common.ServerStatus{}, 3, now)[0]
-	if p.SampleMinutes != 1 || p.SuccessMinutes != 1 || p.History60[58] == nil || *p.History60[58] != 20 || *p.HistoryLoss60[58] != 50 {
-		t.Fatalf("partial failure not preserved: %+v", p)
+	if p.SampleMinutes != 1 || p.SuccessMinutes != 0 || p.History60[58] == nil || *p.History60[58] != -1 || *p.HistoryLoss60[58] != 100 {
+		t.Fatalf("first one-minute probe result was not preserved: %+v", p)
 	}
 	if p.History60[59] != nil || p.HasCurrent {
 		t.Fatal("invented a live/healthy sample for an offline node")
+	}
+}
+
+func TestPingKeepsExactlyOneResultPerTargetAndMinute(t *testing.T) {
+	notificationTestDB(t)
+	now := time.Date(2026, 9, 5, 5, 10, 30, 0, time.UTC)
+	recordPingSamples("n", []common.PingResult{{TargetName: "TCP", CurrentDelay: 149}}, now)
+	recordPingSamples("n", []common.PingResult{{TargetName: "TCP", CurrentDelay: 900}}, now.Add(20*time.Second))
+	recordPingSamples("n", []common.PingResult{{TargetName: "TCP", CurrentDelay: -1}}, now.Add(29*time.Second))
+
+	pending := pendingPingMinutes()
+	if len(pending) != 1 {
+		t.Fatalf("same minute created %d samples", len(pending))
+	}
+	for _, sample := range pending {
+		delay, loss := sample.values()
+		if sample.Count != 1 || sample.Success != 1 || delay != 149 || loss != 0 {
+			t.Fatalf("minute changed after its first probe: %+v", sample)
+		}
 	}
 }

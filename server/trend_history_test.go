@@ -153,7 +153,7 @@ func TestTrendCacheHasMemoryAndEntryLimits(t *testing.T) {
 	}
 }
 
-func TestResourceTrendShortWindowsUseDatabaseClockAndIncludeLiveSample(t *testing.T) {
+func TestResourceTrendShortWindowsUseDatabaseClockWithoutMisleadingSingleton(t *testing.T) {
 	database := notificationTestDB(t)
 	trendTestState(t)
 	if _, err := database.Exec(`CREATE TABLE resource_history(timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,server_id TEXT,cpu_usage REAL,mem_used INTEGER,mem_total INTEGER,disk_used INTEGER,disk_total INTEGER,swap_used INTEGER,swap_total INTEGER,load_1 REAL,net_in_speed INTEGER,net_out_speed INTEGER,tcp_connections INTEGER,udp_connections INTEGER)`); err != nil {
@@ -197,7 +197,7 @@ func TestResourceTrendShortWindowsUseDatabaseClockAndIncludeLiveSample(t *testin
 	w := httptest.NewRecorder()
 	trendHistoryHandler("resource")(w, httptest.NewRequest("GET", "/api/resource_history?server_id=node-1&hours=0.25", nil))
 	var live []map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &live); err != nil || len(live) != 1 || live[0]["live"] != true || live[0]["cpu_usage"] != float64(23) {
-		t.Fatalf("fresh node did not provide an immediate live trend point: %v / %s", err, w.Body.String())
+	if err := json.Unmarshal(w.Body.Bytes(), &live); err != nil || len(live) != 0 {
+		t.Fatalf("fresh node fabricated a one-point trend: %v / %s", err, w.Body.String())
 	}
 }
