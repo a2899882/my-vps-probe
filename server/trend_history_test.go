@@ -152,3 +152,52 @@ func TestTrendCacheHasMemoryAndEntryLimits(t *testing.T) {
 		t.Fatal("expired history reused")
 	}
 }
+
+func TestResourceTrendShortWindowsUseDatabaseClockAndIncludeLiveSample(t *testing.T) {
+	database := notificationTestDB(t)
+	trendTestState(t)
+	if _, err := database.Exec(`CREATE TABLE resource_history(timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,server_id TEXT,cpu_usage REAL,mem_used INTEGER,mem_total INTEGER,disk_used INTEGER,disk_total INTEGER,swap_used INTEGER,swap_total INTEGER,load_1 REAL,net_in_speed INTEGER,net_out_speed INTEGER,tcp_connections INTEGER,udp_connections INTEGER)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Exec(`INSERT INTO resource_history(server_id,cpu_usage,mem_used,mem_total,disk_used,disk_total,swap_used,swap_total,load_1,net_in_speed,net_out_speed,tcp_connections,udp_connections) VALUES ('node-1',17,30,100,40,100,0,0,.2,100,200,10,2)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, hours := range []string{"0.25", "1", "4"} {
+		w := httptest.NewRecorder()
+		trendHistoryHandler("resource")(w, httptest.NewRequest("GET", "/api/resource_history?server_id=node-1&hours="+hours, nil))
+		if w.Code != 200 {
+			t.Fatalf("%sh: %d %s", hours, w.Code, w.Body.String())
+		}
+		var points []map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &points); err != nil || len(points) == 0 {
+			t.Fatalf("%sh omitted a row written by SQLite's current clock: %v / %s", hours, err, w.Body.String())
+		}
+	}
+
+	trendCache.Lock()
+	trendCache.entries = make(map[string]trendCacheEntry)
+	trendCache.Unlock()
+	if _, err := database.Exec(`DELETE FROM resource_history`); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	mapMutex.Lock()
+	oldStatuses := serverStatusMap
+	serverStatusMap = map[string]common.ServerStatus{"node-1": {
+		IsOnline: true, LastReport: now.Unix(), CPUUsage: 23, MemUsed: 50, MemTotal: 100,
+		DiskUsed: 25, DiskTotal: 100, Load1: .4, NetInSpeed: 300, NetOutSpeed: 400,
+		TCPConnections: 12, UDPConnections: 3,
+	}}
+	mapMutex.Unlock()
+	t.Cleanup(func() {
+		mapMutex.Lock()
+		serverStatusMap = oldStatuses
+		mapMutex.Unlock()
+	})
+	w := httptest.NewRecorder()
+	trendHistoryHandler("resource")(w, httptest.NewRequest("GET", "/api/resource_history?server_id=node-1&hours=0.25", nil))
+	var live []map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &live); err != nil || len(live) != 1 || live[0]["live"] != true || live[0]["cpu_usage"] != float64(23) {
+		t.Fatalf("fresh node did not provide an immediate live trend point: %v / %s", err, w.Body.String())
+	}
+}

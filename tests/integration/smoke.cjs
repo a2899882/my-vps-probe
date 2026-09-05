@@ -76,7 +76,9 @@ async function calibrate(id, amount) {
     ws.send(JSON.stringify(sample));
     await waitFor(async () => (await read('/api/status')).nodes[0].status.card_ping_statuses[0].has_current, 'first report was not received');
     const ping = (await read('/api/status')).nodes[0].status.card_ping_statuses[0];
-    assert.equal(ping.history_60[59], 16); assert.equal(ping.history_60[58], null);
+    assert.equal(ping.history_60[59], 16); assert.equal(ping.history_60[58], null); assert.equal(ping.success_minutes, 1);
+    const liveTrend = await read('/api/resource_history?server_id=n1&hours=0.25');
+    assert.equal(liveTrend.length, 1); assert.equal(liveTrend[0].live, true); assert.equal(liveTrend[0].cpu_usage, 95);
     await Promise.all(Array.from({ length: 20 }, async (_, i) => { ws.send(JSON.stringify({ ...sample, cpu_usage: i })); await read('/api/status'); }));
     await calibrate('n1', '1.5');
     ws.send(JSON.stringify({ ...sample, net_in_transfer: 200, net_out_transfer: 300 }));
@@ -104,8 +106,10 @@ assert d.execute('SELECT COUNT(*) FROM ping_history').fetchone()[0]>=1`, path.jo
     await start();
     const status = await read('/api/status');
     assert.equal(status.nodes[0].month_used, expected); assert.equal(status.nodes[0].status.is_online, false);
-    const history = await read('/api/resource_history?server_id=n1&hours=0.25');
-    assert.ok(history.length > 0 && history.length <= 15); assert.equal(history[0].cpu_usage, 99);
+    for (const hours of [0.25, 1, 4]) {
+      const history = await read('/api/resource_history?server_id=n1&hours=' + hours);
+      assert.ok(history.length > 0 && history.length <= Math.max(15, hours * 60)); assert.equal(history[0].cpu_usage, 99);
+    }
     await calibrate('n1', '0');
     assert.equal((await read('/api/status')).nodes[0].month_used, 0);
     await stop();

@@ -27,16 +27,17 @@ type AgentInstruction struct {
 }
 
 type CardPingStatus struct {
-	TargetName    string     `json:"target_name"`
-	History60     []*float64 `json:"history_60"`
-	HistoryLoss60 []*float64 `json:"history_loss_60"`
-	HistoryStart  int64      `json:"history_start"`
-	SampleMinutes int        `json:"sample_minutes"`
-	CurrentAt     int64      `json:"current_at"`
-	HasCurrent    bool       `json:"has_current"`
-	AvgDelay1H    float64    `json:"avg_delay_1h"`
-	LossRate1H    float64    `json:"loss_rate_1h"`
-	CurrentDelay  float64    `json:"current_delay"`
+	TargetName     string     `json:"target_name"`
+	History60      []*float64 `json:"history_60"`
+	HistoryLoss60  []*float64 `json:"history_loss_60"`
+	HistoryStart   int64      `json:"history_start"`
+	SampleMinutes  int        `json:"sample_minutes"`
+	SuccessMinutes int        `json:"success_minutes"`
+	CurrentAt      int64      `json:"current_at"`
+	HasCurrent     bool       `json:"has_current"`
+	AvgDelay1H     float64    `json:"avg_delay_1h"`
+	LossRate1H     float64    `json:"loss_rate_1h"`
+	CurrentDelay   float64    `json:"current_delay"`
 }
 
 type ServerStatus struct {

@@ -49,7 +49,7 @@ func TestPingMinutesSurviveDelayedWritesAndTimezones(t *testing.T) {
 	}
 	st := common.ServerStatus{IsOnline: true, LastReport: end.Unix(), PingStatuses: []common.PingResult{{TargetName: "TCP", CurrentDelay: 12}}}
 	before := cardPingStatuses("n", tasks, st, 3, end)
-	if before[0].SampleMinutes != 60 || before[0].History60[59] == nil || !before[0].HasCurrent {
+	if before[0].SampleMinutes != 60 || before[0].SuccessMinutes != 60 || before[0].History60[59] == nil || !before[0].HasCurrent {
 		t.Fatalf("unflushed samples missing: %+v", before[0])
 	}
 	flushPingMinutes(end, false)
@@ -97,7 +97,7 @@ func TestPingDatabaseFailureRetriesWithoutInventingData(t *testing.T) {
 		t.Fatal("successful retry did not clear buffer")
 	}
 	p := cardPingStatuses("n", []common.PingTask{{Name: "TCP"}}, common.ServerStatus{}, 3, now)[0]
-	if p.SampleMinutes != 1 || p.History60[58] == nil || *p.History60[58] != 20 || *p.HistoryLoss60[58] != 50 {
+	if p.SampleMinutes != 1 || p.SuccessMinutes != 1 || p.History60[58] == nil || *p.History60[58] != 20 || *p.HistoryLoss60[58] != 50 {
 		t.Fatalf("partial failure not preserved: %+v", p)
 	}
 	if p.History60[59] != nil || p.HasCurrent {

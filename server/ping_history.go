@@ -234,6 +234,7 @@ func buildCardPingStatuses(id string, tasks []common.PingTask, points []pingHist
 		if valid > 0 {
 			p.AvgDelay1H = sum / float64(valid)
 		}
+		p.SuccessMinutes = valid
 		if p.SampleMinutes > 0 {
 			p.LossRate1H = lossSum / float64(p.SampleMinutes)
 		}

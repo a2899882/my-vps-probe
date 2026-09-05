@@ -77,6 +77,7 @@ func trendHistoryHandler(kind string) http.HandlerFunc {
 		id := r.URL.Query().Get("server_id")
 		configMutex.RLock()
 		found := false
+		reportSeconds := appConfig.AgentReportSeconds
 		for _, n := range appConfig.Nodes {
 			if n.ID == id {
 				found = true
@@ -117,9 +118,10 @@ func trendHistoryHandler(kind string) http.HandlerFunc {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
-		start := now.Add(-time.Duration(hours * float64(time.Hour))).UTC().Format("2006-01-02 15:04:05")
-		end := now.UTC().Format("2006-01-02 15:04:05")
-		args := []interface{}{step, step, id, start, end}
+		// Use SQLite's clock for both insertion and filtering. Comparing against a
+		// Go-formatted wall clock made short windows sensitive to host time zones.
+		window := fmt.Sprintf("-%g hours", hours)
+		args := []interface{}{step, step, id, window}
 		var query string
 		if kind == "ping" {
 			if len(targets) == 0 {
@@ -133,7 +135,7 @@ func trendHistoryHandler(kind string) http.HandlerFunc {
 			}
 			query = `WITH buckets AS (
  SELECT CAST(strftime('%s', timestamp) AS INTEGER) / ? * ? AS bucket, *
- FROM ping_history WHERE server_id = ? AND timestamp >= ? AND timestamp <= ? AND target_name IN (` + strings.Join(placeholders, ",") + `))
+ FROM ping_history WHERE server_id = ? AND timestamp >= datetime('now', ?) AND timestamp <= datetime('now') AND target_name IN (` + strings.Join(placeholders, ",") + `))
  SELECT datetime(bucket, 'unixepoch', 'localtime') AS time, bucket AS ts,
  target_name AS target, COALESCE(AVG(CASE WHEN delay >= 0 THEN delay END), -1) AS delay,
  AVG(COALESCE(loss_rate, CASE WHEN delay < 0 THEN 100 ELSE 0 END)) AS loss, COUNT(*) AS samples
@@ -141,7 +143,7 @@ func trendHistoryHandler(kind string) http.HandlerFunc {
 		} else {
 			query = `WITH buckets AS (
  SELECT CAST(strftime('%s', timestamp) AS INTEGER) / ? * ? AS bucket, *
- FROM resource_history WHERE server_id = ? AND timestamp >= ? AND timestamp <= ?)
+ FROM resource_history WHERE server_id = ? AND timestamp >= datetime('now', ?) AND timestamp <= datetime('now'))
  SELECT datetime(bucket, 'unixepoch', 'localtime') AS time, bucket AS ts, COUNT(*) AS samples,
  MAX(cpu_usage) AS cpu_usage, MAX(mem_used) AS mem_used, MAX(mem_total) AS mem_total,
  MAX(disk_used) AS disk_used, MAX(disk_total) AS disk_total,
@@ -187,6 +189,9 @@ func trendHistoryHandler(kind string) http.HandlerFunc {
 			writeAPIError(w, http.StatusServiceUnavailable, "历史查询中断，请重试")
 			return
 		}
+		if kind == "resource" {
+			points = appendLiveResourcePoint(points, id, step, reportSeconds, now)
+		}
 		data, err := json.Marshal(points)
 		if err != nil {
 			writeAPIError(w, http.StatusInternalServerError, "历史数据编码失败")
@@ -194,5 +199,85 @@ func trendHistoryHandler(kind string) http.HandlerFunc {
 		}
 		cacheTrend(key, trendCacheEntry{data: data, at: now, step: step})
 		_, _ = w.Write(data)
+	}
+}
+
+func appendLiveResourcePoint(points []map[string]interface{}, id string, step, reportSeconds int, now time.Time) []map[string]interface{} {
+	mapMutex.RLock()
+	status, ok := serverStatusMap[id]
+	mapMutex.RUnlock()
+	if !ok || !statusIsFresh(status, reportSeconds, now) {
+		return points
+	}
+	if step < 1 {
+		step = 60
+	}
+	bucket := now.Unix() / int64(step) * int64(step)
+	percent := func(used, total uint64) float64 {
+		if total == 0 {
+			return 0
+		}
+		return 100 * float64(used) / float64(total)
+	}
+	live := map[string]interface{}{
+		"time":            time.Unix(bucket, 0).Format("2006-01-02 15:04:05"),
+		"ts":              bucket,
+		"samples":         int64(1),
+		"step_seconds":    step,
+		"live":            true,
+		"cpu_usage":       status.CPUUsage,
+		"mem_used":        status.MemUsed,
+		"mem_total":       status.MemTotal,
+		"disk_used":       status.DiskUsed,
+		"disk_total":      status.DiskTotal,
+		"swap_used":       status.SwapUsed,
+		"swap_total":      status.SwapTotal,
+		"mem_usage":       percent(status.MemUsed, status.MemTotal),
+		"disk_usage":      percent(status.DiskUsed, status.DiskTotal),
+		"load_1":          status.Load1,
+		"net_in_speed":    status.NetInSpeed,
+		"net_out_speed":   status.NetOutSpeed,
+		"tcp_connections": status.TCPConnections,
+		"udp_connections": status.UDPConnections,
+	}
+	if len(points) == 0 {
+		return append(points, live)
+	}
+	last := points[len(points)-1]
+	lastBucket, _ := numericValue(last["ts"])
+	if int64(lastBucket) != bucket {
+		return append(points, live)
+	}
+	// A bucket represents peaks. Merge the current sample without hiding a
+	// spike already written earlier in the same minute/aggregate interval.
+	for _, field := range []string{"cpu_usage", "mem_used", "mem_total", "disk_used", "disk_total", "swap_used", "swap_total", "mem_usage", "disk_usage", "load_1", "net_in_speed", "net_out_speed", "tcp_connections", "udp_connections"} {
+		old, oldOK := numericValue(last[field])
+		current, currentOK := numericValue(live[field])
+		if !oldOK || currentOK && current > old {
+			last[field] = live[field]
+		}
+	}
+	last["live"] = true
+	return points
+}
+
+func numericValue(value interface{}) (float64, bool) {
+	switch number := value.(type) {
+	case int:
+		return float64(number), true
+	case int64:
+		return float64(number), true
+	case uint64:
+		return float64(number), true
+	case float64:
+		return number, true
+	case []byte:
+		parsed, err := strconv.ParseFloat(string(number), 64)
+		return parsed, err == nil
+	case string:
+		parsed, err := strconv.ParseFloat(number, 64)
+		return parsed, err == nil
+	default:
+		return 0, false
 	}
 }

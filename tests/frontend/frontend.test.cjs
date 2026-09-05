@@ -118,6 +118,19 @@ test('Ping trend retains zero ms, partial loss and whole-node gaps', async () =>
   const option = charts[0].options[0];
   assert.deepEqual([...option.series[0].data], [0, null, 10], 'smoothing filled an outage or lost zero latency');
   assert.equal(api.pingLegend.value.TCP.loss, 12.5);
+  assert.equal(option.series[0].markPoint.data.length, 2, 'partial failure / missing markers disappeared');
+  assert.equal(option.series[0].markPoint.data.map(item => item.name).join(','), 'partial,missing');
+});
+
+test('empty short trend results are retried instead of being cached for a minute', async () => {
+  let requests = 0;
+  const { api } = trendUI(async () => ({ ok: true, json: async () => { requests++; return requests === 1 ? [] : [{ ts: 1788580800, step_seconds: 60, cpu_usage: 7 }]; } }));
+  api.detailNode.value = { id: 'n' };
+  await api.loadTrend(.25);
+  assert.equal(api.resourcePoints.value.length, 0);
+  await api.loadTrend(.25);
+  assert.equal(requests, 2);
+  assert.equal(api.resourcePoints.value[0].cpu_usage, 7);
 });
 
 test('admin batch calibration uses saved billing revisions and preserves zero', async () => {
@@ -141,15 +154,20 @@ test('admin batch calibration uses saved billing revisions and preserves zero', 
   assert.equal(api.trafficEditor.open, false);
 });
 
-test('Ping display distinguishes missing data, timeout, partial failure, and zero ms', () => {
+test('Ping display uses 60-minute averages and 150ms color thresholds', () => {
   const api = loadUI('index.html');
-  const p = { history_60: [null, -1, 0, 15], history_loss_60: [null, 100, 0, 50], history_start: 1788580800, sample_minutes: 3, has_current: true, current_delay: 0 };
+  const p = { history_60: [null, -1, 0, 15], history_loss_60: [null, 100, 0, 50], history_start: 1788580800, sample_minutes: 3, success_minutes: 2, avg_delay_1h: 82.5, has_current: true, current_delay: 260 };
   assert.equal(api.barClass(null, p, 0), 'missing');
   assert.equal(api.barClass(-1, p, 1), 'r');
   assert.equal(api.barClass(0, p, 2), 'g');
   assert.equal(api.barClass(15, p, 3), 'y');
-  assert.equal(api.pingValue(p), '0 ms');
+  assert.equal(api.barClass(149, { history_loss_60: [0] }, 0), 'g');
+  assert.equal(api.barClass(150, { history_loss_60: [0] }, 0), 'y');
+  assert.equal(api.barClass(20, { history_loss_60: [100] }, 0), 'r');
+  assert.equal(api.pingValue(p), '83 ms', 'right-hand value reverted to a live sample');
+  assert.equal(api.pingTone({ sample_minutes: 4, success_minutes: 0 }), 'r');
   assert.match(api.barTitle(null, p, 0), /未收到探测上报/);
+  assert.match(api.pingSummary(p), /近 60 分钟/);
   assert.equal(api.normalizedBars(p).length, 60);
   assert.equal(api.lossText({ sample_minutes: 0 }), '--');
 });
