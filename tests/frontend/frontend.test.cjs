@@ -182,6 +182,39 @@ test('Ping display uses 60-minute averages and 150ms color thresholds', () => {
   assert.equal(api.shortName('上海移动'), '上海移动');
 });
 
+test('wide cards use five columns and Ping loss labels align in three columns', () => {
+  const html = fs.readFileSync(path.join(root, 'server/index.html'), 'utf8');
+  assert.match(html, /\.grid\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+  assert.match(html, /@media\(max-width:1680px\)\{\.grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(html, /\.loss\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+});
+
+test('admin renewal settings round-trip and batch apply', async () => {
+  let saved;
+  let config = { site_name: 'Test', admin_user: 'admin', nodes: [{ id: 'n', name: 'N', token: 'test-token', expire_date: '2030/01/01|100|7', renewal_cycle: 'monthly', auto_renew: true }], ping_tasks: [] };
+  const api = loadUI('admin.html', async (url, options = {}) => {
+    if (url === '/api/admin/config') {
+      if (options.method === 'POST') { saved = JSON.parse(options.body); config = saved; }
+      return { ok: true, json: async () => JSON.parse(JSON.stringify(config)) };
+    }
+    assert.equal(url, '/api/admin/runtime');
+    return { ok: true, json: async () => ({ nodes: {} }) };
+  });
+  api.loginUser.value = 'admin'; api.loginPass.value = 'test-password';
+  await api.doLogin();
+  assert.equal(api.cfg.nodes[0]._ed, '2030-01-01');
+  assert.equal(api.cfg.nodes[0].renewal_cycle, 'monthly');
+  assert.equal(api.cfg.nodes[0].auto_renew, true);
+  api.selectedIds.value = ['n'];
+  api.openRenewal();
+  api.renewEditor.cycle = 'quarterly'; api.renewEditor.autoRenew = false;
+  api.applyBulkRenewal();
+  await api.saveConfig();
+  assert.equal(saved.nodes[0].expire_date, '2030/01/01|100|7');
+  assert.equal(saved.nodes[0].renewal_cycle, 'quarterly');
+  assert.equal(saved.nodes[0].auto_renew, false);
+});
+
 test('public cards do not expose internal node IDs', () => {
   const html = fs.readFileSync(path.join(root, 'server/index.html'), 'utf8');
   assert.doesNotMatch(html, /class="node-id/);

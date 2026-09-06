@@ -6,12 +6,14 @@ type PingTask struct {
 	NodeIDs []string `json:"node_ids,omitempty"`
 }
 type NodeConfig struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Token      string `json:"token"`
-	ExpireDate string `json:"expire_date"`
-	Region     string `json:"region"`
-	Group      string `json:"group"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Token        string `json:"token"`
+	ExpireDate   string `json:"expire_date"`
+	RenewalCycle string `json:"renewal_cycle,omitempty"`
+	AutoRenew    bool   `json:"auto_renew,omitempty"`
+	Region       string `json:"region"`
+	Group        string `json:"group"`
 }
 type AppConfig struct {
 	SiteName  string       `json:"site_name"`
