@@ -178,6 +178,8 @@ test('Ping display uses 60-minute averages and 150ms color thresholds', () => {
   assert.equal(api.normalizedBars(p).length, 60);
   assert.equal(api.barStyle(p).backgroundSize, 'calc(100% / 60) 100%,100% 100%');
   assert.equal(api.lossText({ sample_minutes: 0 }), '--');
+  assert.equal(api.shortName('广东电信'), '广东电信');
+  assert.equal(api.shortName('上海移动'), '上海移动');
 });
 
 test('public cards do not expose internal node IDs', () => {
