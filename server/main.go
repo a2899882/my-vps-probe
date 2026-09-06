@@ -141,6 +141,7 @@ sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
 				saveHistoryToDB()
 				flushPingMinutes(tick, false)
 				flushMonthlyUsage()
+				renewDueNodes(tick)
 				minuteTimer.Reset(time.Until(time.Now().Truncate(time.Minute).Add(time.Minute)))
 			case <-cleanupTicker.C:
 				cleanupHistory()
@@ -201,6 +202,7 @@ func loadConfig() {
 		appConfig.PingTasks = []common.PingTask{{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80"}, {Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80"}, {Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80"}}
 	}
 	normalizeAppConfig(&appConfig)
+	renewNodes(appConfig.Nodes, time.Now())
 	if err := saveAppConfig(appConfig); err != nil {
 		log.Fatalf("保存规范化配置失败: %v", err)
 	}
@@ -316,6 +318,7 @@ func main() {
 				writeAPIError(w, http.StatusBadRequest, err.Error())
 				return
 			}
+			renewNodes(newConfig.Nodes, time.Now())
 			if err := saveAppConfig(newConfig); err != nil {
 				configMutex.Unlock()
 				log.Printf("save config: %v", err)

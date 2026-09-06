@@ -110,6 +110,7 @@ func validateConfig(config *AppConfig) error {
 		node.Group = trimLimited(node.Group, 80)
 		node.Region = trimLimited(node.Region, 16)
 		node.ExpireDate = trimLimited(node.ExpireDate, 80)
+		node.RenewalCycle = normalizeRenewalCycle(node.RenewalCycle)
 		if node.ID == "" || !validNodeID.MatchString(node.ID) {
 			return fmt.Errorf("第 %d 个节点 ID 无效，只能使用字母、数字、点、下划线和短横线", i+1)
 		}
@@ -121,6 +122,11 @@ func validateConfig(config *AppConfig) error {
 		}
 		if len(node.Token) < 8 || len(node.Token) > 256 {
 			return fmt.Errorf("节点“%s”的 Token 长度需为 8–256 个字符", node.Name)
+		}
+		if node.AutoRenew {
+			if _, ok := parseNodeExpireDate(node.ExpireDate); !ok {
+				return fmt.Errorf("节点“%s”启用自动延期前需要填写有效到期日期", node.Name)
+			}
 		}
 		if ids[node.ID] {
 			return fmt.Errorf("节点 ID 重复：%s", node.ID)

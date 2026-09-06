@@ -37,6 +37,8 @@ type FrontendNode struct {
 	ID                string              `json:"id"`
 	Name              string              `json:"name"`
 	ExpireDate        string              `json:"expire_date"`
+	RenewalCycle      string              `json:"renewal_cycle,omitempty"`
+	AutoRenew         bool                `json:"auto_renew,omitempty"`
 	Region            string              `json:"region"`
 	Group             string              `json:"group"`
 	Status            common.ServerStatus `json:"status"`
@@ -266,6 +268,8 @@ func buildFrontendNode(n common.NodeConfig, st common.ServerStatus) FrontendNode
 		ID:                n.ID,
 		Name:              n.Name,
 		ExpireDate:        n.ExpireDate,
+		RenewalCycle:      n.RenewalCycle,
+		AutoRenew:         n.AutoRenew,
 		Region:            n.Region,
 		Group:             n.Group,
 		Status:            st,
