@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf16"
 
@@ -29,6 +30,7 @@ type TelegramConfig struct {
 	RecoverySeconds    int                 `json:"recovery_seconds"`
 	ExcludedNodeIDs    []string            `json:"excluded_node_ids"`
 	Resources          ResourceAlertConfig `json:"resources"`
+	TCPBlock           TCPBlockAlertConfig `json:"tcp_block"`
 }
 
 func (t *TelegramConfig) normalize() {
@@ -55,6 +57,7 @@ func (t *TelegramConfig) normalize() {
 	t.Resources.Memory.normalize(90, 60)
 	t.Resources.Disk.normalize(90, 300)
 	t.Resources.Traffic.normalize(80, 0)
+	t.TCPBlock.normalize()
 	t.Token = strings.TrimSpace(t.Token)
 	t.ChatID = strings.TrimSpace(t.ChatID)
 	if t.ExcludedNodeIDs == nil {
@@ -72,12 +75,65 @@ func (t TelegramConfig) excludes(id string) bool {
 	return false
 }
 
+var eventSentCounts = struct {
+	sync.RWMutex
+	counts map[string]int
+}{counts: make(map[string]int)}
+
+func getEventSentCount(key string, hasEvent bool) int {
+	eventSentCounts.RLock()
+	c, ok := eventSentCounts.counts[key]
+	eventSentCounts.RUnlock()
+	if ok && c > 0 {
+		return c
+	}
+	if hasEvent {
+		return 1
+	}
+	return 0
+}
+
+func setEventSentCount(key string, count int) {
+	eventSentCounts.Lock()
+	if count <= 0 {
+		delete(eventSentCounts.counts, key)
+	} else {
+		eventSentCounts.counts[key] = count
+	}
+	eventSentCounts.Unlock()
+}
+
+func ensureNotificationColumns() {
+	if db == nil {
+		return
+	}
+	rows, err := db.Query(`PRAGMA table_info(notification_events)`)
+	if err != nil {
+		return
+	}
+	columns := make(map[string]bool)
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, columnType string
+		var defaultValue interface{}
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk); err == nil {
+			columns[name] = true
+		}
+	}
+	_ = rows.Close()
+	if !columns["sent_count"] {
+		_, _ = db.Exec(`ALTER TABLE notification_events ADD COLUMN sent_count INTEGER NOT NULL DEFAULT 1`)
+	}
+}
+
 func startNotificationWorker() {
+	ensureNotificationColumns()
 	events, err := loadNotificationEvents()
 	if err != nil {
 		log.Printf("load notification states: %v", err)
 	} else {
 		resourceMonitor.restore(events)
+		tcpBlockMonitor.restore(events)
 	}
 	backgroundWorkers.Add(1)
 	go func() {
@@ -103,22 +159,51 @@ type notification struct {
 var notificationNextAttempt time.Time // Accessed only by the single notification worker.
 
 func loadNotificationEvents() (map[string]time.Time, error) {
-	rows, err := db.Query(`SELECT event_key,unixepoch(sent_at) FROM notification_events`)
+	ensureNotificationColumns()
+	rows, err := db.Query(`SELECT event_key,unixepoch(sent_at),COALESCE(sent_count,1) FROM notification_events`)
 	if err != nil {
-		return nil, err
+		// Fallback for older test schemas without sent_count column
+		rows, err = db.Query(`SELECT event_key,unixepoch(sent_at) FROM notification_events`)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		events := make(map[string]time.Time)
+		for rows.Next() {
+			var key string
+			var ts int64
+			if err := rows.Scan(&key, &ts); err != nil {
+				return nil, err
+			}
+			events[key] = time.Unix(ts, 0)
+		}
+		return events, rows.Err()
 	}
 	defer rows.Close()
 	events := make(map[string]time.Time)
+	counts := make(map[string]int)
 	for rows.Next() {
 		var key string
 		var ts int64
-		if err := rows.Scan(&key, &ts); err != nil {
+		var count int
+		if err := rows.Scan(&key, &ts, &count); err != nil {
 			return nil, err
 		}
 		events[key] = time.Unix(ts, 0)
+		if count < 1 {
+			count = 1
+		}
+		counts[key] = count
 	}
-	return events, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	eventSentCounts.Lock()
+	eventSentCounts.counts = counts
+	eventSentCounts.Unlock()
+	return events, nil
 }
+
 func reminderDue(last time.Time, repeat int, now time.Time) bool {
 	return last.IsZero() || (repeat > 0 && now.Sub(last) >= time.Duration(repeat)*time.Minute)
 }
@@ -127,6 +212,7 @@ func collectNotifications(tg TelegramConfig, nodes []common.NodeConfig, statuses
 	var pending []notification
 	var clear []string
 	allowed := make(map[string]bool)
+	tcpStates := tcpBlockMonitor.snapshot()
 	for _, n := range nodes {
 		if tg.excludes(n.ID) || !tg.ready() {
 			continue
@@ -187,6 +273,72 @@ func collectNotifications(tg TelegramConfig, nodes []common.NodeConfig, statuses
 				}
 			}
 		}
+
+		// TCP 三网断流（疑似被墙）告警
+		if tg.TCPBlock.Enabled && tg.TCPBlock.allowsNode(n.ID) {
+			key := tcpBlockKey(n.ID)
+			allowed[key] = true
+			tState, ok := tcpStates[key]
+			if ok && tState.Valid && statusIsFresh(s, seconds, now) && now.Sub(tState.LastReport) <= reportFreshness(seconds) {
+				lastSent := events[key]
+				sentCount := getEventSentCount(key, !lastSent.IsZero())
+				maxCount := tg.TCPBlock.MaxNotifyCount
+				repeatMin := tg.TCPBlock.RepeatMinutes
+				if repeatMin < 1 {
+					if tg.RepeatMinutes > 0 {
+						repeatMin = tg.RepeatMinutes
+					} else {
+						repeatMin = 5
+					}
+				}
+				if tState.Firing {
+					canSendMore := maxCount == 0 || sentCount < maxCount
+					due := lastSent.IsZero() || now.Sub(lastSent) >= time.Duration(repeatMin)*time.Minute
+					if canSendMore && due {
+						duration := max(0, int(now.Sub(tState.Since).Seconds()))
+						if tState.Since.IsZero() {
+							duration = tg.TCPBlock.DurationSeconds
+						}
+						countText := fmt.Sprintf("第 %d / %d 次", sentCount+1, maxCount)
+						if maxCount == 0 {
+							countText = fmt.Sprintf("第 %d 次（持续提醒）", sentCount+1)
+						}
+						detail := tState.Detail
+						if detail == "" {
+							detail = "全部三网 TCP 探测目标连接超时"
+						}
+						pending = append(pending, notification{
+							Key:    key,
+							NodeID: n.ID,
+							Kind:   "tcp_block",
+							Message: fmt.Sprintf(
+								"🚨 TCP 三网断流告警（疑似被墙）\n名称：%s\n分组：%s\n探测状态：%s\n触发阈值：三网 TCP 断流 ≥ %d 秒\n本次持续：%d 秒\n通知进度：%s",
+								n.Name, displayGroup(n.Group), detail, tg.TCPBlock.DurationSeconds, duration, countText,
+							),
+						})
+					}
+				} else if !lastSent.IsZero() {
+					if boolEnabled(tg.NotifyRecovery) {
+						recDetail := tState.RecoveryDetail
+						if recDetail == "" {
+							recDetail = "TCP 探测已恢复响应"
+						}
+						pending = append(pending, notification{
+							Key:      key,
+							NodeID:   n.ID,
+							Kind:     "tcp_block_recovery",
+							Recovery: true,
+							Message: fmt.Sprintf(
+								"🟢 TCP 三网连接恢复\n名称：%s\n分组：%s\n当前探测：%s\n已连续正常响应 %d 秒",
+								n.Name, displayGroup(n.Group), recDetail, tg.RecoverySeconds,
+							),
+						})
+					} else {
+						clear = append(clear, key)
+					}
+				}
+			}
+		}
 	}
 	for key := range events {
 		if !strings.HasPrefix(key, "expiry:") && !allowed[key] {
@@ -196,6 +348,11 @@ func collectNotifications(tg TelegramConfig, nodes []common.NodeConfig, statuses
 	for key := range states {
 		if !allowed[key] {
 			resourceMonitor.discard(key)
+		}
+	}
+	for key := range tcpStates {
+		if !allowed[key] {
+			tcpBlockMonitor.discard(key)
 		}
 	}
 	return pending, clear
@@ -259,6 +416,7 @@ func notificationBatch(site string, pending []notification) ([]notification, str
 }
 
 func recordNotificationDelivery(batch []notification, sendErr error, now time.Time) {
+	ensureNotificationColumns()
 	tx, err := db.Begin()
 	if err != nil {
 		log.Printf("record notification: %v", err)
@@ -270,17 +428,28 @@ func recordNotificationDelivery(batch []notification, sendErr error, now time.Ti
 		status = "failed"
 		detail = sendErr.Error()
 	}
+	var countUpdates []struct {
+		key      string
+		recovery bool
+	}
 	for _, n := range batch {
 		if sendErr == nil && n.Key != "" {
 			if n.Recovery {
 				_, err = tx.Exec(`DELETE FROM notification_events WHERE event_key=?`, n.Key)
 			} else {
-				_, err = tx.Exec(`INSERT INTO notification_events(event_key,sent_at) VALUES(?,?) ON CONFLICT(event_key) DO UPDATE SET sent_at=excluded.sent_at`, n.Key, now.UTC().Format("2006-01-02 15:04:05"))
+				_, err = tx.Exec(`INSERT INTO notification_events(event_key,sent_at,sent_count) VALUES(?,?,1) ON CONFLICT(event_key) DO UPDATE SET sent_at=excluded.sent_at,sent_count=COALESCE(notification_events.sent_count,0)+1`, n.Key, now.UTC().Format("2006-01-02 15:04:05"))
+				if err != nil {
+					_, err = tx.Exec(`INSERT INTO notification_events(event_key,sent_at) VALUES(?,?) ON CONFLICT(event_key) DO UPDATE SET sent_at=excluded.sent_at`, n.Key, now.UTC().Format("2006-01-02 15:04:05"))
+				}
 			}
 			if err != nil {
 				log.Printf("save notification acknowledgement: %v", err)
 				return
 			}
+			countUpdates = append(countUpdates, struct {
+				key      string
+				recovery bool
+			}{n.Key, n.Recovery})
 		}
 		if _, err = tx.Exec(`INSERT INTO notification_log(node_id,kind,status,message,error) VALUES(?,?,?,?,?)`, n.NodeID, n.Kind, status, n.Message, detail); err != nil {
 			log.Printf("save notification log: %v", err)
@@ -293,10 +462,27 @@ func recordNotificationDelivery(batch []notification, sendErr error, now time.Ti
 	}
 	if err = tx.Commit(); err != nil {
 		log.Printf("commit notification delivery: %v", err)
+		return
+	}
+	for _, u := range countUpdates {
+		if u.recovery {
+			setEventSentCount(u.key, 0)
+		} else {
+			prev := getEventSentCount(u.key, false)
+			setEventSentCount(u.key, prev+1)
+		}
 	}
 }
 
 func notificationLogHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodDelete {
+		if _, err := db.Exec(`DELETE FROM notification_log`); err != nil {
+			writeAPIError(w, 500, "清空通知记录失败")
+			return
+		}
+		writeJSON(w, 200, map[string]interface{}{"status": "ok"})
+		return
+	}
 	if r.Method != http.MethodGet {
 		writeAPIError(w, 405, "Method Not Allowed")
 		return
@@ -348,6 +534,7 @@ func parseNodeExpireDate(raw string) (time.Time, bool) {
 	return time.Time{}, false
 }
 func releaseEvent(key string) {
+	setEventSentCount(key, 0)
 	if _, err := db.Exec(`DELETE FROM notification_events WHERE event_key=?`, key); err != nil {
 		log.Printf("clear notification event: %v", err)
 	}

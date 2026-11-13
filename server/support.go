@@ -2,10 +2,12 @@ package main
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"my-vps-probe/common"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +20,10 @@ import (
 )
 
 var validNodeID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+func stringsContext() context.Context {
+	return context.Background()
+}
 
 type agentConnection struct {
 	conn    *websocket.Conn
@@ -86,10 +92,33 @@ func trimLimited(value string, max int) string {
 	return value
 }
 
+func normalizeGroupOrder(order []string, nodes []common.NodeConfig) []string {
+	out := make([]string, 0, len(order)+8)
+	seen := make(map[string]bool)
+	for _, g := range order {
+		g = trimLimited(g, 80)
+		if g == "" || g == "未分组" || seen[g] {
+			continue
+		}
+		seen[g] = true
+		out = append(out, g)
+	}
+	for _, n := range nodes {
+		g := trimLimited(n.Group, 80)
+		if g == "" || g == "未分组" || seen[g] {
+			continue
+		}
+		seen[g] = true
+		out = append(out, g)
+	}
+	return out
+}
+
 func validateConfig(config *AppConfig) error {
 	normalizeAppConfig(config)
 	config.SiteName = trimLimited(config.SiteName, 80)
 	config.AdminUser = trimLimited(config.AdminUser, 80)
+	config.PanelDomain = strings.ToLower(trimLimited(config.PanelDomain, 255))
 	if config.SiteName == "" {
 		return errors.New("站点名称不能为空")
 	}
@@ -138,6 +167,8 @@ func validateConfig(config *AppConfig) error {
 		tokens[node.Token] = true
 	}
 
+	config.GroupOrder = normalizeGroupOrder(config.GroupOrder, config.Nodes)
+
 	excluded := make([]string, 0, len(config.Telegram.ExcludedNodeIDs))
 	seenExcluded := map[string]bool{}
 	for _, id := range config.Telegram.ExcludedNodeIDs {
@@ -147,6 +178,28 @@ func validateConfig(config *AppConfig) error {
 		}
 	}
 	config.Telegram.ExcludedNodeIDs = excluded
+
+	if config.Telegram.TCPBlock.NodeIDs != nil {
+		tcpSelected := make([]string, 0, len(config.Telegram.TCPBlock.NodeIDs))
+		seenTCP := map[string]bool{}
+		for _, id := range config.Telegram.TCPBlock.NodeIDs {
+			if ids[id] && !seenTCP[id] {
+				tcpSelected = append(tcpSelected, id)
+				seenTCP[id] = true
+			}
+		}
+		config.Telegram.TCPBlock.NodeIDs = tcpSelected
+	}
+	tcpExcluded := make([]string, 0, len(config.Telegram.TCPBlock.ExcludedNodeIDs))
+	seenTCPEx := map[string]bool{}
+	for _, id := range config.Telegram.TCPBlock.ExcludedNodeIDs {
+		if ids[id] && !seenTCPEx[id] {
+			tcpExcluded = append(tcpExcluded, id)
+			seenTCPEx[id] = true
+		}
+	}
+	config.Telegram.TCPBlock.ExcludedNodeIDs = tcpExcluded
+
 	if config.Telegram.Enabled && (config.Telegram.Token == "" || config.Telegram.ChatID == "") {
 		return errors.New("启用 Telegram 通知需要填写 Bot Token 和 Chat ID")
 	}
@@ -175,6 +228,105 @@ func validateConfig(config *AppConfig) error {
 		}
 	}
 	return nil
+}
+
+func hotPushAllAgents() {
+	configMutex.RLock()
+	pTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
+	reportSeconds := appConfig.AgentReportSeconds
+	nodeNameMap := make(map[string]string, len(appConfig.Nodes))
+	for _, n := range appConfig.Nodes {
+		nodeNameMap[n.ID] = n.Name
+	}
+	configMutex.RUnlock()
+
+	mapMutex.Lock()
+	for id := range serverStatusMap {
+		if _, exists := nodeNameMap[id]; !exists {
+			delete(serverStatusMap, id)
+		}
+	}
+	mapMutex.Unlock()
+	invalidateCardPingCache()
+
+	connMutex.Lock()
+	connections := make(map[string]*agentConnection, len(activeConns))
+	for id, conn := range activeConns {
+		connections[id] = conn
+	}
+	connMutex.Unlock()
+	var pushWG sync.WaitGroup
+	pushLimit := make(chan struct{}, 16)
+	for id, conn := range connections {
+		pushWG.Add(1)
+		go func(id string, conn *agentConnection) {
+			defer pushWG.Done()
+			pushLimit <- struct{}{}
+			defer func() { <-pushLimit }()
+			name, ok := nodeNameMap[id]
+			if !ok {
+				removeActiveConnection(id, conn)
+				_ = conn.close()
+				return
+			}
+			instruction := common.AgentInstruction{ServerName: name, PingTasks: pingTasksForNode(pTasks, id), ReportSeconds: reportSeconds}
+			if err := conn.writeJSON(instruction); err != nil {
+				removeActiveConnection(id, conn)
+				_ = conn.close()
+				markNodeOffline(id)
+			}
+		}(id, conn)
+	}
+	pushWG.Wait()
+}
+
+func isLoopbackAddr(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	host = strings.Trim(host, "[]")
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func ipAccessGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		// Always allow Agent WebSocket, health check, and agent binary/script downloads
+		if path == "/ws" || path == "/healthz" || path == "/install.sh" ||
+			path == "/probe-agent-amd64" || path == "/probe-agent-arm64" || path == "/download/agent.go" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		configMutex.RLock()
+		blockIP := appConfig.BlockIPAccess
+		domain := strings.ToLower(strings.TrimSpace(appConfig.PanelDomain))
+		configMutex.RUnlock()
+		if !blockIP {
+			next.ServeHTTP(w, r)
+			return
+		}
+		reqHost := strings.ToLower(strings.TrimSpace(r.Host))
+		if h, _, err := net.SplitHostPort(reqHost); err == nil {
+			reqHost = strings.Trim(h, "[]")
+		}
+		// Allow local CLI / Caddy loopback when Host matches configured domain or localhost
+		if domain != "" && strings.EqualFold(reqHost, domain) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if isLoopbackAddr(r.RemoteAddr) && (reqHost == "127.0.0.1" || reqHost == "localhost" || reqHost == "::1") && r.Header.Get("X-Forwarded-Host") == "" && r.Header.Get("X-Real-IP") == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("403 Forbidden: Direct IP+Port access is disabled. Please access via bound HTTPS domain."))
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, value interface{}) {
@@ -209,6 +361,10 @@ func (w gzipResponseWriter) Write(data []byte) (int, error) {
 
 func gzipTextResponses(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/admin/backup" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		compressible := strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/" || r.URL.Path == "/admin"
 		if !compressible || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			next.ServeHTTP(w, r)
@@ -240,6 +396,7 @@ func removeActiveConnection(id string, target *agentConnection) {
 
 type nodeRuntime struct {
 	Online     bool    `json:"online"`
+	TCPBlocked bool    `json:"tcp_blocked,omitempty"`
 	LastReport int64   `json:"last_report"`
 	CPUUsage   float64 `json:"cpu_usage"`
 	MemUsed    uint64  `json:"mem_used"`
@@ -252,17 +409,24 @@ func adminRuntimeSnapshot() map[string]interface{} {
 	configMutex.RLock()
 	reportSeconds := appConfig.AgentReportSeconds
 	nodeConfigs := append([]common.NodeConfig(nil), appConfig.Nodes...)
+	pingTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
 	configMutex.RUnlock()
 	mapMutex.RLock()
 	runtimeNodes := make(map[string]nodeRuntime, len(serverStatusMap))
 	online := 0
+	tcpBlockedCount := 0
+	now := time.Now()
 	for id, status := range serverStatusMap {
-		status.IsOnline = statusIsFresh(status, reportSeconds, time.Now())
+		status.IsOnline = statusIsFresh(status, reportSeconds, now)
 		if status.IsOnline {
 			online++
 		}
+		blocked := isNodeTCPBlocked(id, pingTasksForNode(pingTasks, id), status, reportSeconds, now)
+		if blocked {
+			tcpBlockedCount++
+		}
 		runtimeNodes[id] = nodeRuntime{
-			Online: status.IsOnline, LastReport: status.LastReport, CPUUsage: status.CPUUsage,
+			Online: status.IsOnline, TCPBlocked: blocked, LastReport: status.LastReport, CPUUsage: status.CPUUsage,
 			MemUsed: status.MemUsed, MemTotal: status.MemTotal,
 			DiskUsed: status.DiskUsed, DiskTotal: status.DiskTotal,
 		}
@@ -270,7 +434,7 @@ func adminRuntimeSnapshot() map[string]interface{} {
 	mapMutex.RUnlock()
 	traffic := make(map[string]trafficUsageView, len(nodeConfigs))
 	for _, n := range nodeConfigs {
-		traffic[n.ID] = monthlyUsageSnapshot(n, time.Now())
+		traffic[n.ID] = monthlyUsageSnapshot(n, now)
 	}
 
 	configMutex.RLock()
@@ -285,7 +449,7 @@ func adminRuntimeSnapshot() map[string]interface{} {
 		}
 	}
 	return map[string]interface{}{
-		"updated_at": time.Now().Unix(), "online": online, "total": total,
+		"updated_at": now.Unix(), "online": online, "total": total, "tcp_blocked": tcpBlockedCount,
 		"database_bytes": dbBytes, "history_days": historyDays, "nodes": runtimeNodes,
 		"traffic": traffic, "resource_history": resourceHistorySnapshot(),
 	}

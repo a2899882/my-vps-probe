@@ -16,11 +16,14 @@ type NodeConfig struct {
 	Group        string `json:"group"`
 }
 type AppConfig struct {
-	SiteName  string       `json:"site_name"`
-	AdminUser string       `json:"admin_user"`
-	AdminPass string       `json:"admin_pass"`
-	Nodes     []NodeConfig `json:"nodes"`
-	PingTasks []PingTask   `json:"ping_tasks"`
+	SiteName      string       `json:"site_name"`
+	AdminUser     string       `json:"admin_user"`
+	AdminPass     string       `json:"admin_pass"`
+	Nodes         []NodeConfig `json:"nodes"`
+	GroupOrder    []string     `json:"group_order,omitempty"`
+	PingTasks     []PingTask   `json:"ping_tasks"`
+	PanelDomain   string       `json:"panel_domain,omitempty"`
+	BlockIPAccess bool         `json:"block_ip_access,omitempty"`
 }
 type AgentInstruction struct {
 	ServerName    string     `json:"server_name"`

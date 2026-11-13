@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -25,11 +26,14 @@ type AppConfig struct {
 	AdminUser            string              `json:"admin_user"`
 	AdminPass            string              `json:"admin_pass"`
 	Nodes                []common.NodeConfig `json:"nodes"`
+	GroupOrder           []string            `json:"group_order,omitempty"`
 	PingTasks            []common.PingTask   `json:"ping_tasks"`
 	Telegram             TelegramConfig      `json:"telegram"`
 	HistoryDays          int                 `json:"history_days"`
 	PublicRefreshSeconds int                 `json:"public_refresh_seconds"`
 	AgentReportSeconds   int                 `json:"agent_report_seconds"`
+	PanelDomain          string              `json:"panel_domain,omitempty"`
+	BlockIPAccess        bool                `json:"block_ip_access,omitempty"`
 }
 
 var (
@@ -62,19 +66,22 @@ func basicAuth(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
 func initDB() {
 	var err error
-	db, err = sql.Open("sqlite", "file:data.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)")
+	db, err = sql.Open("sqlite", "file:data.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=temp_store(MEMORY)&_pragma=cache_size(-4000)")
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}
-	db.SetMaxOpenConns(4)
-	db.SetMaxIdleConns(2)
+	db.SetMaxOpenConns(3)
+	db.SetMaxIdleConns(1)
 	for _, pragma := range []string{
 		`PRAGMA journal_mode=WAL`,
 		`PRAGMA synchronous=NORMAL`,
 		`PRAGMA busy_timeout=5000`,
 		`PRAGMA foreign_keys=ON`,
+		`PRAGMA temp_store=MEMORY`,
+		`PRAGMA cache_size=-4000`,
 	} {
 		if _, err := db.Exec(pragma); err != nil {
 			log.Printf("database pragma failed: %v", err)
@@ -116,8 +123,10 @@ ON resource_history(server_id, timestamp);`)
 
 	mustExecDB(`CREATE TABLE IF NOT EXISTS notification_events (
 event_key TEXT PRIMARY KEY,
-sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+sent_count INTEGER NOT NULL DEFAULT 1
 );`)
+	ensureNotificationColumns()
 
 	mustExecDB(`CREATE TABLE IF NOT EXISTS notification_log (
  id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -202,6 +211,7 @@ func loadConfig() {
 		appConfig.PingTasks = []common.PingTask{{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80"}, {Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80"}, {Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80"}}
 	}
 	normalizeAppConfig(&appConfig)
+	appConfig.GroupOrder = normalizeGroupOrder(appConfig.GroupOrder, appConfig.Nodes)
 	renewNodes(appConfig.Nodes, time.Now())
 	if err := saveAppConfig(appConfig); err != nil {
 		log.Fatalf("保存规范化配置失败: %v", err)
@@ -250,7 +260,17 @@ func pingTasksForNode(tasks []common.PingTask, nodeID string) []common.PingTask 
 	return out
 }
 
+func tuneLowMemoryRuntime() {
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(75)
+	}
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(64 << 20)
+	}
+}
+
 func main() {
+	tuneLowMemoryRuntime()
 	loadConfig()
 	initDB()
 	startNotificationWorker()
@@ -287,12 +307,67 @@ func main() {
 	})
 	http.HandleFunc("/download/agent.go", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "agent/main.go") })
 	http.HandleFunc("/api/admin/traffic", basicAuth(trafficCalibrationHandler))
+	http.HandleFunc("/api/admin/backup", basicAuth(backupExportHandler))
+	http.HandleFunc("/api/admin/restore", basicAuth(backupRestoreHandler))
+	http.HandleFunc("/api/admin/local-op", func(w http.ResponseWriter, r *http.Request) {
+		if !isLoopbackAddr(r.RemoteAddr) || r.Header.Get("X-Probe-Local") != "1" {
+			writeAPIError(w, http.StatusForbidden, "Forbidden")
+			return
+		}
+		if r.Method == http.MethodGet {
+			configMutex.RLock()
+			resp := map[string]interface{}{
+				"panel_domain":    appConfig.PanelDomain,
+				"block_ip_access": appConfig.BlockIPAccess,
+				"nodes":           len(appConfig.Nodes),
+			}
+			configMutex.RUnlock()
+			writeJSON(w, http.StatusOK, resp)
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeAPIError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
+			return
+		}
+		var req struct {
+			PanelDomain   *string `json:"panel_domain"`
+			BlockIPAccess *bool   `json:"block_ip_access"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req); err != nil {
+			writeAPIError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		configMutex.Lock()
+		next := appConfig
+		next.Nodes = append([]common.NodeConfig(nil), appConfig.Nodes...)
+		next.GroupOrder = append([]string(nil), appConfig.GroupOrder...)
+		next.PingTasks = append([]common.PingTask(nil), appConfig.PingTasks...)
+		if req.PanelDomain != nil {
+			next.PanelDomain = strings.ToLower(trimLimited(*req.PanelDomain, 255))
+		}
+		if req.BlockIPAccess != nil {
+			next.BlockIPAccess = *req.BlockIPAccess
+		}
+		if err := saveAppConfig(next); err != nil {
+			configMutex.Unlock()
+			writeAPIError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		appConfig = next
+		configMutex.Unlock()
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"status":          "ok",
+			"panel_domain":    next.PanelDomain,
+			"block_ip_access": next.BlockIPAccess,
+		})
+	})
 	http.HandleFunc("/api/admin/config", basicAuth(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			configMutex.RLock()
 			safeConfig := appConfig
 			safeConfig.Nodes = append([]common.NodeConfig(nil), appConfig.Nodes...)
+			safeConfig.GroupOrder = append([]string(nil), appConfig.GroupOrder...)
 			safeConfig.PingTasks = append([]common.PingTask(nil), appConfig.PingTasks...)
 			safeConfig.AdminPass = ""
 			safeConfig.Telegram.Token = ""
@@ -313,6 +388,12 @@ func main() {
 			if newConfig.Telegram.Token == "" {
 				newConfig.Telegram.Token = appConfig.Telegram.Token
 			}
+			if newConfig.PanelDomain == "" && appConfig.PanelDomain != "" {
+				newConfig.PanelDomain = appConfig.PanelDomain
+			}
+			if !newConfig.BlockIPAccess && appConfig.BlockIPAccess {
+				newConfig.BlockIPAccess = appConfig.BlockIPAccess
+			}
 			if err := validateConfig(&newConfig); err != nil {
 				configMutex.Unlock()
 				writeAPIError(w, http.StatusBadRequest, err.Error())
@@ -326,52 +407,9 @@ func main() {
 				return
 			}
 			appConfig = newConfig
-			pTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
-			reportSeconds := appConfig.AgentReportSeconds
-			nodeNameMap := map[string]string{}
-			for _, n := range appConfig.Nodes {
-				nodeNameMap[n.ID] = n.Name
-			}
 			configMutex.Unlock()
-			mapMutex.Lock()
-			for id := range serverStatusMap {
-				if _, exists := nodeNameMap[id]; !exists {
-					delete(serverStatusMap, id)
-				}
-			}
-			mapMutex.Unlock()
-			invalidateCardPingCache()
 
-			// Hot-push settings without forcing healthy agents to reconnect.
-			connMutex.Lock()
-			connections := make(map[string]*agentConnection, len(activeConns))
-			for id, conn := range activeConns {
-				connections[id] = conn
-			}
-			connMutex.Unlock()
-			var pushWG sync.WaitGroup
-			pushLimit := make(chan struct{}, 16)
-			for id, conn := range connections {
-				pushWG.Add(1)
-				go func(id string, conn *agentConnection) {
-					defer pushWG.Done()
-					pushLimit <- struct{}{}
-					defer func() { <-pushLimit }()
-					name, ok := nodeNameMap[id]
-					if !ok {
-						removeActiveConnection(id, conn)
-						_ = conn.close()
-						return
-					}
-					instruction := common.AgentInstruction{ServerName: name, PingTasks: pingTasksForNode(pTasks, id), ReportSeconds: reportSeconds}
-					if err := conn.writeJSON(instruction); err != nil {
-						removeActiveConnection(id, conn)
-						_ = conn.close()
-						markNodeOffline(id)
-					}
-				}(id, conn)
-			}
-			pushWG.Wait()
+			hotPushAllAgents()
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		default:
 			w.Header().Set("Allow", "GET, POST")
@@ -480,6 +518,7 @@ func main() {
 			currentNode, valid := configuredNode(appConfig.Nodes, cNode.ID, token)
 			tg := appConfig.Telegram
 			reportSeconds = appConfig.AgentReportSeconds
+			nodeTasks := pingTasksForNode(appConfig.PingTasks, cNode.ID)
 			if !valid {
 				configMutex.RUnlock()
 				break
@@ -504,6 +543,7 @@ func main() {
 			configMutex.RUnlock()
 			recordPingSamples(cNode.ID, st.PingStatuses, now)
 			resourceMonitor.observe(currentNode, st, tg, reportSeconds, now)
+			tcpBlockMonitor.observe(currentNode, nodeTasks, st, tg, reportSeconds, now)
 		}
 	})
 	http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
@@ -512,6 +552,7 @@ func main() {
 		w.Header().Set("Expires", "0")
 		configMutex.RLock()
 		nodeConfigs := append([]common.NodeConfig(nil), appConfig.Nodes...)
+		groupOrder := append([]string(nil), appConfig.GroupOrder...)
 		pingTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
 		siteName := appConfig.SiteName
 		refreshSeconds := appConfig.PublicRefreshSeconds
@@ -534,11 +575,14 @@ func main() {
 		for _, n := range nodeConfigs {
 			st := statuses[n.ID]
 			st.IsOnline = statusIsFresh(st, reportSeconds, now)
-			st.CardPingStatuses = cardPingStatuses(n.ID, pingTasksForNode(pingTasks, n.ID), st, reportSeconds, now)
-			nodes = append(nodes, buildFrontendNode(n, st))
+			nodeTasks := pingTasksForNode(pingTasks, n.ID)
+			st.CardPingStatuses = cardPingStatuses(n.ID, nodeTasks, st, reportSeconds, now)
+			fn := buildFrontendNode(n, st)
+			fn.TCPBlocked = isNodeTCPBlocked(n.ID, nodeTasks, st, reportSeconds, now)
+			nodes = append(nodes, fn)
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"site_name": siteName, "nodes": nodes, "ping_tasks": pingTasks,
+			"site_name": siteName, "nodes": nodes, "group_order": groupOrder, "ping_tasks": pingTasks,
 			"refresh_seconds": refreshSeconds, "updated_at": now.Unix(),
 		})
 	})
@@ -554,7 +598,7 @@ func main() {
 	fmt.Println("🚀 My VPS Probe 已启动，监听 :8080")
 	server := &http.Server{
 		Addr:              ":8080",
-		Handler:           securityHeaders(gzipTextResponses(http.DefaultServeMux)),
+		Handler:           securityHeaders(ipAccessGuard(gzipTextResponses(http.DefaultServeMux))),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,

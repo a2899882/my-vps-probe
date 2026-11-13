@@ -42,6 +42,7 @@ type FrontendNode struct {
 	Region            string              `json:"region"`
 	Group             string              `json:"group"`
 	Status            common.ServerStatus `json:"status"`
+	TCPBlocked        bool                `json:"tcp_blocked,omitempty"`
 	MonthUsed         uint64              `json:"month_used"`
 	MonthCalibratedAt int64               `json:"month_calibrated_at,omitempty"`
 	MonthUsageError   bool                `json:"month_usage_error,omitempty"`

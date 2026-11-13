@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="https://github.com/a2899882/my-vps-probe.git"
+REPO_URL="${REPO_URL:-https://github.com/a2899882/my-vps-probe.git}"
 BRANCH="${BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/my-vps-probe}"
 GO_VERSION="${GO_VERSION:-1.25.0}"
 SERVICE_NAME="probe-server"
 
+SCRIPT_DIR=""
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
 echo "==> 1. install packages"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y git curl wget tar ca-certificates build-essential
+apt-get update -qq
+apt-get install -y -qq git curl wget tar unzip ca-certificates build-essential python3 sqlite3
 
 install_go=true
-if command -v go >/dev/null 2>&1; then
-  current_go_version="$(go version 2>/dev/null | awk '{sub(/^go/, "", $3); print $3}')"
+if command -v go >/dev/null 2>&1 || [ -x /usr/local/go/bin/go ]; then
+  GO_CHECK="/usr/local/go/bin/go"
+  [ -x "$GO_CHECK" ] || GO_CHECK="$(command -v go)"
+  current_go_version="$("$GO_CHECK" version 2>/dev/null | awk '{sub(/^go/, "", $3); print $3}')"
   if [ -n "$current_go_version" ] &&
      [ "$(printf '%s\n' "$GO_VERSION" "$current_go_version" | sort -V | head -n 1)" = "$GO_VERSION" ]; then
     install_go=false
@@ -36,14 +43,42 @@ if $install_go; then
   rm -rf /usr/local/go
   tar -C /usr/local -xzf "$archive"
   ln -sf /usr/local/go/bin/go /usr/local/bin/go
+  rm -f "$archive"
 else
   echo "==> 2. golang ${current_go_version} is ready"
 fi
 
-echo "==> 3. clone or update repo"
-if [ ! -d "${INSTALL_DIR}/.git" ]; then
-  rm -rf "${INSTALL_DIR}"
-  git clone -b "${BRANCH}" --single-branch --depth 1 "${REPO_URL}" "${INSTALL_DIR}"
+echo "==> 3. prepare source in ${INSTALL_DIR} (preserving existing data)"
+mkdir -p "${INSTALL_DIR}"
+
+# Preserve existing runtime data if present
+PRESERVE_DIR="$(mktemp -d)"
+trap 'rm -rf "$PRESERVE_DIR"' EXIT
+for f in config.json data.db data.db-wal data.db-shm usage_state.json; do
+  if [ -f "${INSTALL_DIR}/$f" ]; then
+    cp -pf "${INSTALL_DIR}/$f" "${PRESERVE_DIR}/$f"
+  fi
+done
+
+if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/server/main.go" ] && [ -f "$SCRIPT_DIR/agent/main.go" ]; then
+  echo "    Detected local source directory: ${SCRIPT_DIR}"
+  if [ "$SCRIPT_DIR" != "$INSTALL_DIR" ]; then
+    mkdir -p "${INSTALL_DIR}/server" "${INSTALL_DIR}/agent" "${INSTALL_DIR}/common" "${INSTALL_DIR}/tcpping" "${INSTALL_DIR}/scripts" "${INSTALL_DIR}/tests"
+    cp -rf "$SCRIPT_DIR/server/"*.go "$SCRIPT_DIR/server/"*.html "${INSTALL_DIR}/server/"
+    cp -rf "$SCRIPT_DIR/agent/"* "${INSTALL_DIR}/agent/"
+    cp -rf "$SCRIPT_DIR/common/"* "${INSTALL_DIR}/common/"
+    cp -rf "$SCRIPT_DIR/tcpping/"* "${INSTALL_DIR}/tcpping/"
+    cp -rf "$SCRIPT_DIR/scripts/"* "${INSTALL_DIR}/scripts/"
+    [ -d "$SCRIPT_DIR/tests" ] && cp -rf "$SCRIPT_DIR/tests/"* "${INSTALL_DIR}/tests/" 2>/dev/null || true
+    for f in go.mod go.sum install.sh install-master.sh uninstall-agent.sh README.md; do
+      [ -f "$SCRIPT_DIR/$f" ] && cp -f "$SCRIPT_DIR/$f" "${INSTALL_DIR}/$f"
+    done
+  fi
+elif [ ! -d "${INSTALL_DIR}/.git" ]; then
+  tmp_clone="$(mktemp -d)"
+  git clone -b "${BRANCH}" --single-branch --depth 1 "${REPO_URL}" "$tmp_clone"
+  cp -a "$tmp_clone/." "${INSTALL_DIR}/"
+  rm -rf "$tmp_clone"
 else
   git -C "${INSTALL_DIR}" restore --worktree --staged \
     probe-server probe-agent-amd64 probe-agent-arm64 \
@@ -54,14 +89,21 @@ else
   git -C "${INSTALL_DIR}" pull --ff-only origin "${BRANCH}"
 fi
 
-echo "==> 4. build server and Linux agents"
+# Restore any preserved data files
+for f in config.json data.db data.db-wal data.db-shm usage_state.json; do
+  if [ -f "${PRESERVE_DIR}/$f" ] && [ ! -f "${INSTALL_DIR}/$f" ]; then
+    cp -pf "${PRESERVE_DIR}/$f" "${INSTALL_DIR}/$f"
+  fi
+done
+
+echo "==> 4. build server and Linux agents (low-RAM safe mode)"
 cd "${INSTALL_DIR}"
 GO_BIN="/usr/local/go/bin/go"
 [ -x "$GO_BIN" ] || GO_BIN="$(command -v go)"
 
-"$GO_BIN" build -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/.probe-server.new" ./server
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "$GO_BIN" build -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/server/.probe-agent-amd64.new" ./agent
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "$GO_BIN" build -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/server/.probe-agent-arm64.new" ./agent
+env GOGC=50 GOMEMLIMIT=220MiB "$GO_BIN" build -p 1 -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/.probe-server.new" ./server
+env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOGC=50 GOMEMLIMIT=220MiB "$GO_BIN" build -p 1 -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/server/.probe-agent-amd64.new" ./agent
+env CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOGC=50 GOMEMLIMIT=220MiB "$GO_BIN" build -p 1 -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/server/.probe-agent-arm64.new" ./agent
 install -m 0755 "${INSTALL_DIR}/.probe-server.new" "${INSTALL_DIR}/probe-server"
 install -m 0755 "${INSTALL_DIR}/server/.probe-agent-amd64.new" "${INSTALL_DIR}/server/probe-agent-amd64"
 install -m 0755 "${INSTALL_DIR}/server/.probe-agent-arm64.new" "${INSTALL_DIR}/server/probe-agent-arm64"
@@ -80,6 +122,8 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${INSTALL_DIR}
+Environment="GOGC=75"
+Environment="GOMEMLIMIT=64MiB"
 ExecStart=${INSTALL_DIR}/probe-server
 Restart=always
 RestartSec=3
@@ -94,6 +138,7 @@ EOF
 
 echo "==> 5.5 install tz menu"
 install -m 755 "${INSTALL_DIR}/scripts/tz.sh" /usr/local/bin/tz
+ln -sf /usr/local/bin/tz /usr/bin/tz 2>/dev/null || true
 
 echo "==> 6. enable service"
 systemctl daemon-reload
@@ -106,7 +151,8 @@ done
 curl -fsS http://127.0.0.1:8080/healthz >/dev/null
 
 echo "==> 7. status"
-systemctl --no-pager --full status ${SERVICE_NAME} || true
+systemctl --no-pager -n 10 status ${SERVICE_NAME} || true
 echo
-echo "Install done."
-echo "Open: http://$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'):8080"
+echo "Install/Update done."
+echo "Run 'tz' in SSH to open the management menu."
+echo "Open: http://$(curl -s --max-time 4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'):8080"

@@ -24,7 +24,7 @@ func TestTelegramOldConfigDefaultsAndIndependentSwitches(t *testing.T) {
 		t.Fatal(err)
 	}
 	tg.normalize()
-	if !boolEnabled(tg.NotifyOffline) || !boolEnabled(tg.NotifyExpiry) || !boolEnabled(tg.NotifyRecovery) || tg.Resources.CPU.Enabled || tg.Resources.Memory.Enabled {
+	if !boolEnabled(tg.NotifyOffline) || !boolEnabled(tg.NotifyExpiry) || !boolEnabled(tg.NotifyRecovery) || tg.Resources.CPU.Enabled || tg.Resources.Memory.Enabled || tg.TCPBlock.Enabled {
 		t.Fatal("old configuration defaults changed")
 	}
 	if tg.OfflineMinutes != 5 || tg.ExpiryReminderDays != 7 {
@@ -156,6 +156,112 @@ func TestResourceDedupRepeatAndDeliveryAcknowledgement(t *testing.T) {
 	if count != 3 {
 		t.Fatal("delivery log incomplete")
 	}
+}
+
+func TestTCPBlockAlertDurationMaxCountAndNodeSelection(t *testing.T) {
+	notificationTestDB(t)
+	tcpBlockMonitor.Lock()
+	tcpBlockMonitor.states = make(map[string]tcpBlockAlertState)
+	tcpBlockMonitor.Unlock()
+	t.Cleanup(func() {
+		tcpBlockMonitor.Lock()
+		tcpBlockMonitor.states = make(map[string]tcpBlockAlertState)
+		tcpBlockMonitor.Unlock()
+	})
+
+	now := time.Date(2026, 11, 14, 4, 0, 0, 0, time.UTC)
+	tg := testTelegramConfig()
+	tg.RecoverySeconds = 30
+	tg.TCPBlock = TCPBlockAlertConfig{
+		Enabled:         true,
+		DurationSeconds: 120,
+		MaxNotifyCount:  2,
+		RepeatMinutes:   3,
+		NodeIDs:         []string{"n1"},
+	}
+	tg.normalize()
+
+	n1 := common.NodeConfig{ID: "n1", Name: "US-LA-01", Group: "US优化"}
+	n2 := common.NodeConfig{ID: "n2", Name: "HK-01", Group: "HK"}
+	tasks := []common.PingTask{
+		{Name: "广东电信", Host: "ct:80"},
+		{Name: "广东联通", Host: "cu:80"},
+		{Name: "广东移动", Host: "cm:80"},
+	}
+	allDown := []common.PingResult{
+		{TargetName: "广东电信", CurrentDelay: -1},
+		{TargetName: "广东联通", CurrentDelay: -1},
+		{TargetName: "广东移动", CurrentDelay: -1},
+	}
+	oneUp := []common.PingResult{
+		{TargetName: "广东电信", CurrentDelay: -1},
+		{TargetName: "广东联通", CurrentDelay: 165},
+		{TargetName: "广东移动", CurrentDelay: -1},
+	}
+
+	// Partial failure should not trigger TCP block
+	tcpBlockMonitor.observe(n1, tasks, common.ServerStatus{IsOnline: true, LastReport: now.Unix(), PingStatuses: oneUp}, tg, 3, now)
+	if tcpBlockMonitor.snapshot()[tcpBlockKey("n1")].Firing {
+		t.Fatal("single carrier up should not fire TCP block")
+	}
+
+	// All 3 carriers fail at t=0, t=60 (not yet 120s), t=120 (fires!)
+	tcpBlockMonitor.observe(n1, tasks, common.ServerStatus{IsOnline: true, LastReport: now.Unix(), PingStatuses: allDown}, tg, 3, now)
+	tcpBlockMonitor.observe(n2, tasks, common.ServerStatus{IsOnline: true, LastReport: now.Unix(), PingStatuses: allDown}, tg, 3, now)
+	t60 := now.Add(60 * time.Second)
+	tcpBlockMonitor.observe(n1, tasks, common.ServerStatus{IsOnline: true, LastReport: t60.Unix(), PingStatuses: allDown}, tg, 3, t60)
+	if tcpBlockMonitor.snapshot()[tcpBlockKey("n1")].Firing {
+		t.Fatal("TCP block fired before duration_seconds elapsed")
+	}
+	t120 := now.Add(120 * time.Second)
+	stMap := map[string]common.ServerStatus{
+		"n1": {IsOnline: true, LastReport: t120.Unix(), PingStatuses: allDown},
+		"n2": {IsOnline: true, LastReport: t120.Unix(), PingStatuses: allDown},
+	}
+	tcpBlockMonitor.observe(n1, tasks, stMap["n1"], tg, 3, t120)
+	tcpBlockMonitor.observe(n2, tasks, stMap["n2"], tg, 3, t120)
+
+	// Only n1 is in NodeIDs, so only n1 should generate a notification (1/2)
+	events, _ := loadNotificationEvents()
+	msgs, _ := collectNotifications(tg, []common.NodeConfig{n1, n2}, stMap, nil, events, 3, t120)
+	if len(msgs) != 1 || msgs[0].NodeID != "n1" || msgs[0].Kind != "tcp_block" || !strings.Contains(msgs[0].Message, "第 1 / 2 次") {
+		t.Fatalf("unexpected 1st TCP block notification: %+v", msgs)
+	}
+	recordNotificationDelivery(msgs, nil, t120)
+
+	// After 3 minutes, 2nd notification (2/2) should fire
+	t300 := t120.Add(3 * time.Minute)
+	stMap["n1"] = common.ServerStatus{IsOnline: true, LastReport: t300.Unix(), PingStatuses: allDown}
+	tcpBlockMonitor.observe(n1, tasks, stMap["n1"], tg, 3, t300)
+	events, _ = loadNotificationEvents()
+	msgs, _ = collectNotifications(tg, []common.NodeConfig{n1, n2}, stMap, nil, events, 3, t300)
+	if len(msgs) != 1 || !strings.Contains(msgs[0].Message, "第 2 / 2 次") {
+		t.Fatalf("unexpected 2nd TCP block notification: %+v", msgs)
+	}
+	recordNotificationDelivery(msgs, nil, t300)
+
+	// After another 3 minutes, MaxNotifyCount (2) is reached -> must NOT send a 3rd alert
+	t480 := t300.Add(3 * time.Minute)
+	stMap["n1"] = common.ServerStatus{IsOnline: true, LastReport: t480.Unix(), PingStatuses: allDown}
+	tcpBlockMonitor.observe(n1, tasks, stMap["n1"], tg, 3, t480)
+	events, _ = loadNotificationEvents()
+	msgs, _ = collectNotifications(tg, []common.NodeConfig{n1, n2}, stMap, nil, events, 3, t480)
+	if len(msgs) != 0 {
+		t.Fatalf("exceeded MaxNotifyCount=2: %+v", msgs)
+	}
+
+	// Recovery after 30s
+	t500 := t480.Add(10 * time.Second)
+	tcpBlockMonitor.observe(n1, tasks, common.ServerStatus{IsOnline: true, LastReport: t500.Unix(), PingStatuses: oneUp}, tg, 3, t500)
+	t535 := t500.Add(35 * time.Second)
+	stMap["n1"] = common.ServerStatus{IsOnline: true, LastReport: t535.Unix(), PingStatuses: oneUp}
+	tcpBlockMonitor.observe(n1, tasks, stMap["n1"], tg, 3, t535)
+	events, _ = loadNotificationEvents()
+	msgs, _ = collectNotifications(tg, []common.NodeConfig{n1, n2}, stMap, nil, events, 3, t535)
+	if len(msgs) != 1 || !msgs[0].Recovery || msgs[0].Kind != "tcp_block_recovery" {
+		t.Fatalf("expected TCP block recovery notification, got: %+v", msgs)
+	}
+	recordNotificationDelivery(msgs, nil, t535)
 }
 
 func TestExpiryIncludesTodayAndTrafficCycle(t *testing.T) {

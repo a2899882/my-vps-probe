@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -30,10 +31,11 @@ type PingTracker struct {
 }
 
 type pingSampler struct {
-	minute   int64
-	taskKey  string
-	results  []common.PingResult
-	trackers map[string]*PingTracker
+	minute      int64
+	taskKey     string
+	lastProbeAt time.Time
+	results     []common.PingResult
+	trackers    map[string]*PingTracker
 }
 
 var (
@@ -62,6 +64,12 @@ func startCountryLookup() {
 }
 
 func main() {
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(75)
+	}
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(24 << 20)
+	}
 	defaultServer := os.Getenv("PROBE_SERVER")
 	if defaultServer == "" {
 		defaultServer = "localhost:8080"
@@ -233,9 +241,49 @@ func pingTaskKey(tasks []common.PingTask) string {
 	return key.String()
 }
 
+func allResultsFailed(results []common.PingResult) bool {
+	if len(results) == 0 {
+		return false
+	}
+	for _, r := range results {
+		if r.CurrentDelay >= 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *pingSampler) resultsFor(tasks []common.PingTask, now time.Time) []common.PingResult {
 	minute, key := now.Unix()/60, pingTaskKey(tasks)
 	if s.minute == minute && s.taskKey == key {
+		if !s.lastProbeAt.IsZero() && allResultsFailed(s.results) && now.Sub(s.lastProbeAt) >= 15*time.Second {
+			probes := runPingTasks(tasks)
+			s.lastProbeAt = now
+			for i, task := range tasks {
+				tracker, ok := s.trackers[task.Name]
+				if !ok {
+					continue
+				}
+				if probes[i].success {
+					tracker.Last = probes[i].delay
+				} else {
+					tracker.Last = -1
+				}
+				if len(tracker.History) > 0 {
+					tracker.History[len(tracker.History)-1] = tracker.Last
+				}
+				avg, loss := summarizePingHistory(tracker.History)
+				if i < len(s.results) {
+					s.results[i] = common.PingResult{
+						TargetName:   task.Name,
+						CurrentDelay: tracker.Last,
+						AvgDelay:     avg,
+						LossRate:     loss,
+						History:      append([]float64(nil), tracker.History...),
+					}
+				}
+			}
+		}
 		return s.results
 	}
 	newTrackers := make(map[string]*PingTracker, len(tasks))
@@ -248,7 +296,7 @@ func (s *pingSampler) resultsFor(tasks []common.PingTask, now time.Time) []commo
 	}
 	s.trackers = newTrackers
 	s.results = buildPingResults(tasks, runPingTasks(tasks), s.trackers)
-	s.minute, s.taskKey = minute, key
+	s.minute, s.taskKey, s.lastProbeAt = minute, key, now
 	return s.results
 }
 
@@ -462,11 +510,16 @@ func tcpPing(host string) (float64, bool) {
 	if !strings.Contains(addr, ":") {
 		addr += ":80"
 	}
-	start := time.Now()
-	conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
-	if err != nil {
-		return 0, false
+	for attempt := 0; attempt < 2; attempt++ {
+		start := time.Now()
+		conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
+		if err == nil {
+			conn.Close()
+			return float64(time.Since(start).Milliseconds()), true
+		}
+		if attempt == 0 {
+			time.Sleep(120 * time.Millisecond)
+		}
 	}
-	conn.Close()
-	return float64(time.Since(start).Milliseconds()), true
+	return 0, false
 }

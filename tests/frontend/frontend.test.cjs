@@ -40,9 +40,19 @@ for (const file of ['admin.html', 'index.html']) {
   });
 }
 
-test('notification configuration round-trip preserves false switches and zero duration', async () => {
+test('notification configuration round-trip preserves false switches, zero duration, per-node toggles, and TCP block alert', async () => {
   let saved;
-  let config = { site_name: 'Test', admin_user: 'admin', nodes: [], ping_tasks: [], telegram: { enabled: false } };
+  let config = {
+    site_name: 'Test',
+    admin_user: 'admin',
+    nodes: [
+      { id: 'demo', name: 'Demo 1', token: 'token-demo-1', group: 'HK' },
+      { id: 'node2', name: 'Demo 2', token: 'token-demo-2', group: 'US优化' }
+    ],
+    group_order: ['US优化', 'HK'],
+    ping_tasks: [],
+    telegram: { enabled: false }
+  };
   const api = loadUI('admin.html', async (url, options = {}) => {
     if (url === '/api/admin/config') {
       if (options.method === 'POST') { saved = JSON.parse(options.body); config = saved; }
@@ -55,11 +65,17 @@ test('notification configuration round-trip preserves false switches and zero du
   await api.doLogin();
   assert.equal(api.authed.value, true);
   assert.equal(api.cfg.telegram.resources.cpu.enabled, false);
+  assert.equal(api.cfg.telegram.tcp_block.enabled, false);
+  assert.equal(api.cfg.telegram.tcp_block.duration_seconds, 180);
+  assert.equal(api.cfg.telegram.tcp_block.max_notify_count, 3);
+  assert.deepEqual([...api.nodeGroups.value], ['US优化', 'HK']);
+
   api.cfg.telegram.notify_offline = false;
   api.cfg.telegram.notify_recovery = false;
   api.cfg.telegram.resources.cpu = { enabled: true, threshold: 97, duration_seconds: 0 };
+  api.cfg.telegram.tcp_block = { enabled: true, duration_seconds: 120, max_notify_count: 5, repeat_minutes: 3, node_ids: ['node2'], excluded_node_ids: [] };
   api.cfg.telegram.repeat_minutes = 0;
-  api.cfg.telegram.excluded_node_ids = ['demo'];
+  api.toggleNodeNotify('demo');
   await api.saveConfig();
   assert.equal(saved.telegram.notify_offline, false);
   assert.equal(saved.telegram.notify_recovery, false);
@@ -67,6 +83,46 @@ test('notification configuration round-trip preserves false switches and zero du
   assert.equal(api.cfg.telegram.resources.cpu.duration_seconds, 0);
   assert.equal(api.cfg.telegram.repeat_minutes, 0);
   assert.deepEqual([...api.cfg.telegram.excluded_node_ids], ['demo']);
+  assert.equal(saved.telegram.tcp_block.enabled, true);
+  assert.equal(saved.telegram.tcp_block.duration_seconds, 120);
+  assert.equal(saved.telegram.tcp_block.max_notify_count, 5);
+  assert.deepEqual([...saved.telegram.tcp_block.node_ids], ['node2']);
+});
+
+test('group manager reorders and renames groups across nodes and public tabs', async () => {
+  let saved;
+  let config = {
+    site_name: 'Test',
+    admin_user: 'admin',
+    nodes: [
+      { id: 'n1', name: 'N1', token: 'token-11111111', group: '落地' },
+      { id: 'n2', name: 'N2', token: 'token-22222222', group: '主控' }
+    ],
+    group_order: ['落地', '主控'],
+    ping_tasks: []
+  };
+  const api = loadUI('admin.html', async (url, options = {}) => {
+    if (url === '/api/admin/config') {
+      if (options.method === 'POST') { saved = JSON.parse(options.body); config = saved; }
+      return { ok: true, json: async () => JSON.parse(JSON.stringify(config)) };
+    }
+    return { ok: true, json: async () => ({ nodes: {} }) };
+  });
+  api.loginUser.value = 'admin'; api.loginPass.value = 'synthetic-password';
+  await api.doLogin();
+  api.openGroupManager();
+  assert.equal(api.groupManager.items.length, 2);
+  api.moveGroupItem(1, 0);
+  api.groupManager.items[1].name = '核心落地';
+  api.commitGroupManager();
+  await api.saveConfig();
+  assert.deepEqual([...saved.group_order], ['主控', '核心落地']);
+  assert.equal(saved.nodes[0].group, '核心落地');
+
+  const pub = loadUI('index.html');
+  pub.servers.value = saved.nodes.map(n => ({ ...n, status: { is_online: true } }));
+  pub.groupOrder.value = saved.group_order;
+  assert.deepEqual([...pub.groupTabs.value].map(g => g.name), ['全部', '主控', '核心落地']);
 });
 
 function trendUI(fetch) {
@@ -237,7 +293,6 @@ test('agent deployment command bootstraps Alpine and uses POSIX sh', () => {
 });
 
 test('80-node Vue rendering keeps clock, theme and detail updates out of card subtrees', async t => {
-  // Vue's real renderer with an in-memory host tests VNode updates without a browser.
   const vue = require('vue');
   const api = loadUI('index.html', undefined, { vue: { ref: vue.ref, shallowRef: vue.shallowRef, computed: vue.computed } });
   const html = fs.readFileSync(path.join(root, 'server/index.html'), 'utf8');
