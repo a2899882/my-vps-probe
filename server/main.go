@@ -30,6 +30,7 @@ type AppConfig struct {
 	PingTasks            []common.PingTask        `json:"ping_tasks"`
 	Ping                 common.PingConfig        `json:"ping"`
 	ReturnRoute          common.ReturnRouteConfig `json:"return_route"`
+	AgentAutoUpdate      *bool                    `json:"agent_auto_update,omitempty"`
 	Telegram             TelegramConfig           `json:"telegram"`
 	HistoryDays          int                      `json:"history_days"`
 	PublicRefreshSeconds int                      `json:"public_refresh_seconds"`
@@ -268,6 +269,10 @@ func normalizeAppConfig(c *AppConfig) {
 			c.PingTasks[i].Enabled = &v
 		}
 	}
+	if c.AgentAutoUpdate == nil {
+		v := true
+		c.AgentAutoUpdate = &v
+	}
 	normalizeReturnRouteConfig(&c.ReturnRoute)
 	c.Telegram.normalize()
 }
@@ -491,6 +496,7 @@ func main() {
 		writeJSON(w, http.StatusOK, adminRuntimeSnapshot())
 	}))
 	http.HandleFunc("/api/admin/notifications", basicAuth(notificationLogHandler))
+	http.HandleFunc("/api/admin/agents/update", basicAuth(adminTriggerAgentUpdateHandler))
 	http.HandleFunc("/api/admin/telegram/test", basicAuth(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
@@ -594,6 +600,7 @@ func main() {
 			reportSeconds = appConfig.AgentReportSeconds
 			nodeTasks := activePingTasksForNode(appConfig.PingTasks, appConfig.Ping, cNode.ID)
 			currentRR := appConfig.ReturnRoute
+			autoUpdate := common.BoolEnabled(appConfig.AgentAutoUpdate)
 			if !valid {
 				configMutex.RUnlock()
 				break
@@ -618,6 +625,7 @@ func main() {
 			resourceMonitor.observe(currentNode, st, tg, reportSeconds, now)
 			tcpBlockMonitor.observe(currentNode, nodeTasks, st, tg, reportSeconds, now)
 			routeMonitor.observe(currentNode, st.ReturnRoutes, currentRR, now)
+			maybePushAgentAutoUpdate(currentNode.ID, currentNode.Name, conn, st, nodeTasks, appConfig.Ping, returnRouteForNode(currentRR, currentNode.ID), reportSeconds, autoUpdate)
 		}
 	})
 	http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {

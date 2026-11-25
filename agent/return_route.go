@@ -118,9 +118,7 @@ func (s *returnRouteSampler) runProbe(targets []common.ReturnRouteTarget, key st
 	s.mu.Unlock()
 }
 
-func (s *returnRouteSampler) probeTarget(t common.ReturnRouteTarget) common.ReturnRouteResult {
-	ipVer := common.NormalizeIPVersion(t.IPVersion)
-	ips := traceRouteIPs(t.Host, ipVer)
+func (s *returnRouteSampler) evaluateIPs(ips []string) (string, []string) {
 	hops := make([]routeHopInfo, 0, len(ips))
 	hopSummary := make([]string, 0, len(ips))
 	for _, ipStr := range ips {
@@ -137,7 +135,33 @@ func (s *returnRouteSampler) probeTarget(t common.ReturnRouteTarget) common.Retu
 			}
 		}
 	}
-	line := classifyReturnRouteHops(hops)
+	return classifyReturnRouteHops(hops), hopSummary
+}
+
+// probeTarget tries ICMP -> TCP 80 -> UDP -> tracepath in sequence, stopping as
+// soon as a carrier backbone is identified. This reliably penetrates Unicom /
+// Telecom border routers that drop default UDP traceroute probes.
+func (s *returnRouteSampler) probeTarget(t common.ReturnRouteTarget) common.ReturnRouteResult {
+	ipVer := common.NormalizeIPVersion(t.IPVersion)
+	bestLine := "UNKNOWN"
+	var bestHops []string
+
+	for _, mode := range []string{"icmp", "tcp", "udp"} {
+		ips := traceRouteIPs(t.Host, ipVer, mode)
+		if len(ips) == 0 {
+			continue
+		}
+		line, hopSummary := s.evaluateIPs(ips)
+		if len(hopSummary) > len(bestHops) {
+			bestHops = hopSummary
+		}
+		if line != "UNKNOWN" {
+			bestLine = line
+			bestHops = hopSummary
+			break
+		}
+	}
+
 	label := strings.TrimSpace(t.Label)
 	if label == "" {
 		switch strings.ToUpper(t.Carrier) {
@@ -155,16 +179,16 @@ func (s *returnRouteSampler) probeTarget(t common.ReturnRouteTarget) common.Retu
 		Carrier:   strings.ToUpper(strings.TrimSpace(t.Carrier)),
 		Label:     label,
 		IPVersion: ipVer,
-		Line:      line,
+		Line:      bestLine,
 		CheckedAt: time.Now().Unix(),
-		Hops:      hopSummary,
+		Hops:      bestHops,
 	}
 }
 
 var routeIPv4Pattern = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 var routeIPv6Pattern = regexp.MustCompile(`\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{0,4}\b`)
 
-func traceRouteIPs(rawHost, ipVersion string) []string {
+func traceRouteIPs(rawHost, ipVersion, mode string) []string {
 	host := strings.TrimSpace(rawHost)
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
@@ -174,33 +198,45 @@ func traceRouteIPs(rawHost, ipVersion string) []string {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 18*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	var out []byte
 	var err error
 	if ipVersion == "v6" {
-		if bin, lookErr := exec.LookPath("traceroute6"); lookErr == nil {
-			out, err = exec.CommandContext(ctx, bin, "-n", "-q", "1", "-w", "1", "-m", "18", host).CombinedOutput()
-		} else if bin, lookErr := exec.LookPath("traceroute"); lookErr == nil {
-			out, err = exec.CommandContext(ctx, bin, "-6", "-n", "-q", "1", "-w", "1", "-m", "18", host).CombinedOutput()
-		} else if bin, lookErr := exec.LookPath("tracepath6"); lookErr == nil {
-			out, err = exec.CommandContext(ctx, bin, "-n", "-m", "18", host).CombinedOutput()
-		} else if bin, lookErr := exec.LookPath("tracepath"); lookErr == nil {
-			out, err = exec.CommandContext(ctx, bin, "-6", "-n", "-m", "18", host).CombinedOutput()
-		} else {
-			return nil
+		if bin, lookErr := exec.LookPath("traceroute"); lookErr == nil {
+			args := []string{"-6", "-n", "-q", "1", "-w", "2", "-m", "18"}
+			if mode == "icmp" {
+				args = append(args, "-I")
+			} else if mode == "tcp" {
+				args = append(args, "-T", "-p", "80")
+			}
+			args = append(args, host)
+			out, err = exec.CommandContext(ctx, bin, args...).CombinedOutput()
+		} else if mode == "udp" {
+			if bin, lookErr := exec.LookPath("traceroute6"); lookErr == nil {
+				out, err = exec.CommandContext(ctx, bin, "-n", "-q", "1", "-w", "2", "-m", "18", host).CombinedOutput()
+			} else if bin, lookErr := exec.LookPath("tracepath6"); lookErr == nil {
+				out, err = exec.CommandContext(ctx, bin, "-n", "-m", "18", host).CombinedOutput()
+			}
 		}
 	} else {
 		if bin, lookErr := exec.LookPath("traceroute"); lookErr == nil {
-			out, err = exec.CommandContext(ctx, bin, "-4", "-n", "-q", "1", "-w", "1", "-m", "18", host).CombinedOutput()
-			if err != nil && len(out) == 0 {
-				out, err = exec.CommandContext(ctx, bin, "-n", "-q", "1", "-w", "1", "-m", "18", host).CombinedOutput()
+			args := []string{"-4", "-n", "-q", "1", "-w", "2", "-m", "18"}
+			if mode == "icmp" {
+				args = append(args, "-I")
+			} else if mode == "tcp" {
+				args = append(args, "-T", "-p", "80")
 			}
-		} else if bin, lookErr := exec.LookPath("tracepath"); lookErr == nil {
-			out, err = exec.CommandContext(ctx, bin, "-n", "-m", "18", host).CombinedOutput()
-		} else {
-			return nil
+			args = append(args, host)
+			out, err = exec.CommandContext(ctx, bin, args...).CombinedOutput()
+			if err != nil && len(out) == 0 && mode == "udp" {
+				out, err = exec.CommandContext(ctx, bin, "-n", "-q", "1", "-w", "2", "-m", "18", host).CombinedOutput()
+			}
+		} else if mode == "udp" {
+			if bin, lookErr := exec.LookPath("tracepath"); lookErr == nil {
+				out, err = exec.CommandContext(ctx, bin, "-n", "-m", "18", host).CombinedOutput()
+			}
 		}
 	}
 	if len(out) == 0 && err != nil {
@@ -212,7 +248,6 @@ func traceRouteIPs(rawHost, ipVersion string) []string {
 	var ips []string
 	for idx, line := range lines {
 		line = strings.TrimSpace(line)
-		// Skip traceroute header line ("traceroute to ...")
 		if idx == 0 && strings.HasPrefix(strings.ToLower(line), "traceroute") {
 			continue
 		}
@@ -246,7 +281,6 @@ func isPublicRouteIP(raw string) bool {
 		return false
 	}
 	if v4 := ip.To4(); v4 != nil {
-		// Exclude RFC6598 CGNAT 100.64.0.0/10
 		if v4[0] == 100 && v4[1]&0xc0 == 0x40 {
 			return false
 		}
@@ -314,8 +348,6 @@ func queryCymruASN(ipStr string) int {
 	return asn
 }
 
-// classifyReturnRouteHops mirrors Lite's return-route signature priority:
-// CUG VIP / 9929 / CMIN2 / CMI / CN2 GIA / CN2 GT / 163 / 4837 / CMNET.
 func classifyReturnRouteHops(hops []routeHopInfo) string {
 	if len(hops) == 0 {
 		return "UNKNOWN"
@@ -359,7 +391,6 @@ func classifyReturnRouteHops(hops []routeHopInfo) string {
 		}
 	}
 
-	// CN2 GIA vs CN2 GT (AS4809 / 59.43.0.0/16 / AS23764)
 	firstCN2 := -1
 	for i, h := range hops {
 		if h.ASN == 4809 || isPrefixMatch(h.IP, "59.43.") {
@@ -392,7 +423,6 @@ func classifyReturnRouteHops(hops []routeHopInfo) string {
 		return "CN2 GT"
 	}
 
-	// Ordinary backbones: 163, 4837, CMNET
 	for _, h := range hops {
 		if h.ASN == 4134 || h.ASN == 4812 || isPrefixMatch(h.IP, "202.97.") {
 			return "163"

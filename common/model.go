@@ -27,7 +27,7 @@ type ReturnRouteConfig struct {
 	Enabled         bool                `json:"enabled"`
 	IntervalMinutes int                 `json:"interval_minutes"` // 10, 30, 60, 180
 	NotifyChange    bool                `json:"notify_change"`
-	ConfirmCount    int                 `json:"confirm_count"` // consecutive probes before confirming change
+	ConfirmCount    int                 `json:"confirm_count"`      // consecutive probes before confirming change
 	NodeIDs         []string            `json:"node_ids,omitempty"` // nil means all nodes
 	Targets         []ReturnRouteTarget `json:"targets"`
 }
@@ -55,24 +55,28 @@ type NodeConfig struct {
 }
 
 type AppConfig struct {
-	SiteName      string            `json:"site_name"`
-	AdminUser     string            `json:"admin_user"`
-	AdminPass     string            `json:"admin_pass"`
-	Nodes         []NodeConfig      `json:"nodes"`
-	GroupOrder    []string          `json:"group_order,omitempty"`
-	PingTasks     []PingTask        `json:"ping_tasks"`
-	Ping          PingConfig        `json:"ping"`
-	ReturnRoute   ReturnRouteConfig `json:"return_route"`
-	PanelDomain   string            `json:"panel_domain,omitempty"`
-	BlockIPAccess bool              `json:"block_ip_access,omitempty"`
+	SiteName        string            `json:"site_name"`
+	AdminUser       string            `json:"admin_user"`
+	AdminPass       string            `json:"admin_pass"`
+	Nodes           []NodeConfig      `json:"nodes"`
+	GroupOrder      []string          `json:"group_order,omitempty"`
+	PingTasks       []PingTask        `json:"ping_tasks"`
+	Ping            PingConfig        `json:"ping"`
+	ReturnRoute     ReturnRouteConfig `json:"return_route"`
+	AgentAutoUpdate *bool             `json:"agent_auto_update,omitempty"`
+	PanelDomain     string            `json:"panel_domain,omitempty"`
+	BlockIPAccess   bool              `json:"block_ip_access,omitempty"`
 }
 
 type AgentInstruction struct {
-	ServerName    string            `json:"server_name"`
-	PingTasks     []PingTask        `json:"ping_tasks"`
-	PingConfig    PingConfig        `json:"ping_config,omitempty"`
-	ReturnRoute   ReturnRouteConfig `json:"return_route,omitempty"`
-	ReportSeconds int               `json:"report_seconds,omitempty"`
+	ServerName       string            `json:"server_name"`
+	PingTasks        []PingTask        `json:"ping_tasks"`
+	PingConfig       PingConfig        `json:"ping_config,omitempty"`
+	ReturnRoute      ReturnRouteConfig `json:"return_route,omitempty"`
+	ReportSeconds    int               `json:"report_seconds,omitempty"`
+	AutoUpdate       bool              `json:"auto_update,omitempty"`
+	AgentHash        string            `json:"agent_hash,omitempty"`
+	AgentDownloadURL string            `json:"agent_download_url,omitempty"`
 }
 
 type CardPingStatus struct {
@@ -95,6 +99,8 @@ type ServerStatus struct {
 	// be interpreted as a counter reset; per-interface counters avoid cancellation.
 	NetworkValid     *bool               `json:"network_valid,omitempty"`
 	BootID           string              `json:"boot_id,omitempty"`
+	AgentArch        string              `json:"agent_arch,omitempty"`
+	AgentHash        string              `json:"agent_hash,omitempty"`
 	NetCounters      []NetCounter        `json:"net_counters,omitempty"`
 	ServerID         string              `json:"server_id"`
 	LastReport       int64               `json:"last_report"`

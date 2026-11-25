@@ -257,11 +257,16 @@ func validateConfig(config *AppConfig) error {
 }
 
 func hotPushAllAgents() {
+	hotPushAllAgentsWithUpdate(false)
+}
+
+func hotPushAllAgentsWithUpdate(forceUpdate bool) {
 	configMutex.RLock()
 	pTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
 	pingCfg := appConfig.Ping
 	rrCfg := appConfig.ReturnRoute
 	reportSeconds := appConfig.AgentReportSeconds
+	autoUpdate := forceUpdate || common.BoolEnabled(appConfig.AgentAutoUpdate)
 	nodeNameMap := make(map[string]string, len(appConfig.Nodes))
 	for _, n := range appConfig.Nodes {
 		nodeNameMap[n.ID] = n.Name
@@ -297,12 +302,19 @@ func hotPushAllAgents() {
 				_ = conn.close()
 				return
 			}
+			mapMutex.RLock()
+			lastSt := serverStatusMap[id]
+			mapMutex.RUnlock()
+			dlURL, latestHash := agentBinaryInfo(lastSt.AgentArch)
 			instruction := common.AgentInstruction{
-				ServerName:    name,
-				PingTasks:     activePingTasksForNode(pTasks, pingCfg, id),
-				PingConfig:    pingCfg,
-				ReturnRoute:   returnRouteForNode(rrCfg, id),
-				ReportSeconds: reportSeconds,
+				ServerName:       name,
+				PingTasks:        activePingTasksForNode(pTasks, pingCfg, id),
+				PingConfig:       pingCfg,
+				ReturnRoute:      returnRouteForNode(rrCfg, id),
+				ReportSeconds:    reportSeconds,
+				AutoUpdate:       autoUpdate && dlURL != "" && latestHash != "",
+				AgentHash:        latestHash,
+				AgentDownloadURL: dlURL,
 			}
 			if err := conn.writeJSON(instruction); err != nil {
 				removeActiveConnection(id, conn)
@@ -428,7 +440,9 @@ func removeActiveConnection(id string, target *agentConnection) {
 
 type nodeRuntime struct {
 	Online     bool    `json:"online"`
-	TCPBlocked bool    `json:"tcp_blocked,omitempty"`
+	TCPBlocked    bool    `json:"tcp_blocked,omitempty"`
+	AgentArch     string  `json:"agent_arch,omitempty"`
+	AgentOutdated bool    `json:"agent_outdated,omitempty"`
 	LastReport int64   `json:"last_report"`
 	CPUUsage   float64 `json:"cpu_usage"`
 	MemUsed    uint64  `json:"mem_used"`
@@ -459,7 +473,7 @@ func adminRuntimeSnapshot() map[string]interface{} {
 			tcpBlockedCount++
 		}
 		runtimeNodes[id] = nodeRuntime{
-			Online: status.IsOnline, TCPBlocked: blocked, LastReport: status.LastReport, CPUUsage: status.CPUUsage,
+			Online: status.IsOnline, TCPBlocked: blocked, AgentArch: status.AgentArch, AgentOutdated: isAgentOutdated(status), LastReport: status.LastReport, CPUUsage: status.CPUUsage,
 			MemUsed: status.MemUsed, MemTotal: status.MemTotal,
 			DiskUsed: status.DiskUsed, DiskTotal: status.DiskTotal,
 		}

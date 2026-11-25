@@ -562,11 +562,11 @@
         </div>
 
         <div v-show="trendMode==='route'">
-          <div v-if="nodeRoutes(detailNode).length" class="route-cards">
-            <div v-for="rt in nodeRoutes(detailNode)" :key="rt.carrier+'-'+rt.ip_version" class="route-card">
+          <div v-if="allNodeRoutes(detailNode).length" class="route-cards">
+            <div v-for="rt in allNodeRoutes(detailNode)" :key="rt.carrier+'-'+rt.ip_version" class="route-card">
               <div class="route-card-head">
                 <span class="route-card-title">{{ rt.label || carrierName(rt.carrier) }} <span class="v-badge" :class="rt.ip_version||'v4'">{{ (rt.ip_version||'v4').toUpperCase() }}</span></span>
-                <span class="route-tag" :class="routeTierClass(rt.line)"><span class="dot"></span>{{ rt.line }}</span>
+                <span class="route-tag" :class="routeTierClass(rt.line)"><span class="dot"></span>{{ rt.line==='UNKNOWN'?'待识别':rt.line }}</span>
               </div>
               <div class="mono" style="font-size:11px;color:var(--muted)">
                 <div v-if="rt.prev_line">上次线路：{{ rt.prev_line }} → {{ rt.line }} ({{ rt.changed_at ? new Date(rt.changed_at*1000).toLocaleString() : '' }})</div>
@@ -709,7 +709,8 @@ createApp({setup(){
   const pingIntervalLabel=computed(()=>{const s=Number(pingConfig.value?.interval_seconds||60);return s===60?'60分钟':s+'s 探测'});
 
   // Return route helpers
-  const nodeRoutes=n=>(st(n).return_routes||[]).filter(r=>r&&r.line&&r.line!=='UNKNOWN');
+  const allNodeRoutes=n=>(st(n).return_routes||[]).filter(r=>r&&r.carrier);
+  const nodeRoutes=n=>allNodeRoutes(n).filter(r=>r.line&&r.line!=='UNKNOWN');
   const carrierShort=c=>({CT:'电信',CU:'联通',CM:'移动'}[String(c||'').toUpperCase()]||c);
   const carrierName=c=>({CT:'中国电信',CU:'中国联通',CM:'中国移动'}[String(c||'').toUpperCase()]||c);
   const routeTierClass=line=>{const l=String(line||'').toUpperCase();if(l.includes('GIA'))return'tier-gia';if(l.includes('9929')||l.includes('CUG VIP'))return'tier-9929';if(l.includes('CMIN2'))return'tier-cmin2';if(l.includes('GT')||l.includes('CUG')||l==='CMI')return'tier-gt';return'tier-std'};
@@ -915,7 +916,7 @@ createApp({setup(){
   onMounted(()=>{applyTheme();tick();clockTimer=setInterval(tick,1000);fetchData();window.addEventListener('resize',resizeCharts);window.addEventListener('keydown',handleKey)});
   onUnmounted(()=>{clearTimeout(pollTimer);clearInterval(clockTimer);closeDetail();cancelAnimationFrame(resizeFrame);window.removeEventListener('resize',resizeCharts);window.removeEventListener('keydown',handleKey)});
 
-  return{trendLoading,trendError,trendNote,barStyle,inspectBar,stepBar,emptyPing,resourcePoints,pingPoints,servers,groupOrder,pingConfig,returnRouteConfig,siteName,theme,viewMode,keyword,statusFilter,sortBy,activeGroup,page,pageSize,now,today,loading,loadError,refreshSeconds,foldState,cardIpFilter,detailNode,trendMode,chartHours,pingLegend,pingSmooth,pingConnect,pingModalIpFilter,routeHistory,routeHistoryLoading,hourChoices,resourceCards,groupTabs,scopedServers,filteredServers,pageNodes,totalPages,onlineCnt,offlineCnt,availability,attentionCnt,expiringCnt,tcpBlockedCnt,totIn,totOut,spIn,spOut,lastUpdatedText,pingIntervalLabel,st,isOnline,isTCPBlocked,isExpiring,attention,fb,pct,expiryDate,expiryText,expiryTone,formatUptime,shortUptime,lastReportText,countryCode,flagEmoji,flagHtml,ipVer,meters,barColor,monthUsed,trafficPct,cardPings,hasBothIPVersions,getCardIpFilter,setCardIpFilter,filteredCardPings,visiblePings,toggleFold,nodeRoutes,carrierShort,carrierName,routeTierClass,isRouteRecentlyChanged,hasRecentRouteChange,routeTitle,normalizedBars,barClass,barTitle,pingSummary,pingValue,pingTone,lossText,lossTone,shortName,selectGroup,toggleQuickStatus,pollDelay,fetchData,toggleTheme,setView,openDetail,closeDetail,setTrendMode,setPingModalIpFilter,loadTrend,loadRouteHistory,togglePingSeries,renderPingChart};
+  return{trendLoading,trendError,trendNote,barStyle,inspectBar,stepBar,emptyPing,resourcePoints,pingPoints,servers,groupOrder,pingConfig,returnRouteConfig,siteName,theme,viewMode,keyword,statusFilter,sortBy,activeGroup,page,pageSize,now,today,loading,loadError,refreshSeconds,foldState,cardIpFilter,detailNode,trendMode,chartHours,pingLegend,pingSmooth,pingConnect,pingModalIpFilter,routeHistory,routeHistoryLoading,hourChoices,resourceCards,groupTabs,scopedServers,filteredServers,pageNodes,totalPages,onlineCnt,offlineCnt,availability,attentionCnt,expiringCnt,tcpBlockedCnt,totIn,totOut,spIn,spOut,lastUpdatedText,pingIntervalLabel,st,isOnline,isTCPBlocked,isExpiring,attention,fb,pct,expiryDate,expiryText,expiryTone,formatUptime,shortUptime,lastReportText,countryCode,flagEmoji,flagHtml,ipVer,meters,barColor,monthUsed,trafficPct,cardPings,hasBothIPVersions,getCardIpFilter,setCardIpFilter,filteredCardPings,visiblePings,toggleFold,allNodeRoutes,nodeRoutes,carrierShort,carrierName,routeTierClass,isRouteRecentlyChanged,hasRecentRouteChange,routeTitle,normalizedBars,barClass,barTitle,pingSummary,pingValue,pingTone,lossText,lossTone,shortName,selectGroup,toggleQuickStatus,pollDelay,fetchData,toggleTheme,setView,openDetail,closeDetail,setTrendMode,setPingModalIpFilter,loadTrend,loadRouteHistory,togglePingSeries,renderPingChart};
 }}).mount('#app');
 </script>
 </body>

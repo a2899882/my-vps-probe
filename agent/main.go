@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -111,6 +112,7 @@ func connectAndReport(pings *pingSampler, routes *returnRouteSampler, lastMetric
 	if err := conn.ReadJSON(&instr); err != nil {
 		return
 	}
+	maybeSelfUpdate(instr)
 
 	updates := make(chan common.AgentInstruction, 1)
 	disconnected := make(chan struct{})
@@ -143,12 +145,13 @@ func connectAndReport(pings *pingSampler, routes *returnRouteSampler, lastMetric
 		iterationStarted := time.Now()
 		select {
 		case instr = <-updates:
+			maybeSelfUpdate(instr)
 		case <-disconnected:
 			return
 		default:
 		}
 		countryMutex.RLock()
-		status := common.ServerStatus{IsOnline: true, CountryCode: globalCountryCode, BootID: strings.TrimSpace(string(bootID))}
+		status := common.ServerStatus{IsOnline: true, CountryCode: globalCountryCode, BootID: strings.TrimSpace(string(bootID)), AgentArch: runtime.GOARCH, AgentHash: selfBinaryHash()}
 		countryMutex.RUnlock()
 		carryResourceMetrics(&status, *lastMetrics)
 		if h, err := host.Info(); err == nil && h != nil {
@@ -219,6 +222,7 @@ func connectAndReport(pings *pingSampler, routes *returnRouteSampler, lastMetric
 		timer := time.NewTimer(reportWait(reportSeconds, iterationStarted, time.Now()))
 		select {
 		case instr = <-updates:
+			maybeSelfUpdate(instr)
 			if !timer.Stop() {
 				<-timer.C
 			}
