@@ -22,18 +22,20 @@ import (
 )
 
 type AppConfig struct {
-	SiteName             string              `json:"site_name"`
-	AdminUser            string              `json:"admin_user"`
-	AdminPass            string              `json:"admin_pass"`
-	Nodes                []common.NodeConfig `json:"nodes"`
-	GroupOrder           []string            `json:"group_order,omitempty"`
-	PingTasks            []common.PingTask   `json:"ping_tasks"`
-	Telegram             TelegramConfig      `json:"telegram"`
-	HistoryDays          int                 `json:"history_days"`
-	PublicRefreshSeconds int                 `json:"public_refresh_seconds"`
-	AgentReportSeconds   int                 `json:"agent_report_seconds"`
-	PanelDomain          string              `json:"panel_domain,omitempty"`
-	BlockIPAccess        bool                `json:"block_ip_access,omitempty"`
+	SiteName             string                   `json:"site_name"`
+	AdminUser            string                   `json:"admin_user"`
+	AdminPass            string                   `json:"admin_pass"`
+	Nodes                []common.NodeConfig      `json:"nodes"`
+	GroupOrder           []string                 `json:"group_order,omitempty"`
+	PingTasks            []common.PingTask        `json:"ping_tasks"`
+	Ping                 common.PingConfig        `json:"ping"`
+	ReturnRoute          common.ReturnRouteConfig `json:"return_route"`
+	Telegram             TelegramConfig           `json:"telegram"`
+	HistoryDays          int                      `json:"history_days"`
+	PublicRefreshSeconds int                      `json:"public_refresh_seconds"`
+	AgentReportSeconds   int                      `json:"agent_report_seconds"`
+	PanelDomain          string                   `json:"panel_domain,omitempty"`
+	BlockIPAccess        bool                     `json:"block_ip_access,omitempty"`
 }
 
 var (
@@ -111,8 +113,20 @@ swap_total INTEGER,
 load_1 REAL,
 net_in_speed INTEGER,
 net_out_speed INTEGER,
-	tcp_connections INTEGER,
-	udp_connections INTEGER
+tcp_connections INTEGER,
+udp_connections INTEGER
+);`)
+
+	mustExecDB(`CREATE TABLE IF NOT EXISTS return_route_history (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+server_id TEXT,
+carrier TEXT,
+label TEXT,
+ip_version TEXT,
+old_line TEXT,
+new_line TEXT,
+hops TEXT
 );`)
 
 	ensureResourceHistoryColumns()
@@ -120,6 +134,8 @@ net_out_speed INTEGER,
 ON ping_history(server_id, timestamp);`)
 	mustExecDB(`CREATE INDEX IF NOT EXISTS idx_resource_history_server_time
 ON resource_history(server_id, timestamp);`)
+	mustExecDB(`CREATE INDEX IF NOT EXISTS idx_return_route_history_server_time
+ON return_route_history(server_id, timestamp);`)
 
 	mustExecDB(`CREATE TABLE IF NOT EXISTS notification_events (
 event_key TEXT PRIMARY KEY,
@@ -136,8 +152,6 @@ sent_count INTEGER NOT NULL DEFAULT 1
 	backgroundWorkers.Add(1)
 	go func() {
 		defer backgroundWorkers.Done()
-		// Align archive points to wall-clock minutes. Resource history is saved
-		// first so a temporary Ping backlog cannot starve all resource charts.
 		minuteTimer := time.NewTimer(time.Until(time.Now().Truncate(time.Minute).Add(time.Minute)))
 		cleanupTicker := time.NewTicker(time.Hour)
 		defer minuteTimer.Stop()
@@ -179,6 +193,8 @@ func cleanupHistory() {
 	if _, err := db.Exec("DELETE FROM resource_history WHERE timestamp <= datetime('now', ?)", cutoff); err != nil {
 		log.Printf("cleanup resource history: %v", err)
 	}
+	routeCutoff := fmt.Sprintf("-%d days", max(days, 30))
+	_, _ = db.Exec("DELETE FROM return_route_history WHERE timestamp <= datetime('now', ?)", routeCutoff)
 	_, _ = db.Exec("DELETE FROM notification_events WHERE event_key LIKE 'expiry:%' AND sent_at <= datetime('now', '-7 days')")
 	_, _ = db.Exec("DELETE FROM notification_log WHERE created_at < datetime('now', '-7 days') OR id NOT IN (SELECT id FROM notification_log ORDER BY id DESC LIMIT 1000)")
 }
@@ -194,8 +210,12 @@ func loadConfig() {
 		appConfig = AppConfig{
 			SiteName: "探针看板", AdminUser: "admin", AdminPass: "123456",
 			HistoryDays: 7, PublicRefreshSeconds: 3, AgentReportSeconds: 3,
-			Nodes:     []common.NodeConfig{{ID: "node-1", Name: "主控测试机", Token: "my_secret_token_123", ExpireDate: "2027/05/13", Region: "CN"}},
-			PingTasks: []common.PingTask{{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80"}, {Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80"}, {Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80"}},
+			Nodes: []common.NodeConfig{{ID: "node-1", Name: "主控测试机", Token: "my_secret_token_123", ExpireDate: "2027/05/13", Region: "CN"}},
+			PingTasks: []common.PingTask{
+				{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80", IPVersion: "v4"},
+				{Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80", IPVersion: "v4"},
+				{Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80", IPVersion: "v4"},
+			},
 		}
 	}
 	if appConfig.AdminUser == "" {
@@ -208,7 +228,11 @@ func loadConfig() {
 		appConfig.SiteName = "探针看板"
 	}
 	if isNew && len(appConfig.PingTasks) == 0 {
-		appConfig.PingTasks = []common.PingTask{{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80"}, {Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80"}, {Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80"}}
+		appConfig.PingTasks = []common.PingTask{
+			{Name: "广东电信", Host: "gd-ct-v4.ip.zstaticcdn.com:80", IPVersion: "v4"},
+			{Name: "广东联通", Host: "gd-cu-v4.ip.zstaticcdn.com:80", IPVersion: "v4"},
+			{Name: "广东移动", Host: "gd-cm-v4.ip.zstaticcdn.com:80", IPVersion: "v4"},
+		}
 	}
 	normalizeAppConfig(&appConfig)
 	appConfig.GroupOrder = normalizeGroupOrder(appConfig.GroupOrder, appConfig.Nodes)
@@ -228,6 +252,23 @@ func normalizeAppConfig(c *AppConfig) {
 	if c.AgentReportSeconds < 2 || c.AgentReportSeconds > 60 {
 		c.AgentReportSeconds = 3
 	}
+	if c.Ping.EnableV4 == nil {
+		v := true
+		c.Ping.EnableV4 = &v
+	}
+	if c.Ping.EnableV6 == nil {
+		v := true
+		c.Ping.EnableV6 = &v
+	}
+	c.Ping.IntervalSeconds = common.NormalizePingInterval(c.Ping.IntervalSeconds)
+	for i := range c.PingTasks {
+		c.PingTasks[i].IPVersion = common.NormalizeIPVersion(c.PingTasks[i].IPVersion)
+		if c.PingTasks[i].Enabled == nil {
+			v := true
+			c.PingTasks[i].Enabled = &v
+		}
+	}
+	normalizeReturnRouteConfig(&c.ReturnRoute)
 	c.Telegram.normalize()
 }
 
@@ -235,7 +276,7 @@ var upgrader = websocket.Upgrader{
 	HandshakeTimeout: 10 * time.Second,
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		if origin == "" { // Agent clients do not send a browser Origin header.
+		if origin == "" {
 			return true
 		}
 		u, err := url.Parse(origin)
@@ -256,6 +297,28 @@ func pingTasksForNode(tasks []common.PingTask, nodeID string) []common.PingTask 
 				break
 			}
 		}
+	}
+	return out
+}
+
+func activePingTasksForNode(tasks []common.PingTask, pingCfg common.PingConfig, nodeID string) []common.PingTask {
+	enableV4 := common.BoolEnabled(pingCfg.EnableV4)
+	enableV6 := common.BoolEnabled(pingCfg.EnableV6)
+	assigned := pingTasksForNode(tasks, nodeID)
+	out := make([]common.PingTask, 0, len(assigned))
+	for _, t := range assigned {
+		if !common.BoolEnabled(t.Enabled) {
+			continue
+		}
+		ver := common.NormalizeIPVersion(t.IPVersion)
+		if ver == "v4" && !enableV4 {
+			continue
+		}
+		if ver == "v6" && !enableV6 {
+			continue
+		}
+		t.IPVersion = ver
+		out = append(out, t)
 	}
 	return out
 }
@@ -369,6 +432,7 @@ func main() {
 			safeConfig.Nodes = append([]common.NodeConfig(nil), appConfig.Nodes...)
 			safeConfig.GroupOrder = append([]string(nil), appConfig.GroupOrder...)
 			safeConfig.PingTasks = append([]common.PingTask(nil), appConfig.PingTasks...)
+			safeConfig.ReturnRoute.Targets = append([]common.ReturnRouteTarget(nil), appConfig.ReturnRoute.Targets...)
 			safeConfig.AdminPass = ""
 			safeConfig.Telegram.Token = ""
 			configMutex.RUnlock()
@@ -460,6 +524,8 @@ func main() {
 			}
 		}
 		pTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
+		pingCfg := appConfig.Ping
+		rrCfg := appConfig.ReturnRoute
 		reportSeconds := appConfig.AgentReportSeconds
 		configMutex.RUnlock()
 		if !found {
@@ -488,7 +554,13 @@ func main() {
 			}
 			connMutex.Unlock()
 		}()
-		writeErr := conn.writeJSON(common.AgentInstruction{ServerName: cNode.Name, PingTasks: pingTasksForNode(pTasks, cNode.ID), ReportSeconds: reportSeconds})
+		writeErr := conn.writeJSON(common.AgentInstruction{
+			ServerName:    cNode.Name,
+			PingTasks:     activePingTasksForNode(pTasks, pingCfg, cNode.ID),
+			PingConfig:    pingCfg,
+			ReturnRoute:   returnRouteForNode(rrCfg, cNode.ID),
+			ReportSeconds: reportSeconds,
+		})
 		if writeErr != nil {
 			return
 		}
@@ -499,7 +571,6 @@ func main() {
 		mapMutex.Unlock()
 		conn.conn.SetReadLimit(2 << 20)
 		for {
-			// Decode into a new value so readers never share a slice being mutated.
 			var next common.ServerStatus
 			_ = conn.conn.SetReadDeadline(time.Now().Add(reportFreshness(reportSeconds)))
 			if err := conn.conn.ReadJSON(&next); err != nil {
@@ -518,13 +589,12 @@ func main() {
 			currentNode, valid := configuredNode(appConfig.Nodes, cNode.ID, token)
 			tg := appConfig.Telegram
 			reportSeconds = appConfig.AgentReportSeconds
-			nodeTasks := pingTasksForNode(appConfig.PingTasks, cNode.ID)
+			nodeTasks := activePingTasksForNode(appConfig.PingTasks, appConfig.Ping, cNode.ID)
+			currentRR := appConfig.ReturnRoute
 			if !valid {
 				configMutex.RUnlock()
 				break
 			}
-			// Serialize a replacement connection with its last report. Keep the
-			// quota configuration stable until the corresponding counters commit.
 			connMutex.Lock()
 			if activeConns[cNode.ID] != conn {
 				connMutex.Unlock()
@@ -544,6 +614,7 @@ func main() {
 			recordPingSamples(cNode.ID, st.PingStatuses, now)
 			resourceMonitor.observe(currentNode, st, tg, reportSeconds, now)
 			tcpBlockMonitor.observe(currentNode, nodeTasks, st, tg, reportSeconds, now)
+			routeMonitor.observe(currentNode, st.ReturnRoutes, currentRR, now)
 		}
 	})
 	http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
@@ -554,6 +625,8 @@ func main() {
 		nodeConfigs := append([]common.NodeConfig(nil), appConfig.Nodes...)
 		groupOrder := append([]string(nil), appConfig.GroupOrder...)
 		pingTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
+		pingCfg := appConfig.Ping
+		rrCfg := appConfig.ReturnRoute
 		siteName := appConfig.SiteName
 		refreshSeconds := appConfig.PublicRefreshSeconds
 		reportSeconds := appConfig.AgentReportSeconds
@@ -575,14 +648,23 @@ func main() {
 		for _, n := range nodeConfigs {
 			st := statuses[n.ID]
 			st.IsOnline = statusIsFresh(st, reportSeconds, now)
-			nodeTasks := pingTasksForNode(pingTasks, n.ID)
+			nodeTasks := activePingTasksForNode(pingTasks, pingCfg, n.ID)
 			st.CardPingStatuses = cardPingStatuses(n.ID, nodeTasks, st, reportSeconds, now)
+			if rrCfg.Enabled {
+				st.ReturnRoutes = routeMonitor.enrich(n.ID, st.ReturnRoutes)
+			} else {
+				st.ReturnRoutes = nil
+			}
 			fn := buildFrontendNode(n, st)
 			fn.TCPBlocked = isNodeTCPBlocked(n.ID, nodeTasks, st, reportSeconds, now)
 			nodes = append(nodes, fn)
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"site_name": siteName, "nodes": nodes, "group_order": groupOrder, "ping_tasks": pingTasks,
+			"ping_config": pingCfg, "return_route_config": map[string]interface{}{
+				"enabled":          rrCfg.Enabled,
+				"interval_minutes": rrCfg.IntervalMinutes,
+			},
 			"refresh_seconds": refreshSeconds, "updated_at": now.Unix(),
 		})
 	})
@@ -595,6 +677,7 @@ func main() {
 	})
 	http.HandleFunc("/api/ping_history", trendHistoryHandler("ping"))
 	http.HandleFunc("/api/resource_history", trendHistoryHandler("resource"))
+	http.HandleFunc("/api/return_route_history", returnRouteHistoryHandler)
 	fmt.Println("🚀 My VPS Probe 已启动，监听 :8080")
 	server := &http.Server{
 		Addr:              ":8080",

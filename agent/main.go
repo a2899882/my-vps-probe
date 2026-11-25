@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,13 +26,14 @@ import (
 )
 
 type PingTracker struct {
-	History []float64
-	Last    float64
-	Host    string
+	History   []float64
+	Last      float64
+	Host      string
+	IPVersion string
 }
 
 type pingSampler struct {
-	minute      int64
+	bucket      int64
 	taskKey     string
 	lastProbeAt time.Time
 	results     []common.PingResult
@@ -53,7 +55,7 @@ func startCountryLookup() {
 			var res struct {
 				CountryCode string `json:"country"`
 			}
-			json.NewDecoder(resp.Body).Decode(&res)
+			_ = json.NewDecoder(resp.Body).Decode(&res)
 			if res.CountryCode != "" {
 				countryMutex.Lock()
 				globalCountryCode = res.CountryCode
@@ -82,15 +84,16 @@ func main() {
 	flag.StringVar(&token, "token", defaultToken, "Token")
 	flag.Parse()
 	startCountryLookup()
-	pings := pingSampler{minute: -1, trackers: make(map[string]*PingTracker)}
+	pings := pingSampler{bucket: -1, trackers: make(map[string]*PingTracker)}
+	routes := newReturnRouteSampler()
 	lastMetrics := common.ServerStatus{}
 	for {
-		connectAndReport(&pings, &lastMetrics)
+		connectAndReport(&pings, routes, &lastMetrics)
 		time.Sleep(5 * time.Second)
 	}
 }
 
-func connectAndReport(pings *pingSampler, lastMetrics *common.ServerStatus) {
+func connectAndReport(pings *pingSampler, routes *returnRouteSampler, lastMetrics *common.ServerStatus) {
 	endpoint, err := makeWebSocketURL(serverAddr, token)
 	if err != nil {
 		return
@@ -197,10 +200,12 @@ func connectAndReport(pings *pingSampler, lastMetrics *common.ServerStatus) {
 			networkState.observe(n, status.BootID, time.Now(), &status)
 		}
 
-		// Status can update every few seconds, but each target is probed only once
-		// per wall-clock minute. This keeps Agent work lightweight and makes its
-		// 60-sample history mean the same 60 minutes shown by the card.
-		status.PingStatuses = pings.resultsFor(instr.PingTasks, time.Now())
+		// Probe TCP Ping targets according to configured IPv4/IPv6 switches and
+		// interval (5/10/30/60s), and attach asynchronous return-route results.
+		status.PingStatuses = pings.resultsForConfig(instr.PingTasks, instr.PingConfig, time.Now())
+		if routes != nil {
+			status.ReturnRoutes = routes.resultsFor(instr.ReturnRoute, time.Now())
+		}
 		status.TCPConnections = tcpSocketConnections()
 		status.UDPConnections = udpSocketConnections()
 		_ = conn.SetWriteDeadline(time.Now().Add(15 * time.Second))
@@ -211,9 +216,6 @@ func connectAndReport(pings *pingSampler, lastMetrics *common.ServerStatus) {
 		if reportSeconds < 2 || reportSeconds > 60 {
 			reportSeconds = 3
 		}
-		// Keep reports start-to-start at the configured interval. Sleeping for a
-		// full interval after collection made one-second Ping timeouts turn a
-		// nominal 3-second report cadence into 4-5 seconds on NAT/slow networks.
 		timer := time.NewTimer(reportWait(reportSeconds, iterationStarted, time.Now()))
 		select {
 		case instr = <-updates:
@@ -230,12 +232,37 @@ func connectAndReport(pings *pingSampler, lastMetrics *common.ServerStatus) {
 	}
 }
 
-func pingTaskKey(tasks []common.PingTask) string {
+func filterActivePingTasks(tasks []common.PingTask, cfg common.PingConfig) []common.PingTask {
+	enableV4 := common.BoolEnabled(cfg.EnableV4)
+	enableV6 := common.BoolEnabled(cfg.EnableV6)
+	active := make([]common.PingTask, 0, len(tasks))
+	for _, task := range tasks {
+		if !common.BoolEnabled(task.Enabled) {
+			continue
+		}
+		ver := common.NormalizeIPVersion(task.IPVersion)
+		if ver == "v4" && !enableV4 {
+			continue
+		}
+		if ver == "v6" && !enableV6 {
+			continue
+		}
+		task.IPVersion = ver
+		active = append(active, task)
+	}
+	return active
+}
+
+func pingTaskKey(tasks []common.PingTask, interval int) string {
 	var key strings.Builder
+	key.WriteString(strconv.Itoa(interval))
+	key.WriteByte(0)
 	for _, task := range tasks {
 		key.WriteString(task.Name)
 		key.WriteByte(0)
 		key.WriteString(task.Host)
+		key.WriteByte(0)
+		key.WriteString(common.NormalizeIPVersion(task.IPVersion))
 		key.WriteByte(0)
 	}
 	return key.String()
@@ -253,13 +280,30 @@ func allResultsFailed(results []common.PingResult) bool {
 	return true
 }
 
+// resultsFor keeps backward compatibility with existing unit tests (60s default).
 func (s *pingSampler) resultsFor(tasks []common.PingTask, now time.Time) []common.PingResult {
-	minute, key := now.Unix()/60, pingTaskKey(tasks)
-	if s.minute == minute && s.taskKey == key {
-		if !s.lastProbeAt.IsZero() && allResultsFailed(s.results) && now.Sub(s.lastProbeAt) >= 15*time.Second {
-			probes := runPingTasks(tasks)
+	return s.resultsForConfig(tasks, common.PingConfig{IntervalSeconds: 60}, now)
+}
+
+func (s *pingSampler) resultsForConfig(tasks []common.PingTask, cfg common.PingConfig, now time.Time) []common.PingResult {
+	interval := common.NormalizePingInterval(cfg.IntervalSeconds)
+	activeTasks := filterActivePingTasks(tasks, cfg)
+	if len(activeTasks) == 0 {
+		s.trackers = make(map[string]*PingTracker)
+		s.results = nil
+		s.taskKey = ""
+		s.bucket = -1
+		return nil
+	}
+
+	bucket := now.Unix() / int64(interval)
+	key := pingTaskKey(activeTasks, interval)
+	if s.bucket == bucket && s.taskKey == key {
+		if interval >= 30 && !s.lastProbeAt.IsZero() && allResultsFailed(s.results) && now.Sub(s.lastProbeAt) >= 15*time.Second {
+			probes := runPingTasks(activeTasks)
 			s.lastProbeAt = now
-			for i, task := range tasks {
+			sampledAt := now.Unix()
+			for i, task := range activeTasks {
 				tracker, ok := s.trackers[task.Name]
 				if !ok {
 					continue
@@ -276,9 +320,11 @@ func (s *pingSampler) resultsFor(tasks []common.PingTask, now time.Time) []commo
 				if i < len(s.results) {
 					s.results[i] = common.PingResult{
 						TargetName:   task.Name,
+						IPVersion:    common.NormalizeIPVersion(task.IPVersion),
 						CurrentDelay: tracker.Last,
 						AvgDelay:     avg,
 						LossRate:     loss,
+						SampledAt:    sampledAt,
 						History:      append([]float64(nil), tracker.History...),
 					}
 				}
@@ -286,21 +332,23 @@ func (s *pingSampler) resultsFor(tasks []common.PingTask, now time.Time) []commo
 		}
 		return s.results
 	}
-	newTrackers := make(map[string]*PingTracker, len(tasks))
-	for _, task := range tasks {
-		if tracker, ok := s.trackers[task.Name]; ok && tracker.Host == task.Host {
+
+	newTrackers := make(map[string]*PingTracker, len(activeTasks))
+	for _, task := range activeTasks {
+		ver := common.NormalizeIPVersion(task.IPVersion)
+		if tracker, ok := s.trackers[task.Name]; ok && tracker.Host == task.Host && tracker.IPVersion == ver {
 			newTrackers[task.Name] = tracker
 		} else {
-			newTrackers[task.Name] = &PingTracker{History: make([]float64, 0), Last: -1, Host: task.Host}
+			newTrackers[task.Name] = &PingTracker{History: make([]float64, 0), Last: -1, Host: task.Host, IPVersion: ver}
 		}
 	}
 	s.trackers = newTrackers
-	s.results = buildPingResults(tasks, runPingTasks(tasks), s.trackers)
-	s.minute, s.taskKey, s.lastProbeAt = minute, key, now
+	s.results = buildPingResults(activeTasks, runPingTasks(activeTasks), s.trackers, now.Unix())
+	s.bucket, s.taskKey, s.lastProbeAt = bucket, key, now
 	return s.results
 }
 
-func buildPingResults(tasks []common.PingTask, probes []pingProbe, trackers map[string]*PingTracker) []common.PingResult {
+func buildPingResults(tasks []common.PingTask, probes []pingProbe, trackers map[string]*PingTracker, sampledAt int64) []common.PingResult {
 	results := make([]common.PingResult, 0, len(tasks))
 	for i, task := range tasks {
 		tracker := trackers[task.Name]
@@ -316,9 +364,11 @@ func buildPingResults(tasks []common.PingTask, probes []pingProbe, trackers map[
 		avg, loss := summarizePingHistory(tracker.History)
 		results = append(results, common.PingResult{
 			TargetName:   task.Name,
+			IPVersion:    common.NormalizeIPVersion(task.IPVersion),
 			CurrentDelay: tracker.Last,
 			AvgDelay:     avg,
 			LossRate:     loss,
+			SampledAt:    sampledAt,
 			History:      append([]float64(nil), tracker.History...),
 		})
 	}
@@ -364,16 +414,12 @@ func memoryUsed(total, used, available, free uint64) (uint64, bool) {
 	if total == 0 {
 		return 0, false
 	}
-	// Preserve the established gopsutil value when it is sane so existing nodes
-	// do not jump after an Agent update.
 	if used <= total {
 		return used, true
 	}
 	if available <= total {
 		return total - available, true
 	}
-	// Some OpenVZ/Virtuozzo kernels expose host cache in MemAvailable while
-	// MemTotal/MemFree remain scoped to the guest. Total-Free matches guest tools.
 	if free <= total {
 		return total - free, true
 	}
@@ -456,12 +502,12 @@ func runPingTasks(tasks []common.PingTask) []pingProbe {
 	limit := make(chan struct{}, 8)
 	for i, task := range tasks {
 		wg.Add(1)
-		go func(index int, target string) {
+		go func(index int, target, ipVer string) {
 			defer wg.Done()
 			limit <- struct{}{}
-			results[index].delay, results[index].success = tcpPing(target)
+			results[index].delay, results[index].success = tcpPing(target, ipVer)
 			<-limit
-		}(i, task.Host)
+		}(i, task.Host, common.NormalizeIPVersion(task.IPVersion))
 	}
 	wg.Wait()
 	return results
@@ -505,17 +551,39 @@ func udpSocketConnections() uint64 {
 	return count
 }
 
-func tcpPing(host string) (float64, bool) {
-	addr := host
-	if !strings.Contains(addr, ":") {
-		addr += ":80"
+// normalizeTCPTarget handles bare IPv4, bare IPv6, bracketed IPv6, and host:port.
+func normalizeTCPTarget(raw string) string {
+	addr := strings.TrimSpace(raw)
+	if addr == "" {
+		return ""
+	}
+	if _, _, err := net.SplitHostPort(addr); err == nil {
+		return addr
+	}
+	// Bare IPv6 literal like "240e::1" or "[240e::1]"
+	trimmed := strings.Trim(addr, "[]")
+	if ip := net.ParseIP(trimmed); ip != nil {
+		return net.JoinHostPort(ip.String(), "80")
+	}
+	return net.JoinHostPort(trimmed, "80")
+}
+
+func tcpPing(host, ipVersion string) (float64, bool) {
+	addr := normalizeTCPTarget(host)
+	if addr == "" {
+		return 0, false
+	}
+	network := "tcp4"
+	if common.NormalizeIPVersion(ipVersion) == "v6" {
+		network = "tcp6"
 	}
 	for attempt := 0; attempt < 2; attempt++ {
 		start := time.Now()
-		conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
+		conn, err := net.DialTimeout(network, addr, 1500*time.Millisecond)
 		if err == nil {
 			conn.Close()
-			return float64(time.Since(start).Milliseconds()), true
+			ms := math.Round(float64(time.Since(start).Microseconds())/100.0) / 10.0
+			return ms, true
 		}
 		if attempt == 0 {
 			time.Sleep(120 * time.Millisecond)

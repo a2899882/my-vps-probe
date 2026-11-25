@@ -34,17 +34,19 @@ func (p pingMinute) values() (float64, float64) {
 	return delay, loss
 }
 
-// Keep one real probe result per target and UTC minute until that minute is
-// closed and committed. Agents can report status more frequently than Ping is
-// displayed; retaining the first valid result gives every card cell one clear
-// one-minute meaning without manufacturing averages from repeated reports.
-// A delayed database write must not move a sample into a neighbouring minute.
+// Aggregate real probe samples per target and UTC minute. When agents probe
+// faster than 60s (5/10/30s), SampledAt deduplicates repeated status ticks
+// while folding each genuinely new probe into the minute's average and loss.
 var pingFlushMu sync.Mutex
 
 var pingBuffer = struct {
 	sync.RWMutex
-	items map[pingMinuteKey]pingMinute
-}{items: make(map[pingMinuteKey]pingMinute)}
+	items       map[pingMinuteKey]pingMinute
+	lastSampled map[string]int64
+}{
+	items:       make(map[pingMinuteKey]pingMinute),
+	lastSampled: make(map[string]int64),
+}
 
 func recordPingSamples(id string, pings []common.PingResult, now time.Time) {
 	pingBuffer.Lock()
@@ -55,6 +57,22 @@ func recordPingSamples(id string, pings []common.PingResult, now time.Time) {
 			continue
 		}
 		key := pingMinuteKey{id, p.TargetName, minute}
+		sampleKey := id + "\x00" + p.TargetName
+		if p.SampledAt > 0 {
+			if pingBuffer.lastSampled[sampleKey] == p.SampledAt {
+				continue
+			}
+			pingBuffer.lastSampled[sampleKey] = p.SampledAt
+			v := pingBuffer.items[key]
+			v.Count++
+			if p.CurrentDelay >= 0 {
+				v.Success++
+				v.Sum += p.CurrentDelay
+			}
+			pingBuffer.items[key] = v
+			continue
+		}
+		// Legacy agents without SampledAt: retain first sample per minute.
 		if _, recorded := pingBuffer.items[key]; recorded {
 			continue
 		}
@@ -80,8 +98,6 @@ func pendingPingMinutes() map[pingMinuteKey]pingMinute {
 func flushPingMinutes(now time.Time, includeCurrent bool) {
 	pingFlushMu.Lock()
 	defer pingFlushMu.Unlock()
-	// Keep at most one hour during a database outage; every discarded gap remains
-	// visibly missing instead of being replaced by invented successful samples.
 	pingBuffer.Lock()
 	for k := range pingBuffer.items {
 		if k.Minute < now.Unix()/60-60 {
@@ -124,8 +140,6 @@ func flushPingMinutes(now time.Time, includeCurrent bool) {
 		log.Printf("commit ping history: %v", err)
 		return
 	}
-	// Invalidate before removal: requests already using the old cache still see
-	// the buffer; subsequent requests read the committed rows.
 	invalidateCardPingCache()
 	pingBuffer.Lock()
 	for k, v := range snapshot {
@@ -176,10 +190,6 @@ func readCardPingHistory(database *sql.DB, id string, now time.Time) ([]pingHist
 	return points, rows.Err()
 }
 
-// Load the complete recent card window in one indexed query. The previous
-// per-node cache still performed up to N SQLite queries after every minute
-// flush; with 56 nodes that made /api/status take 7-9 seconds and caused the
-// apparent 5-6 second (or worse) refresh lag in the browser.
 func readAllCardPingHistory(database *sql.DB, ids []string, now time.Time) (map[string][]pingHistoryPoint, error) {
 	if len(ids) == 0 {
 		return make(map[string][]pingHistoryPoint), nil
@@ -248,17 +258,12 @@ func primeCardPingHistory(ids []string, now time.Time) {
 	byServer, err := readAllCardPingHistory(db, requested, now)
 	if err != nil {
 		log.Printf("read card ping history: %v", err)
-		// Cache an empty database part for this minute too. Retrying the same
-		// busy query once per node would amplify a transient DB problem N times;
-		// pending in-memory minutes and current values remain available.
 		byServer = make(map[string][]pingHistoryPoint)
 	}
 	pingHistoryCache.entry = cachedPingHistory{Minute: minute, ByServer: byServer, Loaded: seen}
 }
 
 func cardPingStatuses(id string, tasks []common.PingTask, st common.ServerStatus, reportSeconds int, now time.Time) []common.CardPingStatus {
-	// Serialize the cache swap with buffer removal so a committed minute never
-	// disappears between the database snapshot and the in-memory pending set.
 	minute := now.Unix() / 60
 	var entry cachedPingHistory
 	for {
@@ -268,9 +273,6 @@ func cardPingStatuses(id string, tasks []common.PingTask, st common.ServerStatus
 		if entry.Minute == minute && entry.ByServer != nil && entry.Loaded[id] {
 			break
 		}
-		// A minute flush may invalidate the cache after primeCardPingHistory
-		// returns. Retry before taking the pending-buffer snapshot so that the
-		// just-committed minute cannot disappear from both sources.
 		pingHistoryCache.Unlock()
 	}
 	pingBuffer.RLock()
@@ -306,7 +308,13 @@ func buildCardPingStatuses(id string, tasks []common.PingTask, points []pingHist
 	}
 	out := make([]common.CardPingStatus, 0, len(tasks))
 	for _, task := range tasks {
-		p := common.CardPingStatus{TargetName: task.Name, History60: make([]*float64, 60), HistoryLoss60: make([]*float64, 60), HistoryStart: start * 60}
+		p := common.CardPingStatus{
+			TargetName:    task.Name,
+			IPVersion:     common.NormalizeIPVersion(task.IPVersion),
+			History60:     make([]*float64, 60),
+			HistoryLoss60: make([]*float64, 60),
+			HistoryStart:  start * 60,
+		}
 		valid := 0
 		sum, lossSum := 0.0, 0.0
 		for i := 0; i < 60; i++ {

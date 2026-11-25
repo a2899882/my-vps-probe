@@ -180,20 +180,33 @@ func evaluateTCPBlock(tasks []common.PingTask, st common.ServerStatus) (allFaile
 	for _, p := range st.PingStatuses {
 		byName[p.TargetName] = p
 	}
-	var checkNames []string
+	var v4Names []string
+	var allNames []string
 	if len(tasks) > 0 {
 		for _, t := range tasks {
 			if _, ok := byName[t.Name]; ok {
-				checkNames = append(checkNames, t.Name)
+				allNames = append(allNames, t.Name)
+				if common.NormalizeIPVersion(t.IPVersion) == "v4" {
+					v4Names = append(v4Names, t.Name)
+				}
 			}
 		}
-		if len(checkNames) == 0 {
+		if len(allNames) == 0 {
 			return false, 0, 0, "", "", false
 		}
 	} else {
 		for _, p := range st.PingStatuses {
-			checkNames = append(checkNames, p.TargetName)
+			allNames = append(allNames, p.TargetName)
+			if common.NormalizeIPVersion(p.IPVersion) == "v4" {
+				v4Names = append(v4Names, p.TargetName)
+			}
 		}
+	}
+	// Prefer IPv4 targets for three-network block detection when present, so
+	// IPv4-only VPS nodes are not falsely flagged when IPv6 targets are added.
+	checkNames := v4Names
+	if len(checkNames) == 0 {
+		checkNames = allNames
 	}
 	targetCount = len(checkNames)
 	if targetCount == 0 {
@@ -328,7 +341,6 @@ func (m *resourceAlertMonitor) observe(n common.NodeConfig, st common.ServerStat
 	if !tg.ready() || tg.excludes(n.ID) {
 		return
 	}
-	// Reading quota state happens before the monitor lock, avoiding a reverse lock order.
 	type sample struct {
 		kind   string
 		rule   ResourceAlertRule
@@ -377,7 +389,6 @@ func (m *resourceAlertMonitor) observe(n common.NodeConfig, st common.ServerStat
 			}
 		} else {
 			state.Since = time.Time{}
-			// Five percentage points of hysteresis prevent flapping near the threshold.
 			if state.Firing && s.value <= math.Max(0, s.rule.Threshold-5) {
 				if state.BelowSince.IsZero() {
 					state.BelowSince = now

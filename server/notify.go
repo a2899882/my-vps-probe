@@ -156,13 +156,12 @@ type notification struct {
 	Recovery                   bool
 }
 
-var notificationNextAttempt time.Time // Accessed only by the single notification worker.
+var notificationNextAttempt time.Time
 
 func loadNotificationEvents() (map[string]time.Time, error) {
 	ensureNotificationColumns()
 	rows, err := db.Query(`SELECT event_key,unixepoch(sent_at),COALESCE(sent_count,1) FROM notification_events`)
 	if err != nil {
-		// Fallback for older test schemas without sent_count column
 		rows, err = db.Query(`SELECT event_key,unixepoch(sent_at) FROM notification_events`)
 		if err != nil {
 			return nil, err
@@ -274,7 +273,6 @@ func collectNotifications(tg TelegramConfig, nodes []common.NodeConfig, statuses
 			}
 		}
 
-		// TCP 三网断流（疑似被墙）告警
 		if tg.TCPBlock.Enabled && tg.TCPBlock.allowsNode(n.ID) {
 			key := tcpBlockKey(n.ID)
 			allowed[key] = true
@@ -361,6 +359,7 @@ func collectNotifications(tg TelegramConfig, nodes []common.NodeConfig, statuses
 func runNotifications() {
 	configMutex.RLock()
 	tg := appConfig.Telegram
+	rrCfg := appConfig.ReturnRoute
 	nodes := append([]common.NodeConfig(nil), appConfig.Nodes...)
 	seconds := appConfig.AgentReportSeconds
 	site := appConfig.SiteName
@@ -378,14 +377,31 @@ func runNotifications() {
 	mapMutex.RUnlock()
 	now := time.Now()
 	pending, clear := collectNotifications(tg, nodes, statuses, resourceMonitor.snapshot(), events, seconds, now)
+
+	// Drain confirmed return-route change alerts
+	if routeAlerts := routeMonitor.drainAlerts(); len(routeAlerts) > 0 && tg.ready() && rrCfg.Enabled && rrCfg.NotifyChange {
+		for _, a := range routeAlerts {
+			if tg.excludes(a.NodeID) {
+				continue
+			}
+			verTag := strings.ToUpper(common.NormalizeIPVersion(a.IPVersion))
+			pending = append(pending, notification{
+				NodeID: a.NodeID,
+				Kind:   "return_route_change",
+				Message: fmt.Sprintf(
+					"🔀 三网回程线路变动\n名称：%s\n分组：%s\n线路目标：%s (%s %s)\n线路变化：%s ➔ %s\n检测时间：%s",
+					a.NodeName, displayGroup(a.Group), a.Label, a.Carrier, verTag, a.OldLine, a.NewLine, a.ChangedAt.Format("2006-01-02 15:04:05"),
+				),
+			})
+		}
+	}
+
 	for _, key := range clear {
 		releaseEvent(key)
 	}
 	if len(pending) == 0 || now.Before(notificationNextAttempt) {
 		return
 	}
-	// One merged message per five-second tick (at most 12/minute per chat). Events
-	// beyond this batch remain unclaimed for the next tick, not silently dropped.
 	batch, text := notificationBatch(site, pending)
 	err = sendTelegram(tg, text)
 	notificationNextAttempt = now.Add(5 * time.Second)
@@ -456,7 +472,6 @@ func recordNotificationDelivery(batch []notification, sendErr error, now time.Ti
 			return
 		}
 	}
-	// A hard row cap also applies during an alert storm, between hourly cleanups.
 	if _, err = tx.Exec(`DELETE FROM notification_log WHERE id NOT IN (SELECT id FROM notification_log ORDER BY id DESC LIMIT 1000)`); err != nil {
 		return
 	}
@@ -552,7 +567,6 @@ func sendTelegram(tg TelegramConfig, text string) error {
 	body, _ := json.Marshal(map[string]string{"chat_id": tg.ChatID, "text": text})
 	endpoint := "https://api.telegram.org/bot" + url.PathEscape(tg.Token) + "/sendMessage"
 	resp, err := telegramClient.Post(endpoint, "application/json", bytes.NewReader(body))
-	// net/http errors include the request URL (and therefore the Bot Token).
 	if err != nil {
 		return errors.New("无法连接 Telegram，请检查主控网络或稍后重试")
 	}

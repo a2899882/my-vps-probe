@@ -208,6 +208,7 @@ func validateConfig(config *AppConfig) error {
 		task := &config.PingTasks[i]
 		task.Name = trimLimited(task.Name, 80)
 		task.Host = trimLimited(task.Host, 255)
+		task.IPVersion = common.NormalizeIPVersion(task.IPVersion)
 		if task.Name == "" || task.Host == "" {
 			return fmt.Errorf("第 %d 个 Ping 目标的名称和地址不能为空", i+1)
 		}
@@ -227,12 +228,28 @@ func validateConfig(config *AppConfig) error {
 			task.NodeIDs = selected
 		}
 	}
+	for i := range config.ReturnRoute.Targets {
+		t := &config.ReturnRoute.Targets[i]
+		if t.NodeIDs != nil {
+			selected := make([]string, 0, len(t.NodeIDs))
+			seen := map[string]bool{}
+			for _, id := range t.NodeIDs {
+				if ids[id] && !seen[id] {
+					selected = append(selected, id)
+					seen[id] = true
+				}
+			}
+			t.NodeIDs = selected
+		}
+	}
 	return nil
 }
 
 func hotPushAllAgents() {
 	configMutex.RLock()
 	pTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
+	pingCfg := appConfig.Ping
+	rrCfg := appConfig.ReturnRoute
 	reportSeconds := appConfig.AgentReportSeconds
 	nodeNameMap := make(map[string]string, len(appConfig.Nodes))
 	for _, n := range appConfig.Nodes {
@@ -269,7 +286,13 @@ func hotPushAllAgents() {
 				_ = conn.close()
 				return
 			}
-			instruction := common.AgentInstruction{ServerName: name, PingTasks: pingTasksForNode(pTasks, id), ReportSeconds: reportSeconds}
+			instruction := common.AgentInstruction{
+				ServerName:    name,
+				PingTasks:     activePingTasksForNode(pTasks, pingCfg, id),
+				PingConfig:    pingCfg,
+				ReturnRoute:   returnRouteForNode(rrCfg, id),
+				ReportSeconds: reportSeconds,
+			}
 			if err := conn.writeJSON(instruction); err != nil {
 				removeActiveConnection(id, conn)
 				_ = conn.close()
@@ -296,7 +319,6 @@ func isLoopbackAddr(remoteAddr string) bool {
 func ipAccessGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		// Always allow Agent WebSocket, health check, and agent binary/script downloads
 		if path == "/ws" || path == "/healthz" || path == "/install.sh" ||
 			path == "/probe-agent-amd64" || path == "/probe-agent-arm64" || path == "/download/agent.go" {
 			next.ServeHTTP(w, r)
@@ -314,7 +336,6 @@ func ipAccessGuard(next http.Handler) http.Handler {
 		if h, _, err := net.SplitHostPort(reqHost); err == nil {
 			reqHost = strings.Trim(h, "[]")
 		}
-		// Allow local CLI / Caddy loopback when Host matches configured domain or localhost
 		if domain != "" && strings.EqualFold(reqHost, domain) {
 			next.ServeHTTP(w, r)
 			return
@@ -410,6 +431,7 @@ func adminRuntimeSnapshot() map[string]interface{} {
 	reportSeconds := appConfig.AgentReportSeconds
 	nodeConfigs := append([]common.NodeConfig(nil), appConfig.Nodes...)
 	pingTasks := append([]common.PingTask(nil), appConfig.PingTasks...)
+	pingCfg := appConfig.Ping
 	configMutex.RUnlock()
 	mapMutex.RLock()
 	runtimeNodes := make(map[string]nodeRuntime, len(serverStatusMap))
@@ -421,7 +443,7 @@ func adminRuntimeSnapshot() map[string]interface{} {
 		if status.IsOnline {
 			online++
 		}
-		blocked := isNodeTCPBlocked(id, pingTasksForNode(pingTasks, id), status, reportSeconds, now)
+		blocked := isNodeTCPBlocked(id, activePingTasksForNode(pingTasks, pingCfg, id), status, reportSeconds, now)
 		if blocked {
 			tcpBlockedCount++
 		}

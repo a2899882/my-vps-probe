@@ -339,3 +339,70 @@ test('80-node Vue rendering keeps clock, theme and detail updates out of card su
   t.diagnostic(`80 nodes / 240 strips / ${initialElements} host elements; initial Vue render ${initialMs.toFixed(1)} ms; clock update ${clockMs.toFixed(2)} ms (in-memory host, not browser paint)`);
   app.unmount();
 });
+
+test('attention excludes TCP blocked nodes and expiring filter matches <=7 days', () => {
+  const api = loadUI('index.html');
+  const soon = new Date(Date.now() + 3 * 86400000);
+  const far = new Date(Date.now() + 90 * 86400000);
+  const fmt = d => `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  api.servers.value = [
+    { id: 'n-blocked', name: 'NAT Blocked', expire_date: fmt(far), tcp_blocked: true, status: { is_online: true, cpu_usage: 10, mem_used: 10, mem_total: 100, disk_used: 10, disk_total: 100 } },
+    { id: 'n-expiring', name: 'Expiring Soon', expire_date: fmt(soon), tcp_blocked: false, status: { is_online: true, cpu_usage: 10, mem_used: 10, mem_total: 100, disk_used: 10, disk_total: 100 } },
+    { id: 'n-offline', name: 'Offline Node', expire_date: fmt(far), tcp_blocked: false, status: { is_online: false } },
+    { id: 'n-ok', name: 'Healthy Node', expire_date: fmt(far), tcp_blocked: false, status: { is_online: true, cpu_usage: 15, mem_used: 20, mem_total: 100, disk_used: 20, disk_total: 100 } }
+  ];
+  assert.equal(api.isTCPBlocked(api.servers.value[0]), true);
+  assert.equal(api.attention(api.servers.value[0]), false, 'TCP blocked node must not appear in attention');
+  assert.equal(api.attention(api.servers.value[1]), true);
+  assert.equal(api.attention(api.servers.value[2]), true);
+  assert.equal(api.attentionCnt.value, 2);
+  assert.equal(api.expiringCnt.value, 1);
+  assert.equal(api.tcpBlockedCnt.value, 1);
+
+  api.statusFilter.value = 'expiring';
+  assert.deepEqual(api.filteredServers.value.map(n => n.id), ['n-expiring']);
+  api.statusFilter.value = 'tcp_blocked';
+  assert.deepEqual(api.filteredServers.value.map(n => n.id), ['n-blocked']);
+  api.statusFilter.value = 'attention';
+  assert.deepEqual(api.filteredServers.value.map(n => n.id), ['n-expiring', 'n-offline']);
+});
+
+test('admin ping v4/v6 switches, interval selection, and return route config round-trip', async () => {
+  let saved;
+  let config = {
+    site_name: 'Test', admin_user: 'admin',
+    nodes: [{ id: 'us1', name: 'US GIA', token: 'tok-12345678', group: 'US优化' }],
+    ping_tasks: [{ name: '广东电信', host: 'gd-ct-v4.ip.zstaticcdn.com:80', ip_version: 'v4', enabled: true }],
+    ping: { enable_v4: true, enable_v6: true, interval_seconds: 60 },
+    return_route: { enabled: false, interval_minutes: 30, notify_change: false, confirm_count: 2, targets: [] },
+    telegram: { enabled: false }
+  };
+  const api = loadUI('admin.html', async (url, options = {}) => {
+    if (url === '/api/admin/config') {
+      if (options.method === 'POST') { saved = JSON.parse(options.body); config = saved; }
+      return { ok: true, json: async () => JSON.parse(JSON.stringify(config)) };
+    }
+    return { ok: true, json: async () => ({ nodes: {} }) };
+  });
+  api.loginUser.value = 'admin'; api.loginPass.value = 'pass';
+  await api.doLogin();
+  api.cfg.ping.enable_v4 = true;
+  api.cfg.ping.enable_v6 = false;
+  api.cfg.ping.interval_seconds = 10;
+  api.addPresetPing('v6');
+  api.cfg.return_route.enabled = true;
+  api.cfg.return_route.notify_change = true;
+  api.cfg.return_route.interval_minutes = 10;
+  api.cfg.return_route.confirm_count = 3;
+  await api.saveConfig();
+
+  assert.equal(saved.ping.enable_v4, true);
+  assert.equal(saved.ping.enable_v6, false);
+  assert.equal(saved.ping.interval_seconds, 10);
+  assert.equal(saved.ping_tasks.filter(t => t.ip_version === 'v6').length, 3);
+  assert.equal(saved.return_route.enabled, true);
+  assert.equal(saved.return_route.notify_change, true);
+  assert.equal(saved.return_route.interval_minutes, 10);
+  assert.equal(saved.return_route.confirm_count, 3);
+  assert.equal(api.notificationKind('return_route_change'), '三网回程线路变动');
+});
