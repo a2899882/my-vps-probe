@@ -50,10 +50,23 @@ func normalizeReturnRouteConfig(c *common.ReturnRouteConfig) {
 	}
 }
 
+func returnRouteAllowsNode(cfg common.ReturnRouteConfig, nodeID string) bool {
+	if cfg.NodeIDs == nil {
+		return true
+	}
+	for _, id := range cfg.NodeIDs {
+		if id == nodeID {
+			return true
+		}
+	}
+	return false
+}
+
 func returnRouteForNode(cfg common.ReturnRouteConfig, nodeID string) common.ReturnRouteConfig {
 	out := cfg
 	out.Targets = make([]common.ReturnRouteTarget, 0, len(cfg.Targets))
-	if !cfg.Enabled {
+	if !cfg.Enabled || !returnRouteAllowsNode(cfg, nodeID) {
+		out.Enabled = false
 		return out
 	}
 	for _, t := range cfg.Targets {
@@ -114,7 +127,7 @@ func routeStateKey(nodeID, carrier, ipVersion string) string {
 }
 
 func (m *returnRouteStateMonitor) observe(n common.NodeConfig, routes []common.ReturnRouteResult, cfg common.ReturnRouteConfig, now time.Time) {
-	if !cfg.Enabled || len(routes) == 0 {
+	if !cfg.Enabled || !returnRouteAllowsNode(cfg, n.ID) || len(routes) == 0 {
 		return
 	}
 	confirmCount := cfg.ConfirmCount

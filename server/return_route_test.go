@@ -37,3 +37,19 @@ func TestReturnRouteMonitorDebounceAndAlert(t *testing.T) {
 		t.Fatalf("expected enriched prev_line and changed_at, got %+v", enriched)
 	}
 }
+
+func TestReturnRouteForNodeFilter(t *testing.T) {
+	cfg := common.ReturnRouteConfig{
+		Enabled: true,
+		NodeIDs: []string{"us-1"},
+		Targets: defaultReturnRouteTargets(),
+	}
+	allowed := returnRouteForNode(cfg, "us-1")
+	if !allowed.Enabled || len(allowed.Targets) != 3 {
+		t.Fatalf("expected enabled with 3 targets for us-1, got %+v", allowed)
+	}
+	skipped := returnRouteForNode(cfg, "nat-2")
+	if skipped.Enabled || len(skipped.Targets) != 0 {
+		t.Fatalf("expected disabled with 0 targets for nat-2, got %+v", skipped)
+	}
+}

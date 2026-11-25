@@ -433,6 +433,9 @@ func main() {
 			safeConfig.GroupOrder = append([]string(nil), appConfig.GroupOrder...)
 			safeConfig.PingTasks = append([]common.PingTask(nil), appConfig.PingTasks...)
 			safeConfig.ReturnRoute.Targets = append([]common.ReturnRouteTarget(nil), appConfig.ReturnRoute.Targets...)
+			if appConfig.ReturnRoute.NodeIDs != nil {
+				safeConfig.ReturnRoute.NodeIDs = append([]string(nil), appConfig.ReturnRoute.NodeIDs...)
+			}
 			safeConfig.AdminPass = ""
 			safeConfig.Telegram.Token = ""
 			configMutex.RUnlock()
@@ -650,7 +653,7 @@ func main() {
 			st.IsOnline = statusIsFresh(st, reportSeconds, now)
 			nodeTasks := activePingTasksForNode(pingTasks, pingCfg, n.ID)
 			st.CardPingStatuses = cardPingStatuses(n.ID, nodeTasks, st, reportSeconds, now)
-			if rrCfg.Enabled {
+			if rrCfg.Enabled && returnRouteAllowsNode(rrCfg, n.ID) {
 				st.ReturnRoutes = routeMonitor.enrich(n.ID, st.ReturnRoutes)
 			} else {
 				st.ReturnRoutes = nil

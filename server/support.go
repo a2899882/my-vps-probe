@@ -228,6 +228,17 @@ func validateConfig(config *AppConfig) error {
 			task.NodeIDs = selected
 		}
 	}
+	if config.ReturnRoute.NodeIDs != nil {
+		selected := make([]string, 0, len(config.ReturnRoute.NodeIDs))
+		seen := map[string]bool{}
+		for _, id := range config.ReturnRoute.NodeIDs {
+			if ids[id] && !seen[id] {
+				selected = append(selected, id)
+				seen[id] = true
+			}
+		}
+		config.ReturnRoute.NodeIDs = selected
+	}
 	for i := range config.ReturnRoute.Targets {
 		t := &config.ReturnRoute.Targets[i]
 		if t.NodeIDs != nil {

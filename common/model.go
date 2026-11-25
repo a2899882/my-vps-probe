@@ -28,6 +28,7 @@ type ReturnRouteConfig struct {
 	IntervalMinutes int                 `json:"interval_minutes"` // 10, 30, 60, 180
 	NotifyChange    bool                `json:"notify_change"`
 	ConfirmCount    int                 `json:"confirm_count"` // consecutive probes before confirming change
+	NodeIDs         []string            `json:"node_ids,omitempty"` // nil means all nodes
 	Targets         []ReturnRouteTarget `json:"targets"`
 }
 
