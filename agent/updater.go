@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -169,7 +170,12 @@ func performAtomicSelfUpdate(rawServer, downloadPath, expectedHash string) error
 	// Verify the new binary is executable on this OS/arch before replacing.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = exec.CommandContext(ctx, tmpPath, "-h").Run()
+	if runErr := exec.CommandContext(ctx, tmpPath, "-h").Run(); runErr != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(runErr, &exitErr) {
+			return fmt.Errorf("binary exec check failed: %w", runErr)
+		}
+	}
 
 	if err := os.Rename(tmpPath, execPath); err != nil {
 		return err

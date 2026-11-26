@@ -338,7 +338,7 @@
         <span class="badge" :class="expiryTone(nd)">{{ expiryText(nd) }}</span>
         <span v-if="nd.group" class="badge" :title="nd.group">{{ nd.group }}</span>
         <span v-if="isTCPBlocked(nd)" class="badge bad" title="节点在线，但三网 TCP 探测目标全部超时">三网断流</span>
-        <span v-if="hasRecentRouteChange(nd)" class="badge orange" title="最近 24 小时内检测到三网回程线路变动">⇄ 线路变动</span>
+        
       </div>
 
       <!-- 1. Prominent Hardware Specs Bar on Top -->
@@ -398,7 +398,7 @@
         </div>
 
         <div v-if="nodeRoutes(nd).length" class="route-strip">
-          <span v-for="rt in nodeRoutes(nd)" :key="rt.carrier+'-'+rt.ip_version" class="route-tag" :class="[routeTierClass(rt.line),{changed:isRouteRecentlyChanged(rt)}]" :title="routeTitle(rt)">
+          <span v-for="rt in nodeRoutes(nd)" :key="rt.carrier+'-'+rt.ip_version" class="route-tag" :class="routeTierClass(rt.line)" :title="routeTitle(rt)">
             <span class="dot"></span>
             <span>{{ carrierShort(rt.carrier) }} {{ rt.line }}</span>
           </span>

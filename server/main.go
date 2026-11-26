@@ -599,6 +599,7 @@ func main() {
 			tg := appConfig.Telegram
 			reportSeconds = appConfig.AgentReportSeconds
 			nodeTasks := activePingTasksForNode(appConfig.PingTasks, appConfig.Ping, cNode.ID)
+			currentPingCfg := appConfig.Ping
 			currentRR := appConfig.ReturnRoute
 			autoUpdate := common.BoolEnabled(appConfig.AgentAutoUpdate)
 			if !valid {
@@ -625,7 +626,7 @@ func main() {
 			resourceMonitor.observe(currentNode, st, tg, reportSeconds, now)
 			tcpBlockMonitor.observe(currentNode, nodeTasks, st, tg, reportSeconds, now)
 			routeMonitor.observe(currentNode, st.ReturnRoutes, currentRR, now)
-			maybePushAgentAutoUpdate(currentNode.ID, currentNode.Name, conn, st, nodeTasks, appConfig.Ping, returnRouteForNode(currentRR, currentNode.ID), reportSeconds, autoUpdate)
+			maybePushAgentAutoUpdate(currentNode.ID, currentNode.Name, conn, st, nodeTasks, currentPingCfg, returnRouteForNode(currentRR, currentNode.ID), reportSeconds, autoUpdate)
 		}
 	})
 	http.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
